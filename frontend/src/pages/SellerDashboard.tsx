@@ -1,406 +1,602 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import {
-  Package, FileText, Send, Clock, CheckCircle, DollarSign, Plus,
-  TrendingUp, Eye, ChevronRight, AlertCircle, Star, ShoppingBag,
+  Package, FileText, TrendingUp, ShoppingBag, ArrowUp, ArrowDown,
+  CheckCircle, Clock, Truck, AlertCircle, Plus, ChevronRight,
+  BarChart2, Star, Bell, Settings, Eye, RotateCcw, Layers,
 } from "lucide-react";
 
-type Tab = "overview" | "sourcing" | "quotes" | "products" | "orders";
+// ────────────────────────────────────────────────
+// 더미 데이터
+// ────────────────────────────────────────────────
 
-const receivedSourcingRequests = [
-  {
-    id: "SRC-2024-0118",
-    date: "2024.03.18",
-    buyer: "KBeauty USA Inc",
-    product: "시트 마스크 (콜라겐/히알루론산)",
-    quantity: "10,000개",
-    budget: "$25,000",
-    deadline: "2024.04.30",
-    status: "진행중" as const,
-    quoteSent: true,
-    myQuote: {
-      id: "QUO-2024-0048",
-      unitPrice: "$2.3",
-      total: "$23,000",
-      sentAt: "2024.03.19",
-      status: "검토중",
-    },
-  },
-  {
-    id: "SRC-2024-0112",
-    date: "2024.03.15",
-    buyer: "뷰티월드",
-    product: "쿠션 파운데이션 5종 (색상별)",
-    quantity: "2,500개",
-    budget: "$30,000~$40,000",
-    deadline: "2024.04.15",
-    status: "신규" as const,
-    quoteSent: false,
-  },
-];
-
-const myProducts = [
-  { id: 1, name: "콜라겐 시트 마스크 25mL", category: "마스크팩", price: "$2.3", moq: "5,000개", stock: "재고 있음", status: "판매중", orders: 42 },
-  { id: 2, name: "히알루론산 슬리핑 마스크 100mL", category: "마스크팩", price: "$4.0", moq: "2,000개", stock: "재고 있음", status: "판매중", orders: 28 },
-  { id: 3, name: "비타민C 브라이트닝 세럼 30mL", category: "스킨케어", price: "$8.5", moq: "1,000개", stock: "소진 임박", status: "판매중", orders: 15 },
+const salesStats = [
+  { month: "2024-03", total: 8420000, count: 142, avgOrder: 59296 },
+  { month: "2024-02", total: 7180000, count: 128, avgOrder: 56093 },
+  { month: "2024-01", total: 9240000, count: 161, avgOrder: 57391 },
+  { month: "2023-12", total: 6930000, count: 118, avgOrder: 58728 },
 ];
 
 const recentOrders = [
-  { id: "TKR-2024-0841", date: "2024.03.18", buyer: "글로벌뷰티㈜", product: "히알루론산 에센스", quantity: "1,000개", status: "배송 중", amount: "$12,000" },
-  { id: "TKR-2024-0820", date: "2024.03.10", buyer: "KBeauty USA Inc", product: "콜라겐 시트 마스크", quantity: "5,000개", status: "결제 완료", amount: "$11,500" },
+  { id: "FBZ-2024-0841", date: "2024.03.21", buyer: "스타일위크㈜",    product: "플리츠 미디 스커트",        qty: "M×3 L×4",  amount: 252000, status: "배송중" },
+  { id: "FBZ-2024-0838", date: "2024.03.20", buyer: "패션플러스",      product: "오버핏 린넨 블라우스",      qty: "S×2 M×5",  amount: 297000, status: "발주확정" },
+  { id: "FBZ-2024-0820", date: "2024.03.18", buyer: "트렌디샵",        product: "와이드 하이웨이스트 슬랙스", qty: "M×6 L×2",  amount: 384000, status: "배송완료" },
+  { id: "FBZ-2024-0807", date: "2024.03.15", buyer: "언니네옷장",      product: "프릴넥 플로럴 원피스",      qty: "FREE×10",  amount: 590000, status: "발주확정" },
+  { id: "FBZ-2024-0791", date: "2024.03.12", buyer: "데일리룩스토어",  product: "크롭 후드 집업",            qty: "S×1 M×2",  amount: 135000, status: "취소" },
 ];
 
-export function SellerDashboard() {
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const [expandedSrc, setExpandedSrc] = useState<string | null>(null);
+const myProducts = [
+  { id: 1, name: "플리츠 미디 스커트",        category: "하의",   price: 28000, moq: 3,  stock: "재고 충분",  status: "판매중",  orders: 86,  views: 1240 },
+  { id: 2, name: "오버핏 린넨 블라우스",      category: "상의",   price: 33000, moq: 5,  stock: "재고 충분",  status: "판매중",  orders: 64,  views: 980  },
+  { id: 3, name: "와이드 하이웨이스트 슬랙스", category: "하의",   price: 48000, moq: 3,  stock: "소진 임박",  status: "판매중",  orders: 42,  views: 760  },
+  { id: 4, name: "프릴넥 플로럴 원피스",      category: "원피스", price: 59000, moq: 5,  stock: "재고 충분",  status: "판매중",  orders: 38,  views: 1540 },
+  { id: 5, name: "크롭 후드 집업",            category: "상의",   price: 45000, moq: 3,  stock: "품절",       status: "판매중단", orders: 21,  views: 430  },
+];
 
-  const tabs = [
-    { id: "overview" as Tab, label: "대시보드 홈", icon: <TrendingUp size={16} /> },
-    { id: "sourcing" as Tab, label: "소싱 요청 수신", icon: <FileText size={16} /> },
-    { id: "quotes" as Tab, label: "내 견적서 현황", icon: <Send size={16} /> },
-    { id: "products" as Tab, label: "제품 관리", icon: <Package size={16} /> },
-    { id: "orders" as Tab, label: "주문 현황", icon: <ShoppingBag size={16} /> },
+const receivedInquiries = [
+  {
+    id: "INQ-2024-0124",
+    date: "2024.03.21",
+    buyer: "스타일위크㈜",
+    style: "오피스룩 재킷",
+    qty: "200장",
+    budget: "₩5,000,000~₩7,000,000",
+    status: "신규",
+    responded: false,
+  },
+  {
+    id: "INQ-2024-0118",
+    date: "2024.03.18",
+    buyer: "트렌디샵",
+    style: "니트 가디건 3컬러",
+    qty: "150장",
+    budget: "₩3,000,000~₩4,000,000",
+    status: "답변완료",
+    responded: true,
+    myQuote: { unitPrice: "₩22,000", total: "₩3,300,000", sentAt: "2024.03.19", statusLabel: "검토중" },
+  },
+  {
+    id: "INQ-2024-0112",
+    date: "2024.03.15",
+    buyer: "패션플러스",
+    style: "와이드 팬츠 봄 신상 2종",
+    qty: "300장",
+    budget: "₩9,000,000~",
+    status: "계약완료",
+    responded: true,
+  },
+];
+
+const topBuyers = [
+  { name: "스타일위크㈜",   type: "편집샵",      orders: 28, total: 2840000 },
+  { name: "패션플러스",     type: "온라인쇼핑몰", orders: 22, total: 1980000 },
+  { name: "트렌디샵",       type: "온라인쇼핑몰", orders: 18, total: 1560000 },
+  { name: "언니네옷장",     type: "편집샵",      orders: 14, total: 980000  },
+];
+
+// ────────────────────────────────────────────────
+// 상태 뱃지 헬퍼
+// ────────────────────────────────────────────────
+
+function OrderBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    발주확정:  "bg-blue-50 text-blue-700 border-blue-200",
+    배송중:    "bg-amber-50 text-amber-700 border-amber-200",
+    배송완료:  "bg-green-50 text-green-700 border-green-200",
+    취소:      "bg-red-50 text-red-700 border-red-200",
+  };
+  return (
+      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${map[status] ?? "bg-muted text-muted-foreground border-border"}`}>
+      {status}
+    </span>
+  );
+}
+
+function InquiryBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    신규:    "bg-rose-50 text-rose-700 border-rose-200",
+    답변완료: "bg-blue-50 text-blue-700 border-blue-200",
+    계약완료: "bg-green-50 text-green-700 border-green-200",
+  };
+  return (
+      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${map[status] ?? "bg-muted text-muted-foreground border-border"}`}>
+      {status}
+    </span>
+  );
+}
+
+function StockBadge({ stock }: { stock: string }) {
+  const map: Record<string, string> = {
+    "재고 충분": "text-green-600",
+    "소진 임박": "text-amber-600",
+    "품절":      "text-red-500",
+  };
+  return <span className={`text-xs font-medium ${map[stock] ?? "text-muted-foreground"}`}>{stock}</span>;
+}
+
+// ────────────────────────────────────────────────
+// 탭 타입
+// ────────────────────────────────────────────────
+
+type Tab = "overview" | "orders" | "products" | "inquiries";
+
+// ────────────────────────────────────────────────
+// 컴포넌트
+// ────────────────────────────────────────────────
+
+export function SellerDashboard() {
+  const [tab, setTab] = useState<Tab>("overview");
+  const [selectedPeriod, setSelectedPeriod] = useState("3months");
+
+  const totalRevenue = salesStats.reduce((a, s) => a + s.total, 0);
+  const totalOrders  = salesStats.reduce((a, s) => a + s.count, 0);
+  const avgOrderValue = Math.round(totalRevenue / totalOrders);
+
+  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    { key: "overview",   label: "개요",      icon: <BarChart2 size={15} /> },
+    { key: "orders",     label: "발주 내역", icon: <ShoppingBag size={15} /> },
+    { key: "products",   label: "상품 관리", icon: <Package size={15} /> },
+    { key: "inquiries",  label: "발주 문의", icon: <FileText size={15} /> },
   ];
 
-  const newRequests = receivedSourcingRequests.filter(r => !r.quoteSent);
-
   return (
-    <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-[#1a2e1a] to-[#2d4a35] text-white rounded-lg p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <Star size={26} />
-              <h1 className="text-2xl font-bold">셀러 전용 페이지</h1>
-              <span className="bg-white/20 text-white text-xs px-2.5 py-0.5 rounded-full">SELLER</span>
+      <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
+
+        {/* ── 헤더 ── */}
+        <div className="bg-gradient-to-r from-[#1C1C1C] to-[#2a2a2a] text-white rounded-lg p-6 mb-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <Layers size={24} className="text-[#C4956A]" />
+                <h1 className="text-2xl font-bold">셀러 대시보드</h1>
+                <span className="text-xs bg-[#C4956A]/20 text-[#C4956A] border border-[#C4956A]/40 px-2 py-0.5 rounded font-medium">인증 브랜드</span>
+              </div>
+              <p className="text-gray-400 text-sm">르솔레이유 — 국내 여성복 B2B 판매 현황</p>
             </div>
-            <p className="text-white/80 text-sm mt-1">안녕하세요, 메디힐㈜ 님. 소싱 요청 및 제품 관리를 진행하세요.</p>
+            <div className="flex items-center gap-2">
+              <Link
+                  to="/seller/products/new"
+                  className="flex items-center gap-1.5 bg-[#C4956A] hover:bg-[#b3845a] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                <Plus size={15} /> 상품 등록
+              </Link>
+              <button className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors">
+                <Bell size={18} />
+              </button>
+              <button className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors">
+                <Settings size={18} />
+              </button>
+            </div>
           </div>
-          <Link
-            to="/seller/products/new"
-            className="bg-white text-[#2d4a35] hover:bg-white/90 px-5 py-2.5 rounded font-semibold text-sm transition-colors flex items-center gap-2"
-          >
-            <Plus size={16} /> 새 제품 등록
-          </Link>
         </div>
-      </div>
 
-      <div className="grid grid-cols-[220px_1fr] gap-6">
-        {/* Sidebar */}
-        <div className="space-y-1.5">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-colors text-left ${
-                activeTab === tab.id
-                  ? "bg-[#2d4a35] text-white"
-                  : "bg-white border border-border text-foreground hover:border-[#2d4a35] hover:text-[#2d4a35]"
-              }`}
-            >
-              {tab.icon}
-              <span className="text-sm font-medium">{tab.label}</span>
-              {tab.id === "sourcing" && newRequests.length > 0 && (
-                <span className="ml-auto bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
-                  {newRequests.length}
-                </span>
-              )}
-            </button>
+        {/* ── 퀵 네비 ── */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {[
+            { to: "/seller",               icon: <BarChart2 size={20} className="text-blue-600"   />, bg: "bg-blue-50 group-hover:bg-blue-100",   label: "판매 현황",  sub: "매출·주문 통계"    },
+            { to: "/seller/products/new",  icon: <Plus size={20}      className="text-[#C4956A]"  />, bg: "bg-rose-50 group-hover:bg-rose-100",   label: "상품 등록",  sub: "새 상품 업로드"    },
+            { to: "/orders",               icon: <Truck size={20}     className="text-amber-600"  />, bg: "bg-amber-50 group-hover:bg-amber-100", label: "발주 내역",  sub: "주문 처리 현황"    },
+            { to: "/seller/shipping-quote",icon: <FileText size={20}  className="text-green-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "출고 처리",  sub: "운송장 등록·출고"  },
+          ].map((item) => (
+              <Link
+                  key={item.to}
+                  to={item.to}
+                  className="bg-white border border-border rounded-lg p-4 flex items-center gap-4 hover:border-[#C4956A] hover:shadow-md transition-all group"
+              >
+                <div className={`${item.bg} p-3 rounded-lg transition-colors`}>{item.icon}</div>
+                <div className="flex-1">
+                  <div className="font-semibold text-foreground text-sm">{item.label}</div>
+                  <div className="text-xs text-muted-foreground">{item.sub}</div>
+                </div>
+                <ChevronRight size={15} className="text-muted-foreground group-hover:text-[#C4956A] transition-colors" />
+              </Link>
           ))}
-
-          <div className="pt-3 border-t border-border">
-            <Link to="/seller/products/new" className="w-full bg-[#2d4a35] hover:bg-[#1a2e1a] text-white py-2.5 rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2">
-              <Plus size={14} /> 제품 등록
-            </Link>
-          </div>
-          <Link to="/mypage" className="w-full border border-border text-muted-foreground hover:border-primary hover:text-primary py-2.5 rounded text-sm font-medium transition-colors flex items-center justify-center">
-            마이페이지
-          </Link>
         </div>
 
-        {/* Content */}
-        <div>
-          {/* Overview */}
-          {activeTab === "overview" && (
-            <div className="space-y-5">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white border border-border rounded-lg p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="bg-orange-50 p-2 rounded"><FileText size={18} className="text-orange-600" /></div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">새 소싱 요청</div>
-                      <div className="text-2xl font-bold text-foreground font-mono">{newRequests.length}</div>
-                    </div>
+        {/* ── KPI 카드 4개 ── */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {[
+            {
+              icon: <TrendingUp size={20} className="text-[#C4956A]" />,
+              bg: "bg-rose-50",
+              label: "총 매출 (3개월)",
+              value: `₩${(totalRevenue / 10000).toFixed(0)}만`,
+              sub: "+12.4% vs 이전 3개월",
+              subColor: "text-green-600",
+              arrow: <ArrowUp size={12} />,
+            },
+            {
+              icon: <ShoppingBag size={20} className="text-blue-600" />,
+              bg: "bg-blue-50",
+              label: "총 발주 건수",
+              value: `${totalOrders}건`,
+              sub: "+8.1% vs 이전 3개월",
+              subColor: "text-green-600",
+              arrow: <ArrowUp size={12} />,
+            },
+            {
+              icon: <Package size={20} className="text-amber-600" />,
+              bg: "bg-amber-50",
+              label: "등록 상품 수",
+              value: `${myProducts.length}개`,
+              sub: `판매중 ${myProducts.filter(p => p.status === "판매중").length}개`,
+              subColor: "text-muted-foreground",
+              arrow: null,
+            },
+            {
+              icon: <Star size={20} className="text-purple-600" />,
+              bg: "bg-purple-50",
+              label: "평균 발주액",
+              value: `₩${(avgOrderValue / 1000).toFixed(0)}천`,
+              sub: "+3.2% vs 이전 3개월",
+              subColor: "text-green-600",
+              arrow: <ArrowUp size={12} />,
+            },
+          ].map((card) => (
+              <div key={card.label} className="bg-white border border-border rounded-lg p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`${card.bg} p-2.5 rounded`}>{card.icon}</div>
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide">{card.label}</div>
+                    <div className="text-2xl font-bold text-foreground font-mono">{card.value}</div>
                   </div>
-                  <div className="text-xs text-orange-600">견적서 발송 필요</div>
                 </div>
-                <div className="bg-white border border-border rounded-lg p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="bg-green-50 p-2 rounded"><Send size={18} className="text-green-600" /></div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">발송 견적서</div>
-                      <div className="text-2xl font-bold text-foreground font-mono">{receivedSourcingRequests.filter(r => r.quoteSent).length}</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">검토 중</div>
-                </div>
-                <div className="bg-white border border-border rounded-lg p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="bg-primary/10 p-2 rounded"><DollarSign size={18} className="text-primary" /></div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">이번달 매출</div>
-                      <div className="text-2xl font-bold text-foreground font-mono">$23.5K</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-green-600"><TrendingUp size={11} />+8%</div>
+                <div className={`flex items-center gap-1 text-xs ${card.subColor}`}>
+                  {card.arrow}{card.sub}
                 </div>
               </div>
+          ))}
+        </div>
 
-              {/* 새 요청 알림 */}
-              {newRequests.length > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertCircle size={16} className="text-orange-600" />
-                    <span className="font-semibold text-orange-800 text-sm">새로운 소싱 요청 {newRequests.length}건 — 견적서를 발송해 주세요</span>
-                  </div>
-                  {newRequests.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between bg-white border border-orange-200 rounded p-3">
-                      <div>
-                        <div className="text-sm font-medium text-foreground">{r.product}</div>
-                        <div className="text-xs text-muted-foreground">{r.id} · {r.buyer} · {r.quantity}</div>
-                      </div>
-                      <button
-                        onClick={() => { setActiveTab("sourcing"); setExpandedSrc(r.id); }}
-                        className="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1.5 rounded font-semibold transition-colors"
-                      >
-                        견적서 발송
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+        {/* ── 탭 네비 ── */}
+        <div className="flex gap-1 border-b border-border mb-6">
+          {tabs.map((t) => (
+              <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                      tab === t.key
+                          ? "border-[#C4956A] text-[#C4956A]"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+              >
+                {t.icon}{t.label}
+              </button>
+          ))}
+        </div>
 
-              {/* 등록 제품 */}
+        {/* ══════════ 탭: 개요 ══════════ */}
+        {tab === "overview" && (
+            <div className="grid grid-cols-[1fr_380px] gap-6">
+
+              {/* 월별 매출 통계 */}
               <div className="bg-white border border-border rounded-lg overflow-hidden">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                  <h3 className="font-bold text-foreground flex items-center gap-2"><Package size={16} className="text-primary" />등록 제품</h3>
-                  <Link to="/seller/products/new" className="text-xs text-primary hover:underline">+ 새 제품 등록</Link>
+                  <h2 className="font-bold text-foreground flex items-center gap-2">
+                    <BarChart2 size={18} className="text-[#C4956A]" />
+                    월별 매출 통계
+                  </h2>
+                  <select
+                      value={selectedPeriod}
+                      onChange={(e) => setSelectedPeriod(e.target.value)}
+                      className="text-xs border border-border rounded px-2 py-1 outline-none"
+                  >
+                    <option value="3months">최근 3개월</option>
+                    <option value="6months">최근 6개월</option>
+                  </select>
                 </div>
-                <div className="divide-y divide-border">
-                  {myProducts.map((p) => (
-                    <div key={p.id} className="flex items-center gap-4 px-5 py-3.5">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-foreground">{p.name}</div>
-                        <div className="text-xs text-muted-foreground">{p.category} · MOQ {p.moq}</div>
+                <div className="p-5 space-y-4">
+                  {salesStats.map((stat) => (
+                      <div key={stat.month}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-mono text-muted-foreground">{stat.month}</span>
+                          <span className="text-sm font-bold font-mono text-foreground">
+                      ₩{(stat.total / 10000).toFixed(0)}만
+                    </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                          <div
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${(stat.total / 10000000) * 100}%`,
+                                background: "linear-gradient(90deg, #C4956A, #e0b48a)",
+                              }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                          <span>{stat.count}건</span>
+                          <span>평균 ₩{(stat.avgOrder / 1000).toFixed(0)}천</span>
+                        </div>
                       </div>
-                      <span className={`text-xs px-2 py-0.5 rounded border ${p.stock === "소진 임박" ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-green-50 border-green-200 text-green-700"}`}>
-                        {p.stock}
-                      </span>
-                      <span className="font-mono font-bold text-primary text-sm">{p.price}</span>
-                      <span className="text-xs text-muted-foreground">주문 {p.orders}건</span>
-                    </div>
                   ))}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* Sourcing Requests */}
-          {activeTab === "sourcing" && (
-            <div className="bg-white border border-border rounded-lg overflow-hidden">
-              <div className="px-5 py-4 border-b border-border">
-                <h2 className="font-bold text-foreground flex items-center gap-2"><FileText size={18} className="text-primary" />받은 소싱 요청</h2>
-              </div>
-              <div className="divide-y divide-border">
-                {receivedSourcingRequests.map((req) => {
-                  const isExpanded = expandedSrc === req.id;
-                  return (
-                    <div key={req.id}>
-                      <div
-                        className="px-5 py-4 cursor-pointer hover:bg-muted/20 transition-colors"
-                        onClick={() => setExpandedSrc(isExpanded ? null : req.id)}
-                      >
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className="font-mono font-bold text-sm text-foreground">{req.id}</span>
-                          <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${
-                            req.quoteSent ? "bg-green-50 border-green-200 text-green-700" : "bg-orange-50 border-orange-200 text-orange-700"
-                          }`}>
-                            {req.quoteSent ? <><Send size={10} />견적발송</> : <><AlertCircle size={10} />견적 미발송</>}
-                          </span>
-                        </div>
-                        <div className="text-sm font-medium text-foreground mb-1">{req.product}</div>
-                        <div className="flex gap-4 text-xs text-muted-foreground">
-                          <span>바이어: {req.buyer}</span>
-                          <span>수량: {req.quantity}</span>
-                          <span>예산: {req.budget}</span>
-                          <span>납기: {req.deadline}</span>
-                        </div>
-                      </div>
-                      {isExpanded && (
-                        <div className="px-5 pb-4 bg-muted/20 border-t border-border">
-                          {req.quoteSent && req.myQuote ? (
-                            <div className="mt-3 bg-green-50 border border-green-200 rounded p-4">
-                              <div className="flex items-center gap-2 mb-3">
-                                <Send size={14} className="text-green-600" />
-                                <h4 className="font-semibold text-foreground text-sm">내가 발송한 견적서</h4>
-                                <span className="font-mono text-xs text-muted-foreground">{req.myQuote.id}</span>
-                                <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded">{req.myQuote.status}</span>
-                              </div>
-                              <div className="grid grid-cols-3 gap-4">
-                                <div><div className="text-xs text-muted-foreground">단가</div><div className="font-bold text-primary">{req.myQuote.unitPrice}</div></div>
-                                <div><div className="text-xs text-muted-foreground">총액</div><div className="font-bold text-foreground">{req.myQuote.total}</div></div>
-                                <div><div className="text-xs text-muted-foreground">발송일</div><div className="font-medium text-foreground">{req.myQuote.sentAt}</div></div>
-                              </div>
+                {/* TOP 바이어 */}
+                <div className="px-5 pb-5">
+                  <h3 className="text-xs font-semibold text-foreground mb-3 uppercase tracking-wide border-t border-border pt-4">
+                    TOP 바이어
+                  </h3>
+                  <div className="space-y-2">
+                    {topBuyers.map((buyer, i) => (
+                        <div key={buyer.name} className="flex items-center gap-3 text-sm">
+                          <div className="w-6 h-6 rounded bg-rose-50 text-[#C4956A] flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {i + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-foreground truncate">{buyer.name}</div>
+                            <div className="text-xs text-muted-foreground">{buyer.type}</div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-mono text-xs text-muted-foreground">{buyer.orders}건</div>
+                            <div className="font-mono text-xs font-bold text-foreground">
+                              ₩{(buyer.total / 10000).toFixed(0)}만
                             </div>
-                          ) : (
-                            <div className="mt-3">
-                              <div className="bg-amber-50 border border-amber-200 rounded p-3 mb-3 text-sm text-amber-800 flex items-start gap-2">
-                                <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
-                                아직 견적서를 발송하지 않았습니다. 빠른 답변이 수주 가능성을 높입니다.
-                              </div>
-                              <div className="grid grid-cols-2 gap-3 mb-3">
-                                <div>
-                                  <label className="text-xs font-medium text-foreground mb-1 block">단가 (USD)</label>
-                                  <input type="text" placeholder="예: $2.5" className="w-full border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary" />
-                                </div>
-                                <div>
-                                  <label className="text-xs font-medium text-foreground mb-1 block">납기 (일)</label>
-                                  <input type="text" placeholder="예: 21일" className="w-full border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary" />
-                                </div>
-                              </div>
-                              <textarea rows={3} placeholder="견적 조건, 패키징, 인증 등 추가 사항 기재" className="w-full border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary resize-none mb-3" />
-                              <button className="bg-[#2d4a35] hover:bg-[#1a2e1a] text-white text-sm px-6 py-2.5 rounded font-semibold transition-colors flex items-center gap-2">
-                                <Send size={14} /> 견적서 발송
-                              </button>
-                            </div>
-                          )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* My Quotes */}
-          {activeTab === "quotes" && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Send size={20} className="text-primary" /> 발송한 견적서 현황
-              </h2>
-              {receivedSourcingRequests.filter(r => r.quoteSent && r.myQuote).map((r) => (
-                <div key={r.id} className="bg-white border border-border rounded-lg overflow-hidden">
-                  <div className="px-5 py-4 bg-muted/30 border-b border-border">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono font-bold text-sm">{r.myQuote!.id}</span>
-                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
-                            r.myQuote!.status === "검토중" ? "bg-blue-50 border-blue-200 text-blue-700" :
-                            r.myQuote!.status === "수락" ? "bg-green-50 border-green-200 text-green-700" :
-                            "bg-muted border-border text-muted-foreground"
-                          }`}>{r.myQuote!.status}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">소싱 요청: {r.id} · 바이어: {r.buyer}</div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">발송일: {r.myQuote!.sentAt}</div>
-                    </div>
-                  </div>
-                  <div className="p-5">
-                    <div className="text-sm font-medium text-foreground mb-3">{r.product}</div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div><div className="text-xs text-muted-foreground">단가</div><div className="font-bold text-primary">{r.myQuote!.unitPrice}</div></div>
-                      <div><div className="text-xs text-muted-foreground">총액</div><div className="font-bold text-foreground">{r.myQuote!.total}</div></div>
-                      <div><div className="text-xs text-muted-foreground">요청 수량</div><div className="font-medium text-foreground">{r.quantity}</div></div>
-                    </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-              {receivedSourcingRequests.filter(r => r.quoteSent).length === 0 && (
-                <div className="bg-white border border-border rounded-lg p-12 text-center text-muted-foreground">
-                  <Send size={36} className="mx-auto mb-3 opacity-30" />
-                  <div>아직 발송한 견적서가 없습니다.</div>
-                </div>
-              )}
-            </div>
-          )}
+              </div>
 
-          {/* Products */}
-          {activeTab === "products" && (
+              {/* 오른쪽: 알림 + 재고 현황 */}
+              <div className="space-y-4">
+                {/* 처리 필요 알림 */}
+                <div className="bg-white border border-border rounded-lg overflow-hidden">
+                  <div className="px-5 py-4 border-b border-border">
+                    <h2 className="font-bold text-foreground flex items-center gap-2">
+                      <Bell size={18} className="text-rose-500" />
+                      처리 필요
+                    </h2>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {[
+                      { icon: <AlertCircle size={16} className="text-rose-500" />, bg: "bg-rose-50", text: "미답변 발주 문의 1건", sub: "INQ-2024-0124 · 스타일위크㈜" },
+                      { icon: <Clock size={16} className="text-amber-500" />,       bg: "bg-amber-50", text: "출고 대기 주문 3건",   sub: "오늘 오후 2시 마감" },
+                      { icon: <RotateCcw size={16} className="text-blue-500" />,   bg: "bg-blue-50",  text: "반품 접수 1건",       sub: "FBZ-2024-0791 처리 필요" },
+                    ].map((item) => (
+                        <div key={item.text} className={`${item.bg} rounded-lg px-4 py-3 flex items-start gap-3`}>
+                          <div className="mt-0.5">{item.icon}</div>
+                          <div>
+                            <div className="text-sm font-medium text-foreground">{item.text}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{item.sub}</div>
+                          </div>
+                        </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 재고 현황 */}
+                <div className="bg-white border border-border rounded-lg overflow-hidden">
+                  <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+                    <h2 className="font-bold text-foreground flex items-center gap-2">
+                      <Package size={18} className="text-amber-500" />
+                      재고 현황
+                    </h2>
+                    <button
+                        onClick={() => setTab("products")}
+                        className="text-xs text-[#C4956A] hover:underline"
+                    >
+                      전체보기
+                    </button>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {myProducts.map((p) => (
+                        <div key={p.id} className="px-5 py-3 flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-foreground truncate">{p.name}</div>
+                            <div className="text-xs text-muted-foreground">{p.category} · 도매가 ₩{p.price.toLocaleString()}</div>
+                          </div>
+                          <StockBadge stock={p.stock} />
+                        </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+        )}
+
+        {/* ══════════ 탭: 발주 내역 ══════════ */}
+        {tab === "orders" && (
             <div className="bg-white border border-border rounded-lg overflow-hidden">
               <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                <h2 className="font-bold text-foreground flex items-center gap-2"><Package size={18} className="text-primary" />등록 제품 목록</h2>
-                <Link to="/seller/products/new" className="bg-primary hover:bg-primary/90 text-white text-xs px-4 py-2 rounded font-semibold transition-colors flex items-center gap-1.5">
-                  <Plus size={12} /> 새 제품 등록
+                <h2 className="font-bold text-foreground flex items-center gap-2">
+                  <ShoppingBag size={18} className="text-[#C4956A]" />
+                  발주 내역
+                </h2>
+                <select
+                    value={selectedPeriod}
+                    onChange={(e) => setSelectedPeriod(e.target.value)}
+                    className="text-xs border border-border rounded px-2 py-1 outline-none"
+                >
+                  <option value="3months">최근 3개월</option>
+                  <option value="6months">최근 6개월</option>
+                  <option value="1year">최근 1년</option>
+                </select>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                  <tr className="bg-muted text-muted-foreground text-xs uppercase tracking-wide">
+                    <th className="px-5 py-3 text-left font-medium">주문번호</th>
+                    <th className="px-3 py-3 text-left font-medium">발주일</th>
+                    <th className="px-3 py-3 text-left font-medium">바이어</th>
+                    <th className="px-3 py-3 text-left font-medium">상품명</th>
+                    <th className="px-3 py-3 text-left font-medium">수량</th>
+                    <th className="px-3 py-3 text-right font-medium">결제금액</th>
+                    <th className="px-3 py-3 text-center font-medium">상태</th>
+                    <th className="px-3 py-3 text-center font-medium">출고</th>
+                  </tr>
+                  </thead>
+                  <tbody>
+                  {recentOrders.map((o) => (
+                      <tr key={o.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                        <td className="px-5 py-3 font-mono text-xs text-foreground">{o.id}</td>
+                        <td className="px-3 py-3 text-muted-foreground text-xs font-mono">{o.date}</td>
+                        <td className="px-3 py-3 text-foreground font-medium">{o.buyer}</td>
+                        <td className="px-3 py-3 text-foreground">{o.product}</td>
+                        <td className="px-3 py-3 text-xs text-muted-foreground font-mono">{o.qty}</td>
+                        <td className="px-3 py-3 text-right font-mono font-bold text-foreground">
+                          ₩{o.amount.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <OrderBadge status={o.status} />
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          {o.status === "발주확정" ? (
+                              <Link
+                                  to="/seller/shipping-quote"
+                                  className="text-xs text-[#C4956A] font-semibold hover:underline flex items-center justify-center gap-1"
+                              >
+                                <Truck size={12} /> 출고처리
+                              </Link>
+                          ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                  ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+        )}
+
+        {/* ══════════ 탭: 상품 관리 ══════════ */}
+        {tab === "products" && (
+            <div className="bg-white border border-border rounded-lg overflow-hidden">
+              <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+                <h2 className="font-bold text-foreground flex items-center gap-2">
+                  <Package size={18} className="text-[#C4956A]" />
+                  상품 관리
+                </h2>
+                <Link
+                    to="/seller/products/new"
+                    className="flex items-center gap-1.5 bg-[#C4956A] hover:bg-[#b3845a] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Plus size={13} /> 새 상품 등록
                 </Link>
               </div>
-              <table className="w-full text-sm">
-                <thead>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
                   <tr className="bg-muted text-muted-foreground text-xs uppercase tracking-wide">
-                    <th className="px-5 py-3 text-left font-medium">제품명</th>
+                    <th className="px-5 py-3 text-left font-medium">상품명</th>
                     <th className="px-3 py-3 text-left font-medium">카테고리</th>
-                    <th className="px-3 py-3 text-right font-medium">단가</th>
-                    <th className="px-3 py-3 text-center font-medium">MOQ</th>
+                    <th className="px-3 py-3 text-right font-medium">도매가</th>
+                    <th className="px-3 py-3 text-center font-medium">최소수량</th>
                     <th className="px-3 py-3 text-center font-medium">재고</th>
-                    <th className="px-3 py-3 text-right font-medium">주문수</th>
+                    <th className="px-3 py-3 text-center font-medium">누적 발주</th>
+                    <th className="px-3 py-3 text-center font-medium">조회수</th>
+                    <th className="px-3 py-3 text-center font-medium">상태</th>
                     <th className="px-3 py-3 text-center font-medium">관리</th>
                   </tr>
-                </thead>
-                <tbody>
+                  </thead>
+                  <tbody>
                   {myProducts.map((p) => (
-                    <tr key={p.id} className="border-t border-border hover:bg-muted/20 transition-colors">
-                      <td className="px-5 py-3 font-medium text-foreground">{p.name}</td>
-                      <td className="px-3 py-3"><span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded">{p.category}</span></td>
-                      <td className="px-3 py-3 text-right font-mono font-bold text-primary">{p.price}</td>
-                      <td className="px-3 py-3 text-center text-muted-foreground text-xs">{p.moq}</td>
-                      <td className="px-3 py-3 text-center">
-                        <span className={`text-[11px] px-2 py-0.5 rounded border ${
-                          p.stock === "소진 임박" ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-green-50 border-green-200 text-green-700"
-                        }`}>{p.stock}</span>
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono text-muted-foreground">{p.orders}</td>
-                      <td className="px-3 py-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button className="text-xs text-primary hover:underline">수정</button>
-                          <span className="text-border">|</span>
-                          <button className="text-xs text-muted-foreground hover:text-foreground">삭제</button>
-                        </div>
-                      </td>
-                    </tr>
+                      <tr key={p.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                        <td className="px-5 py-3 font-medium text-foreground">{p.name}</td>
+                        <td className="px-3 py-3 text-muted-foreground text-xs">{p.category}</td>
+                        <td className="px-3 py-3 text-right font-mono font-bold text-foreground">
+                          ₩{p.price.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-center text-xs text-muted-foreground">{p.moq}장</td>
+                        <td className="px-3 py-3 text-center"><StockBadge stock={p.stock} /></td>
+                        <td className="px-3 py-3 text-center font-mono text-sm font-bold text-foreground">{p.orders}</td>
+                        <td className="px-3 py-3 text-center">
+                      <span className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                        <Eye size={12} />{p.views.toLocaleString()}
+                      </span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                          p.status === "판매중"
+                              ? "bg-green-50 text-green-700 border-green-200"
+                              : "bg-muted text-muted-foreground border-border"
+                      }`}>
+                        {p.status}
+                      </span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <button className="text-xs text-[#C4956A] hover:underline font-semibold">수정</button>
+                        </td>
+                      </tr>
                   ))}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
-          )}
+        )}
 
-          {/* Orders */}
-          {activeTab === "orders" && (
+        {/* ══════════ 탭: 발주 문의 ══════════ */}
+        {tab === "inquiries" && (
             <div className="bg-white border border-border rounded-lg overflow-hidden">
               <div className="px-5 py-4 border-b border-border">
-                <h2 className="font-bold text-foreground flex items-center gap-2"><ShoppingBag size={18} className="text-primary" />주문 현황</h2>
+                <h2 className="font-bold text-foreground flex items-center gap-2">
+                  <FileText size={18} className="text-[#C4956A]" />
+                  받은 발주 문의
+                </h2>
               </div>
               <div className="divide-y divide-border">
-                {recentOrders.map((o) => (
-                  <div key={o.id} className="flex items-center gap-4 px-5 py-4 hover:bg-muted/20 transition-colors">
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-foreground mb-1">{o.product}</div>
-                      <div className="text-xs text-muted-foreground font-mono">{o.id} · {o.date} · {o.buyer}</div>
+                {receivedInquiries.map((inq) => (
+                    <div key={inq.id} className="px-5 py-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-xs text-muted-foreground">{inq.id}</span>
+                          <InquiryBadge status={inq.status} />
+                          {!inq.responded && (
+                              <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-semibold animate-pulse">
+                        NEW
+                      </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground font-mono">{inq.date}</span>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-4 mb-3 text-sm">
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-0.5">바이어</div>
+                          <div className="font-medium text-foreground">{inq.buyer}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-0.5">요청 스타일</div>
+                          <div className="font-medium text-foreground">{inq.style}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-0.5">수량</div>
+                          <div className="font-medium text-foreground">{inq.qty}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-0.5">예산</div>
+                          <div className="font-medium text-foreground">{inq.budget}</div>
+                        </div>
+                      </div>
+
+                      {inq.myQuote && (
+                          <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs flex items-center gap-6 mb-3">
+                            <span className="text-blue-700 font-semibold">내 견적</span>
+                            <span className="text-foreground">단가 <b>{inq.myQuote.unitPrice}</b></span>
+                            <span className="text-foreground">합계 <b>{inq.myQuote.total}</b></span>
+                            <span className="text-muted-foreground">발송일 {inq.myQuote.sentAt}</span>
+                            <span className="ml-auto text-blue-600 font-semibold">{inq.myQuote.statusLabel}</span>
+                          </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        {!inq.responded && (
+                            <button className="flex items-center gap-1.5 bg-[#C4956A] hover:bg-[#b3845a] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                              <CheckCircle size={13} /> 견적 보내기
+                            </button>
+                        )}
+                        <button className="flex items-center gap-1.5 border border-border hover:border-[#C4956A] text-foreground text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                          <Eye size={13} /> 상세보기
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-xs text-muted-foreground">{o.quantity}</span>
-                    <span className="text-xs bg-secondary text-primary border border-primary/20 px-2 py-0.5 rounded">{o.status}</span>
-                    <span className="font-mono font-bold text-foreground">{o.amount}</span>
-                    <Link to={`/orders/${o.id}`} className="border border-border text-foreground hover:border-primary hover:text-primary text-xs px-3 py-1.5 rounded transition-colors flex items-center gap-1">
-                      <Eye size={12} /> 상세
-                    </Link>
-                  </div>
                 ))}
               </div>
             </div>
-          )}
-        </div>
+        )}
+
       </div>
-    </div>
   );
 }
