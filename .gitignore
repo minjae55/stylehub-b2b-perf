@@ -34,3 +34,4 @@ frontend/.next/
 application-local.properties
 application-secret.properties
 application-prod.properties
+/.project
