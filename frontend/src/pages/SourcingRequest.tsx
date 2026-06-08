@@ -197,6 +197,33 @@ function SourcingCard({
         {/* ── READY 전용 필드 ── */}
         {item.type === "READY" && (
           <>
+            <div className="grid grid-cols-2 gap-4">
+              {field("대카테고리", true,
+                <select
+                  value={item.mainCategory}
+                  onChange={(e) => {
+                    onChange(item.id, "mainCategory", e.target.value);
+                    onChange(item.id, "subCategory", "");
+                  }}
+                  className={inputCls}
+                >
+                  <option value="">선택하세요</option>
+                  {MAIN_CATS.map((c) => <option key={c}>{c}</option>)}
+                </select>
+              )}
+              {field("중카테고리", true,
+                <select
+                  value={item.subCategory}
+                  onChange={(e) => onChange(item.id, "subCategory", e.target.value)}
+                  className={inputCls}
+                  disabled={!item.mainCategory}
+                >
+                  <option value="">선택하세요</option>
+                  {(item.mainCategory ? CATEGORY_MAP[item.mainCategory] : []).map((c) => <option key={c}>{c}</option>)}
+                </select>
+              )}
+            </div>
+
             {field("희망 단가", true,
               <div className="relative">
                 <input
@@ -354,7 +381,7 @@ function SourcingCard({
 // ── 유효성 검사 ───────────────────────────────────────────────────────
 const isItemValid = (item: SourcingItem): boolean => {
   const commonOk = !!(item.productName && item.quantity);
-  if (item.type === "READY") return commonOk && !!item.unitPrice;
+  if (item.type === "READY") return commonOk && !!(item.unitPrice && item.mainCategory && item.subCategory);
   if (item.type === "CUSTOM") return commonOk && !!(item.mainCategory && item.subCategory && item.totalBudget && item.needSample);
   return false;
 };

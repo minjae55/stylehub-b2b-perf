@@ -25,6 +25,7 @@ import {SellerProductRegister} from "../pages/SellerProductRegister";
 import {OrderDetail} from "../pages/OrderDetail";
 import {SupplierRegister} from "../pages/SupplierRegister";
 import {SourcingRequest} from "../pages/SourcingRequest";
+import {ReadyRequestList} from "../pages/ReadyRequestList";
 import {SellerShippingQuote} from "../pages/SellerShippingQuote";
 import {BuyerShippingQuotes} from "../pages/BuyerShippingQuotes";
 import {AllProducts} from "../pages/AllProducts";
@@ -56,7 +57,8 @@ export const router = createBrowserRouter([
             {path: "products", Component: AllProducts},
             {path: "suppliers", Component: Suppliers},
             {path: "sourcing-request", Component: SourcingRequest},
-            {path: "customs", Component: CustomsClearance},
+			{path: "ready-requests", Component: ReadyRequestList},
+			{path: "customs", Component: CustomsClearance},
             {path: "support", Component: Support},
             {path: "cart", Component: Cart},
             {path: "checkout", Component: Checkout},
