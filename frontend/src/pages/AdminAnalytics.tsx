@@ -20,7 +20,7 @@ const paymentStats = [
   { month: "2023-12", total: 134200, count: 31, fee: 4026 },
 ];
 
-export function AdminPayments() {
+export function AdminAnalytics() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("전체");
   const [selectedPeriod, setSelectedPeriod] = useState("3months");
@@ -39,13 +39,7 @@ export function AdminPayments() {
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
       {/* Admin Header */}
-      <div className="bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg p-6 mb-6 shadow-lg">
-        <div className="flex items-center gap-3 mb-2">
-          <Shield size={28} />
-          <h1 className="text-2xl font-bold">관리자 전용 — 결제 및 거래 현황</h1>
-        </div>
-        <p className="text-red-100 text-sm">플랫폼 전체 결제 내역, 수수료 현황, 월별 매출 통계를 관리합니다</p>
-      </div>
+      
 
       {/* Back Link */}
       <Link to="/admin/dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mb-5">
