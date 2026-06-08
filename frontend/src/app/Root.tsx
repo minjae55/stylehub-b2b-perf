@@ -318,7 +318,7 @@ export function Root() {
                 title: "회사 정보",
                 links: [
                   { label: "회사 소개", path: "/" },
-                  { label: "파트너십", path: "/" },
+                  { label: "파트너십", path: "/partner" },
                   { label: "셀러 파트너 등록", path: "/auth?tab=signup&role=seller" },
                   { label: "채용 공고", path: "/" },
                 ],
