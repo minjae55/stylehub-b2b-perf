@@ -34,6 +34,7 @@ import Register from "../pages/auth/Register";
 import Buyer from "../pages/auth/Buyer";
 import Payment from "../pages/auth/Payment";
 import { AdminUsers } from "../pages/AdminUsers";
+import { PartnerPlan } from "../pages/PartnerPlan";
 
 export const router = createBrowserRouter([
   {
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
       { path: "admin/shipping-quotes", Component: AdminShippingQuotes },
       { path: "admin/inspection", Component: AdminInspection },
       { path: "inspection", Component: BuyerInspection },
+      { path: "partner", Component: PartnerPlan },
       // 인증 관련 (Auth)
 
     ],
