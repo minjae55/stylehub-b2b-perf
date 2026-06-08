@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { DollarSign, Users, ShoppingBag, TrendingUp, Shield, Calendar, ArrowUp, ArrowDown, FileText, Truck, LayoutDashboard, ChevronRight } from "lucide-react";
+import AdminHeader from "./AdminHeader";
+import { Outlet } from "react-router";
 
 const paymentStats = [
   { month: "2024-03", total: 142500, count: 32, avgOrder: 4453 },
@@ -36,6 +38,23 @@ const topSellers = [
   { name: "에스트라㈜", category: "메이크업", orders: 62, total: 384000 },
 ];
 
+export function AdminLayout() {
+  return (
+    <>
+      <AdminHeader
+        brandName="관리자 페이지"
+        user={{ name: "Admin", initials: "AM", role: "관리자" }}
+        notificationCount={3}
+        onSearch={(query) => console.log("검색:", query)}
+        onNotificationClick={() => console.log("알림 열기")}
+        onSettingsClick={() => console.log("설정 열기")}
+        onUserMenuClick={() => console.log("유저 메뉴 열기")}
+      />
+      <Outlet/>
+      </>
+  );
+}
+
 export function Admin() {
   const [selectedPeriod, setSelectedPeriod] = useState("3months");
 
@@ -46,13 +65,9 @@ export function Admin() {
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
       {/* Admin Header */}
-      <div className="bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg p-6 mb-6 shadow-lg">
-        <div className="flex items-center gap-3 mb-2">
-          <Shield size={28} />
-          <h1 className="text-2xl font-bold">관리자 전용 페이지</h1>
-        </div>
-        <p className="text-red-100 text-sm">TradeKR 플랫폼 통합 관리 대시보드 — 결제, 사용자, 거래 현황을 한눈에 확인</p>
-      </div>
+      
+      <div className="grid grid-cols-3 gap-4 mb-6"/>
+
 
       {/* Quick Nav */}
       <div className="grid grid-cols-3 gap-4 mb-6">

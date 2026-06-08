@@ -8,7 +8,7 @@ import { CustomsClearance } from "../pages/CustomsClearance";
 import { Support } from "../pages/Support";
 import { Cart } from "../pages/Cart";
 import { Orders } from "../pages/Orders";
-import { Admin } from "../pages/Admin";
+import { Admin, AdminLayout } from "../pages/Admin";
 import { Checkout } from "../pages/Checkout";
 import { MyPage } from "../pages/MyPage";
 import { ProductDetail } from "../pages/ProductDetail";
@@ -16,7 +16,7 @@ import { AdminDashboard } from "../pages/AdminDashboard";
 import { AdminSourcingRequests } from "../pages/AdminSourcingRequests";
 import { AdminShippingQuotes } from "../pages/AdminShippingQuotes";
 import { AdminInspection } from "../pages/AdminInspection";
-import { AdminPayments } from "../pages/AdminPayments";
+import { AdminAnalytics } from "../pages/AdminAnalytics";
 import { BuyerInspection } from "../pages/BuyerInspection";
 import { QuoteRequest } from "../pages/QuoteRequest";
 import { BuyerDashboard } from "../pages/BuyerDashboard";
@@ -32,6 +32,8 @@ import AuthLayout from "../pages/auth/_layout";
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
 import Buyer from "../pages/auth/Buyer";
+import Payment from "../pages/auth/Payment";
+import { AdminUsers } from "../pages/AdminUsers";
 
 export const router = createBrowserRouter([
   {
@@ -59,12 +61,8 @@ export const router = createBrowserRouter([
       { path: "seller", Component: SellerDashboard },
       { path: "seller/products/new", Component: SellerProductRegister },
       { path: "seller/shipping-quote", Component: SellerShippingQuote },
-      { path: "admin", Component: Admin },
-      { path: "admin/dashboard", Component: AdminDashboard },
-      { path: "admin/sourcing-requests", Component: AdminSourcingRequests },
       { path: "admin/shipping-quotes", Component: AdminShippingQuotes },
       { path: "admin/inspection", Component: AdminInspection },
-      { path: "admin/analytics", Component: AdminPayments },
       { path: "inspection", Component: BuyerInspection },
       // 인증 관련 (Auth)
 
@@ -76,7 +74,19 @@ export const router = createBrowserRouter([
     children: [
       { path: "login", Component: Login },
       { path: "register", Component: Register},
-      { path: "register/buyer", Component: Buyer}
+      { path: "register/buyer", Component: Buyer},
+      { path: "payment", Component: Payment }
+    ]
+  },
+  {
+    path: "admin",
+    Component: AdminLayout,
+    children: [
+      { index:true, Component: Admin},
+      { path: "dashboard", Component: AdminDashboard},
+      { path: "sourcing-requests", Component: AdminSourcingRequests},
+      { path: "users", Component: AdminUsers},
+      { path: "analytics", Component: AdminAnalytics }
     ]
   }
 ]);

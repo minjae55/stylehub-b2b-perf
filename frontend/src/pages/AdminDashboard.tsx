@@ -40,13 +40,7 @@ export function AdminDashboard() {
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
       {/* Admin Header */}
-      <div className="bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg p-6 mb-6 shadow-lg">
-        <div className="flex items-center gap-3 mb-2">
-          <Shield size={32} />
-          <h1 className="text-3xl font-bold">관리자 대시보드</h1>
-        </div>
-        <p className="text-red-100">TradeKR 플랫폼 통합 관리 센터 — 모든 요청과 거래를 한 곳에서 관리하세요</p>
-      </div>
+      
 
       {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-4 mb-8">
