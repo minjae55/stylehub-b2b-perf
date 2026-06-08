@@ -1,10 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-<<<<<<< HEAD
-import { Search, Filter, MapPin, Plus, Factory, Layers, Zap, Clock, Award, TrendingUp, CheckCircle } from "lucide-react";
-=======
-import { Search, CheckCircle, Star, Filter, MapPin, Plus, Leaf, RefreshCw, Heart, Users, ShieldCheck, FileText } from "lucide-react";
->>>>>>> branch 'main' of https://github.com/RE-MERGE/kbeauty-b2b
+import { Search, CheckCircle, Star, Filter, MapPin, Plus, Layers, Leaf, RefreshCw, Heart, Users, ShieldCheck, FileText, TrendingUp, Award, Zap, Clock, Factory} from "lucide-react";
 
 type BadgeKey = "검증업체" | "OEM" | "ODM" | "소량생산" | "자체공장" | "10년+업력" | "재주문율높음" | "빠른출고";
 
