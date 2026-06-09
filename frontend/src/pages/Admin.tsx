@@ -42,7 +42,13 @@ export function AdminLayout() {
   return (
     <>
       <AdminHeader
-        brandName="관리자 페이지"
+        /*brandName="KBeauty Admin"*/
+        logo={
+          <div className="text-2xl font-bold tracking-tight">
+            <span className="text-primary">Style</span>
+            <span className="text-foreground">Hub</span>
+          </div>
+        }
         user={{ name: "Admin", initials: "AM", role: "관리자" }}
         notificationCount={3}
         onSearch={(query) => console.log("검색:", query)}

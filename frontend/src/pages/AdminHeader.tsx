@@ -1,7 +1,7 @@
 "use client";
 
-import { ReactElement, useState, } from "react";
-import { Link, useLocation } from "react-router"
+import React, { ReactElement, useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router"
 
 export interface NavItem {
   label: string;
@@ -9,7 +9,15 @@ export interface NavItem {
   icon: string;
 }
 
+interface Notification {
+  id: string;
+  message: string;
+  time: string;
+  read: boolean;
+}
+
 export interface AdminHeaderProps {
+  logo?: React.ReactNode;
   brandName?: string;
   navItems?: NavItem[];
   user?: {
@@ -27,7 +35,7 @@ export interface AdminHeaderProps {
 const DEFAULT_NAV: NavItem[] = [
   { label: "홈", href: "/admin", icon: "home" },
   { label: "사용자", href: "/admin/users", icon: "users" },
-  { label: "결제", href: "/admin/analytics", icon: "receipt" }, 
+  { label: "결제", href: "/admin/payments", icon: "receipt" }, 
   { label: "통계", href: "/admin/analytics", icon: "chart-bar" },
 ];
 
@@ -38,6 +46,7 @@ const DEFAULT_USER = {
 };
 
 export default function AdminHeader({
+  logo,
   brandName = "AdminHub",
   navItems = DEFAULT_NAV,
   user = DEFAULT_USER,
@@ -47,27 +56,89 @@ export default function AdminHeader({
   onNotificationClick,
   onUserMenuClick,
 }: AdminHeaderProps) {
-    const location = useLocation();
+  const location = useLocation();
   const [activeHref, setActiveHref] = useState(navItems[0]?.href ?? "");
   const [searchQuery, setSearchQuery] = useState("");
+  const [notifCount, setNotifCount] = useState(notificationCount);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+useEffect(() => {
+  const es = new EventSource('/events');
+
+  es.addEventListener('notification', (e: MessageEvent) => {
+  const data = JSON.parse(e.data);
+  const newNotif: Notification = {
+    id: Date.now().toString(),
+    message: data.message,
+    time: '방금 전',
+    read: false,
+  };
+  setNotifications(prev => [newNotif, ...prev]);
+  setNotifCount(prev => prev + 1);
+});
+
+  es.onerror = () => console.warn('SSE 재연결 중...');
+
+  return () => es.close();
+}, []);
+
+useEffect(() => {
+  if (!notifOpen) return;
+
+  const handleClickOutside = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('[data-notif-panel]')) {
+      setNotifOpen(false);
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [notifOpen]);
+
+const [notifications, setNotifications] = useState<Notification[]>([
+  { id: '1', message: '새 사용자가 가입했습니다.', time: '방금 전', read: false },
+  { id: '2', message: '결제 승인이 완료됐습니다.', time: '5분 전', read: false },
+  { id: '3', message: '서버 점검 예정 안내', time: '1시간 전', read: true },
+]);
+
+useEffect(() => {
+  if (!userMenuOpen) return;
+  const handleClickOutside = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('[data-user-menu]')) setUserMenuOpen(false);
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [userMenuOpen]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     onSearch?.(e.target.value);
-  };
+};
+const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'Enter' && searchQuery.trim()) {
+    navigate(`/admin/search?q=${encodeURIComponent(searchQuery.trim())}`);
+  }
+};
 
   return (
     <header style={styles.header}>
       {/* Left — Brand + Nav */}
       <div style={styles.left}>
         <div style={styles.brand}>
-          <div style={styles.brandIcon}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-            </svg>
-          </div>
-          <span style={styles.brandName}>{brandName}</span>
+          <Link to="/" style={{ textDecoration: 'none' }}>
+          {logo ? logo : (
+      <>
+        <div style={styles.brandIcon}>
+
+        </div>
+        <span style={styles.brandName}>{brandName}</span>
+      </>
+    )}
+    </Link>
         </div>
 
         <nav style={styles.nav} aria-label="주 메뉴">
@@ -100,25 +171,61 @@ export default function AdminHeader({
             placeholder="검색..."
             value={searchQuery}
             onChange={handleSearchChange}
+            onKeyDown={handleSearchKeyDown}
             style={styles.searchInput}
             aria-label="검색"
           />
         </div>
 
         {/* Notification */}
+        <div style={{ position: 'relative' }} data-notif-panel>
+  <button
+    onClick={() => {
+      setNotifOpen(prev => !prev);
+      setNotifCount(0);
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    }}
+    aria-label={`알림 ${notifCount}개`}
+    style={styles.iconBtn}
+  >
+    <BellIcon />
+    {notifCount > 0 && <span style={styles.badge} aria-hidden="true" />}
+  </button>
+
+  {notifOpen && (
+    <div style={styles.dropdown}>
+      <div style={styles.dropdownHeader}>
+        <span style={styles.dropdownTitle}>알림</span>
         <button
-          onClick={onNotificationClick}
-          aria-label={`알림 ${notificationCount}개`}
-          style={styles.iconBtn}
+          style={styles.clearBtn}
+          onClick={() => setNotifications([])}
         >
-          <BellIcon />
-          {notificationCount > 0 && (
-            <span style={styles.badge} aria-hidden="true" />
-          )}
+          모두 지우기
         </button>
+      </div>
+
+      {notifications.length === 0 ? (
+        <p style={styles.empty}>알림이 없습니다.</p>
+      ) : (
+        notifications.map(n => (
+          <div key={n.id} style={{
+            ...styles.notifItem,
+            background: n.read ? 'transparent' : 'var(--color-background-secondary)',
+          }}>
+            {!n.read && <span style={styles.unreadDot} />}
+            <div style={{ flex: 1 }}>
+              <p style={styles.notifMsg}>{n.message}</p>
+              <p style={styles.notifTime}>{n.time}</p>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  )}
+</div>
 
         {/* Settings */}
-        <button
+        {/*<button
           onClick={onSettingsClick}
           aria-label="설정"
           style={styles.iconBtn}
@@ -127,25 +234,57 @@ export default function AdminHeader({
         </button>
 
         <div style={styles.divider} aria-hidden="true" />
+        */}
 
         {/* User menu */}
-        <button
-          onClick={onUserMenuClick}
-          aria-label="사용자 메뉴 열기"
-          aria-haspopup="true"
-          style={styles.userBtn}
-        >
-          <div style={styles.avatar}>
-            <span style={styles.avatarText}>{user.initials}</span>
-          </div>
-          <div style={styles.userInfo}>
-            <p style={styles.userName}>{user.name}</p>
-            <p style={styles.userRole}>{user.role}</p>
-          </div>
-          <ChevronIcon />
-        </button>
+        <div style={{ position: 'relative' }} data-user-menu>
+  <button
+    onClick={() => setUserMenuOpen(prev => !prev)}
+    aria-label="사용자 메뉴 열기"
+    aria-haspopup="true"
+    style={styles.userBtn}
+  >
+    <div style={styles.avatar}>
+      <span style={styles.avatarText}>{user.initials}</span>
+    </div>
+    <div style={styles.userInfo}>
+      <p style={styles.userName}>{user.name}</p>
+      <p style={styles.userRole}>{user.role}</p>
+    </div>
+    <ChevronIcon />
+  </button>
+
+  {userMenuOpen && (
+    <div style={styles.userDropdown}>
+      <div style={styles.userDropdownInfo}>
+        <p style={styles.userDropdownName}>{user.name}</p>
+        <p style={styles.userDropdownRole}>{user.role}</p>
+      </div>
+      <div style={styles.userDropdownDivider} />
+      <button
+        onClick={() => {
+          // 로그아웃 로직 연결
+          onUserMenuClick?.();
+        }}
+        style={styles.logoutBtn}
+      >
+        <LogoutIcon />
+        로그아웃
+      </button>
+    </div>
+  )}
+</div>
       </div>
     </header>
+  );
+}
+function LogoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
   );
 }
 
@@ -372,4 +511,114 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--color-text-secondary)",
     lineHeight: 1.3,
   },
+  dropdown: {
+  position: 'absolute',
+  top: 'calc(100% + 8px)',
+  right: 0,
+  width: 320,
+  background: '#ffffff',  
+  border: '0.5px solid var(--color-border-secondary)',
+  borderRadius: 12,
+  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07), 0 12px 32px rgba(0,0,0,0.12)',  // 그림자 강화
+  zIndex: 100,
+  overflow: 'hidden',
+},
+dropdownHeader: {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '12px 16px',
+  borderBottom: '0.5px solid var(--color-border-tertiary)',
+  position: 'relative',
+  zIndex: 50,
+},
+dropdownTitle: {
+  fontSize: 13,
+  fontWeight: 500,
+  color: 'var(--color-text-primary)',
+},
+clearBtn: {
+  fontSize: 12,
+  color: 'var(--color-text-secondary)',
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: 0,
+},
+notifItem: {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 10,
+  padding: '12px 16px',
+  borderBottom: '0.5px solid var(--color-border-tertiary)',
+},
+unreadDot: {
+  width: 6,
+  height: 6,
+  borderRadius: '50%',
+  background: '#E24B4A',
+  flexShrink: 0,
+  marginTop: 5,
+},
+notifMsg: {
+  fontSize: 13,
+  color: 'var(--color-text-primary)',
+  margin: 0,
+  lineHeight: 1.4,
+},
+notifTime: {
+  fontSize: 11,
+  color: 'var(--color-text-secondary)',
+  margin: '3px 0 0',
+},
+empty: {
+  fontSize: 13,
+  color: 'var(--color-text-secondary)',
+  textAlign: 'center',
+  padding: '24px 0',
+  margin: 0,
+},
+userDropdown: {
+  position: 'absolute',
+  top: 'calc(100% + 8px)',
+  right: 0,
+  width: 200,
+  background: 'var(--color-background-primary)',
+  border: '0.5px solid var(--color-border-secondary)',
+  borderRadius: 12,
+  boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+  zIndex: 100,
+  overflow: 'hidden',
+},
+userDropdownInfo: {
+  padding: '12px 16px',
+},
+userDropdownName: {
+  fontSize: 13,
+  fontWeight: 500,
+  color: 'var(--color-text-primary)',
+  margin: 0,
+},
+userDropdownRole: {
+  fontSize: 11,
+  color: 'var(--color-text-secondary)',
+  margin: '2px 0 0',
+},
+userDropdownDivider: {
+  height: 0.5,
+  background: 'var(--color-border-tertiary)',
+},
+logoutBtn: {
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '10px 16px',
+  fontSize: 13,
+  color: '#E24B4A',
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  textAlign: 'left' as const,
+},
 };
