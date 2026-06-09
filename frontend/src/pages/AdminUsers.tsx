@@ -22,6 +22,9 @@ export const AdminUsers: React.FC = () => {
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+  
 
   const handleToggleStatus = (userId: string) => {
     setUsers(prevUsers =>
@@ -43,6 +46,7 @@ export const AdminUsers: React.FC = () => {
     
     let matchesRole = false;
     
+    
     if (roleFilter === 'ALL') {
       matchesRole = true;
     } else if (roleFilter === 'BUYER') {
@@ -54,6 +58,11 @@ export const AdminUsers: React.FC = () => {
     }
     return matchesSearch && matchesRole;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const pagedUsers = filteredUsers.slice(
+  (currentPage - 1) * PAGE_SIZE,
+  currentPage * PAGE_SIZE
+  );
 
   const getRoleBadge = (role: User['role']) => {
     if (role.endsWith('/대표')) {
@@ -86,14 +95,18 @@ export const AdminUsers: React.FC = () => {
             type="text"
             placeholder="이름, 이메일, 혹은 회사명으로 검색..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full pl-4 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-sm transition-all placeholder-slate-400"
           />
         </div>
         <div className="w-full md:w-52">
           <select
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
+            onChange={(e) => {setRoleFilter(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full px-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-sm text-slate-700 font-medium transition-all cursor-pointer"
           >
             <option value="ALL">전체 유형</option>
@@ -126,7 +139,7 @@ export const AdminUsers: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
+                pagedUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-4 pl-6 font-mono text-xs text-slate-400 font-medium">{user.id}</td>
                     <td className="p-4">
@@ -179,19 +192,56 @@ export const AdminUsers: React.FC = () => {
 
         {/* ── 하단 페이지네이션 영역 ── */}
         <div className="p-4 px-6 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-medium bg-slate-50/30">
-          <span>{filteredUsers.length}개 항목</span>
-          <div className="flex gap-1.5">
-            <button className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-400 cursor-not-allowed font-semibold text-xs shadow-sm">
-              이전
-            </button>
-            <button className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-sm shadow-indigo-200">
-              1
-            </button>
-            <button className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 transition-colors font-semibold text-xs shadow-sm">
-              다음
-            </button>
-          </div>
-        </div>
+  <span>{filteredUsers.length}개 항목</span>
+  <div className="flex gap-1.5">
+    {/* 이전 */}
+    <button
+      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+      disabled={currentPage === 1}
+      className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-400 font-semibold text-xs shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      이전
+    </button>
+
+    {/* 페이지 번호 */}
+    {Array.from({ length: totalPages }, (_, i) => i + 1)
+      .filter(p => {
+        // 현재 페이지 앞뒤 2개 + 첫/마지막 항상 표시
+        return p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1;
+      })
+      .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+        acc.push(p);
+        return acc;
+      }, [])
+      .map((p, idx) =>
+        p === '...' ? (
+          <span key={`ellipsis-${idx}`} className="px-2 py-1.5 text-slate-400">...</span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => setCurrentPage(p as number)}
+            className={`px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-colors ${
+              currentPage === p
+                ? 'bg-indigo-600 text-white shadow-indigo-200'
+                : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {p}
+          </button>
+        )
+      )}
+
+    {/* 다음 */}
+    <button
+      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+      disabled={currentPage === totalPages}
+      className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-600 font-semibold text-xs shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      다음
+    </button>
+  </div>
+</div>
       </div>
     </div>
   );

@@ -101,13 +101,7 @@ export function AdminShippingQuotes() {
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
       {/* Admin Header */}
-      <div className="bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg p-6 mb-6 shadow-lg">
-        <div className="flex items-center gap-3 mb-2">
-          <Shield size={28} />
-          <h1 className="text-2xl font-bold">관리자 전용 — 운임 견적 요청 관리</h1>
-        </div>
-        <p className="text-red-100 text-sm">바이어가 제출한 모든 운임 견적 요청을 조회하고 처리 상태를 관리합니다</p>
-      </div>
+      
 
       {/* Stats */}
       <div className="grid grid-cols-5 gap-4 mb-6">

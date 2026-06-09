@@ -74,10 +74,6 @@ export const router = createBrowserRouter([
             {path: "seller", Component: SellerDashboard},
             {path: "seller/products/new", Component: SellerProductRegister},
             {path: "seller/shipping-quote", Component: SellerShippingQuote},
-            {path: "admin", Component: Admin},
-            {path: "admin/dashboard", Component: AdminDashboard},
-            {path: "admin/sourcing-requests", Component: AdminSourcingRequests},
-            {path: "admin/shipping-quotes", Component: AdminShippingQuotes},
             {path: "admin/inspection", Component: AdminInspection},
             {path: "inspection", Component: BuyerInspection},
             { path: "/seller/sourcing/:requestId/quote", Component: SellerQuoteWrite},
@@ -107,7 +103,8 @@ export const router = createBrowserRouter([
             { path: "dashboard", Component: AdminDashboard},
             { path: "sourcing-requests", Component: AdminSourcingRequests},
             { path: "users", Component: AdminUsers},
-            { path: "analytics", Component: AdminAnalytics }
+            { path: "analytics", Component: AdminAnalytics },
+            {path: "shipping-quotes", Component: AdminShippingQuotes}
         ]
     }
 ]);
