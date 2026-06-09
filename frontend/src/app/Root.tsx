@@ -15,6 +15,7 @@ import {
   CheckCircle,
   X,
   Settings,
+  ShieldAlert,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
@@ -35,7 +36,7 @@ const notifications = [
     icon: CheckCircle,
     color: "text-green-500",
     title: "주문 승인 완료",
-    desc: "여성 린넨 블라우스 300벌 주문이 승인되었습니다.",
+    desc: "'여성 갸라도스 블라우스' 300벌 주문이 승인되었습니다.",
     time: "방금 전",
     unread: true,
   },
@@ -44,7 +45,7 @@ const notifications = [
     icon: Truck,
     color: "text-blue-500",
     title: "배송 출발",
-    desc: "와이드 슬랙스 200벌 주문이 동대문 창고를 출발했습니다.",
+    desc: "'스이쿤 패턴 슬랙스' 200벌 주문이 동대문 창고를 출발했습니다.",
     time: "1시간 전",
     unread: true,
   },
@@ -53,10 +54,49 @@ const notifications = [
     icon: Package,
     color: "text-primary",
     title: "신규 상품 등록",
-    desc: "플로럴 원피스 신규 시즌 상품이 등록되었습니다.",
+    desc: "'고급 극세사 메타퐁 담요 망토' 신규 시즌 상품이 등록되었습니다.",
     time: "어제",
     unread: false,
   },
+    {
+    id: 4, //(바이어용)재입고 알림 추가
+    icon: Bell,
+    color: "text-primary",
+    title: "재입고 알림",
+    desc: "저장하신 '잉어킹 티셔츠'이(가) 재입고 되었습니다.[바이어]",
+    time: "방금 전",
+    unread: true,
+  },
+
+  {
+    id: 5, //(셀러용)일정수량 이하 알림 추가
+    icon: Bell,
+    color: "text-primary",
+    title: "수량 알림",
+    desc: "'피카츄 후드집업'의 재고가 일정 수량 이하로 떨어졌습니다.[셀러]",
+    time: "방금 전",
+    unread: true,
+  },
+
+  {
+    id: 5, //인증서 유효기간
+    icon: ShieldAlert ,
+    color: "text-yellow-500",
+    title: " 인증서 갱신 필요 ",
+    desc: "'고라파덕 후드티' KC인증서 유효기간이 14일 남았습니다.",
+    time: "방금 전",
+    unread: true,
+  },
+  {
+    id: 6, //7일 이하로 떨어지면 붉은색
+    icon: ShieldAlert ,
+    color: "text-red-500",
+    title: " 인증서 갱신 필요 ",
+    desc: "'치코리타 백팩' GOTS인증서 유효기간이 7일 남았습니다.",
+    time: "방금 전",
+    unread: true,
+  },
+
 ];
 
 export function Root() {

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router";
 import {
   Shirt, Tag, LayoutGrid, Store, Settings, Ruler, Palette,
-  Award, FileText, Image, ChevronLeft, Plus, X, AlertCircle, CheckCircle, CloudUpload
+  Award, FileText, Image, ChevronLeft, Plus, X, AlertCircle, 
+  CheckCircle, CloudUpload, Upload
 } from "lucide-react";
 
 const subCategories: Record<string, Record<string, string[]>> = {
@@ -115,6 +116,168 @@ function CertGroupLabel({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+function ConfirmModal({ //삭제확인 모달
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-sm text-foreground font-medium mb-6 text-center leading-relaxed">
+          {message}
+        </p>
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={onCancel}
+            className="border border-border text-foreground hover:border-primary hover:text-primary px-6 py-2 rounded text-sm font-medium transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={onConfirm}
+className="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded text-sm font-semibold transition-colors"          >
+            삭제
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// 인증서 업로드 모달 추가
+function CertUploadModal({
+  certName,
+  onSave,
+  onCancel,
+}: {
+  certName: string;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [dragging, setDragging] = useState(false);
+
+  const addFiles = (incoming: FileList | null) => {
+    if (!incoming) return;
+    const valid = Array.from(incoming).filter((f) =>
+      ["application/pdf", "image/jpeg", "image/png"].includes(f.type)
+    );
+    setFiles((prev) => {
+      const names = new Set(prev.map((f) => f.name));
+      return [...prev, ...valid.filter((f) => !names.has(f.name))];
+    });
+  };
+
+  const removeFile = (name: string) =>
+    setFiles((p) => p.filter((f) => f.name !== name));
+
+  return (
+    <div
+       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onCancel} //모달버튼
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 모달 헤더 */}
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5">인증서 업로드</p>
+            <h3 className="text-base font-bold text-foreground">{certName}</h3>
+          </div>
+          <button
+            onClick={onCancel} //모달닫기
+            className="text-muted-foreground hover:text-foreground transition-colors mt-0.5"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* 드래그 앤 드롭 영역 */}
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
+          onClick={() => fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-7 text-center cursor-pointer transition-colors mb-4 ${
+            dragging
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-primary hover:bg-muted/20"
+          }`}
+        >
+          <CloudUpload size={26} className="mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm font-medium text-foreground mb-1">
+            파일을 드래그하거나 클릭하여 업로드
+          </p>
+          <p className="text-xs text-muted-foreground">PDF, JPG, PNG · 최대 10MB</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png"
+            className="hidden"
+            onChange={(e) => addFiles(e.target.files)}
+          />
+        </div>
+
+        {/* 업로드된 파일 목록 */}
+        {files.length > 0 && (
+          <ul className="space-y-2 mb-4">
+            {files.map((f) => (
+              <li
+                key={f.name}
+                className="flex items-center justify-between bg-muted/30 border border-border rounded px-3 py-2"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText size={14} className="text-primary flex-shrink-0" />
+                  <span className="text-xs text-foreground truncate">{f.name}</span>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    {(f.size / 1024 / 1024).toFixed(1)}MB
+                  </span>
+                </div>
+                <button
+                  onClick={() => removeFile(f.name)}
+                  className="text-muted-foreground hover:text-red-500 transition-colors ml-2 flex-shrink-0"
+                >
+                  <X size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* 하단 버튼 */}
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onCancel} //모달닫기
+            className="border border-border text-foreground hover:border-primary hover:text-primary px-5 py-2 rounded text-sm font-medium transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={onSave} 
+            disabled={files.length === 0}
+            className="bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2 rounded text-sm font-semibold transition-colors flex items-center gap-1.5"
+          >
+            <Upload size={14} /> 저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const initialForm = {
   productName: "",
@@ -127,6 +290,7 @@ const initialForm = {
   unitPrice: "",
   leadTime: "",
   stock: "",
+  stockAlert: "", //재입고알림
   mainMaterial: "",
   materialCert: "",
   description: "",
@@ -146,6 +310,9 @@ export function SellerProductRegister() {
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedPatterns, setSelectedPatterns] = useState<string[]>([]);
   const [selectedCerts, setSelectedCerts] = useState<string[]>([]);
+  const [certModalTarget, setCertModalTarget] = useState<string | null>(null); //모달추가
+  const [confirmTarget, setConfirmTarget] = useState<string | null>(null); //삭제확인 모달 타겟
+
 
   const update = (field: string, value: string | boolean) =>
     setForm((p) => ({ ...p, [field]: value }));
@@ -156,6 +323,8 @@ export function SellerProductRegister() {
     item: string
   ) => setList((p) => (p.includes(item) ? p.filter((x) => x !== item) : [...p, item]));
 
+
+  
   const currentSubGroups = form.mainCategory ? subCategories[form.mainCategory] : {};
   const currentSubTypes = form.subCategory ? currentSubGroups[form.subCategory] ?? [] : [];
 
@@ -213,6 +382,27 @@ export function SellerProductRegister() {
 
   return (
     <div className="max-w-[900px] mx-auto px-4 py-8">
+       {/* 인증서 모달 */}
+      {certModalTarget && (
+        <CertUploadModal
+          certName={certModalTarget}
+          onSave={() => setCertModalTarget(null)}
+          onCancel={() => {
+            toggleItem(selectedCerts, setSelectedCerts, certModalTarget);
+            setCertModalTarget(null);
+          }}
+        />
+      )}
+      {confirmTarget && (
+  <ConfirmModal
+    message="등록된 인증서를 삭제하시겠습니까?"
+    onConfirm={() => {
+      toggleItem(selectedCerts, setSelectedCerts, confirmTarget);
+      setConfirmTarget(null);
+    }}
+    onCancel={() => setConfirmTarget(null)}
+  />
+)}
       {/* Header */}
       <div className="bg-gradient-to-r from-[#1a1a2e] via-[#16213e] to-[#0f3460] text-white rounded-lg p-6 mb-6">
         <div className="flex items-center gap-3 mb-2">
@@ -339,7 +529,9 @@ export function SellerProductRegister() {
 
         {/* 거래 조건 */}
         <div className="bg-white border border-border rounded-lg p-6">
-          <SectionTitle icon={<Store size={17} />}>거래 조건</SectionTitle>
+          <SectionTitle icon={<Store size={17} />}>거래 조건 및 재고 관리</SectionTitle>  
+          {/* [수정] 거래 조건 섹션명 변경 및 재고 알림 기준 수량 입력 필드 추가 */}
+ 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -371,9 +563,24 @@ export function SellerProductRegister() {
                 type="text"
                 value={form.stock}
                 onChange={(e) => update("stock", e.target.value)}
-                placeholder="예: 500개 (즉시 출고 가능)"
+                placeholder="예: 500벌 (즉시 출고 가능)"
                 className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors"
               />
+            </div>
+            <div> {/*재입고알림 추가*/}
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                재고 알림 기준 수량
+              </label>
+              <input
+                type="text"
+                value={form.stockAlert}
+                onChange={(e) => update("stockAlert", e.target.value)}
+                placeholder="예: 50벌"
+                className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                재고가 입력한 수량 이하로 떨어지면 알림을 보내드립니다.
+              </p>
             </div>
           </div>
         </div>
@@ -467,7 +674,7 @@ export function SellerProductRegister() {
           <div className="mb-4">
             <p className="text-xs font-medium text-muted-foreground mb-2">주요 색상</p>
             <div className="flex flex-wrap gap-2">
-              {colorOptions.map((item) => (
+              {colorOptions.map((item) => (   //모달 추가
                 <ToggleChip
                   key={item}
                   label={item}
@@ -500,14 +707,31 @@ export function SellerProductRegister() {
               <div key={group.label}>
                 <CertGroupLabel>{group.label}</CertGroupLabel>
                 <div className="flex flex-wrap gap-2">
-                  {group.items.map((item) => (
-                    <ToggleChip
-                      key={item}
-                      label={item}
-                      selected={selectedCerts.includes(item)}
-                      onToggle={() => toggleItem(selectedCerts, setSelectedCerts, item)}
-                    />
-                  ))}
+                  {group.items.map((item) => {
+                  const isSelected = selectedCerts.includes(item);
+  return (
+    <div key={item} className="flex items-center"> 
+      <button //인증서 버튼누르면 모달뜨게
+        type="button"
+      onClick={() => {
+      if (isSelected) {
+      setConfirmTarget(item);
+  } else {
+    toggleItem(selectedCerts, setSelectedCerts, item);
+    setCertModalTarget(item);
+  }
+}}
+        className={`py-1.5 px-3 text-xs border transition-colors rounded ${
+          isSelected
+            ? "bg-primary text-white border-primary"
+            : "border-border text-foreground hover:border-primary hover:text-primary"
+        }`}
+      >
+        {item}
+      </button>
+    </div>
+  );
+})}
                 </div>
               </div>
             ))}
