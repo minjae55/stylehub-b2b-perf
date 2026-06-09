@@ -244,9 +244,6 @@ export function Home() {
               <Link to="/products" className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded text-sm font-semibold transition-colors">
                 전체 상품 보기
               </Link>
-              <Link to="/auth?tab=signup" className="bg-white/10 hover:bg-white/20 text-white border border-white/30 px-6 py-2.5 rounded text-sm font-medium transition-colors backdrop-blur-sm">
-                무료로 시작하기
-              </Link>
             </div>
           </div>
           <div className="relative z-10 border-t border-white/10 bg-black/30 backdrop-blur-sm grid grid-cols-3 divide-x divide-white/10">
@@ -267,24 +264,20 @@ export function Home() {
         <div className="flex flex-col gap-3">
           <div className="bg-white rounded border border-border p-4">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">내 계정</div>
-            <Link to="/auth" className="w-full bg-primary text-white text-sm font-semibold py-2 rounded hover:bg-primary/90 transition-colors mb-2 block text-center">로그인</Link>
-            <Link to="/auth?tab=signup" className="w-full border border-primary text-primary text-sm font-semibold py-2 rounded hover:bg-secondary transition-colors block text-center">회원가입</Link>
+            <Link to="/auth" className="w-full bg-primary text-white text-sm font-semibold py-2 rounded hover:bg-primary/90 transition-colors mb-2 block text-center">파트너십 등록</Link>
+            <Link to="/auth?tab=signup&role=seller" className="block w-full text-center bg-accent hover:bg-accent/90 text-white text-xs font-semibold py-2 rounded transition-colors">셀러 등록하기</Link>
+         
           </div>
           <div className="bg-secondary rounded border border-primary/20 p-4">
             <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-2 flex items-center gap-1">
               <TrendingUp size={12} /> 이번 주 인기
             </div>
-            {["여성 린넨 블라우스", "와이드 슬랙스", "플로럴 원피스", "오버핏 코트", "요가 레깅스"].map((item, i) => (
+            {["여성 린넨 블라우스", "와이드 슬랙스", "플로럴 원피스", "오버핏 코트", "요가 레깅스", "카와이다케쟈다메데스까", "비기 제1장 집 가버리기", "블랙 패턴 셔츠"].map((item, i) => (
               <div key={item} className="flex items-center gap-2 py-1.5 border-b border-primary/20 last:border-0 text-sm">
                 <span className={`font-mono text-[11px] font-bold w-4 ${i < 3 ? "text-primary" : "text-muted-foreground"}`}>{i + 1}</span>
                 <a href="#" className="hover:text-primary transition-colors">{item}</a>
               </div>
             ))}
-          </div>
-          <div className="bg-white rounded border border-border p-4">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">신규 셀러 혜택</div>
-            <p className="text-xs text-muted-foreground leading-relaxed mb-3">등록 후 첫 달 플랫폼 수수료 면제 + 상품 상단 노출 지원</p>
-            <Link to="/auth?tab=signup&role=seller" className="block w-full text-center bg-accent hover:bg-accent/90 text-white text-xs font-semibold py-2 rounded transition-colors">셀러 등록하기</Link>
           </div>
         </div>
       </div>
@@ -398,29 +391,10 @@ export function Home() {
               </div>
             ))}
           </div>
-          <Link to="/auth?tab=signup" className="mt-5 block w-full bg-primary hover:bg-primary/90 text-white text-sm font-semibold py-2.5 rounded transition-colors text-center">
-            무료 회원가입 →
-          </Link>
         </section>
       </div>
 
       {/* Banner Strip */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        {[
-          { title: "신규 바이어 혜택", desc: "첫 주문 10% 추가 할인 + 무료 샘플 제공", bg: "from-primary to-accent", cta: "지금 가입", path: "/auth?tab=signup" },
-          { title: "셀러 파트너 모집", desc: "패션 셀러 등록 무료 · 첫 달 수수료 면제", bg: "from-[#1a2e1a] to-[#2d4a35]", cta: "등록하기", path: "/auth?tab=signup&role=seller" },
-        ].map((banner) => (
-          <div key={banner.title} className={`bg-gradient-to-r ${banner.bg} rounded p-5 flex items-center justify-between text-white`}>
-            <div>
-              <div className="font-bold text-base">{banner.title}</div>
-              <div className="text-sm opacity-80 mt-0.5">{banner.desc}</div>
-            </div>
-            <Link to={banner.path} className="bg-white/20 hover:bg-white/30 border border-white/40 text-white text-xs px-4 py-2 rounded font-semibold transition-colors whitespace-nowrap">
-              {banner.cta}
-            </Link>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
