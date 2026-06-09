@@ -25,7 +25,7 @@ import {SellerProductRegister} from "../pages/SellerProductRegister";
 import {OrderDetail} from "../pages/OrderDetail";
 import {SupplierRegister} from "../pages/SupplierRegister";
 import {SourcingRequest} from "../pages/SourcingRequest";
-import {ReadyRequestList} from "../pages/ReadyRequestList";
+import {SellerRequestList} from "../pages/seller/SellerRequestList";
 import {SellerShippingQuote} from "../pages/SellerShippingQuote";
 import {BuyerShippingQuotes} from "../pages/BuyerShippingQuotes";
 import {AllProducts} from "../pages/AllProducts";
@@ -42,6 +42,7 @@ import {FindPw} from "../pages/auth/FindPw";
 import {AdminUsers} from "../pages/AdminUsers";
 
 import { BuyerOrderDetail } from "../pages/buyer/BuyerOrderDetail";
+import { BuyerSourcingList } from "../pages/buyer/BuyerSourcingList";
 import { SellerOrderDetail } from "../pages/seller/SellerOrderDetail";
 import { SellerQuoteWrite } from "../pages/seller/SellerQuoteWrite";
 import {PartnerPlan} from "../pages/PartnerPlan";
@@ -58,7 +59,7 @@ export const router = createBrowserRouter([
             {path: "products", Component: AllProducts},
             {path: "suppliers", Component: Suppliers},
             {path: "sourcing-request", Component: SourcingRequest},
-			{path: "ready-requests", Component: ReadyRequestList},
+			{path: "seller/sourcing-requests", Component: SellerRequestList},
 			{path: "customs", Component: CustomsClearance},
             {path: "support", Component: Support},
             {path: "cart", Component: Cart},
@@ -72,7 +73,8 @@ export const router = createBrowserRouter([
             {path: "quote-request", Component: QuoteRequest},
             {path: "buyer", Component: BuyerDashboard},
             {path: "buyer/shipping-quotes", Component: BuyerShippingQuotes},
-            {path: "seller", Component: SellerDashboard},
+			{path: "buyer/my-sourcing", Component: BuyerSourcingList },
+			{path: "seller", Component: SellerDashboard},
             {path: "seller/products/new", Component: SellerProductRegister},
             {path: "seller/shipping-quote", Component: SellerShippingQuote},
             {path: "admin/inspection", Component: AdminInspection},

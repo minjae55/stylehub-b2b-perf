@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
-import { Link } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
   ArrowLeft, CheckCircle, Upload, Package, Plus,
-  Trash2, FileText, ChevronRight, X, Link as LinkIcon,
+  Trash2, FileText, ChevronRight, X,
 } from "lucide-react";
 
 // ── 더미 바이어 정보 ──────────────────────────────────────────────────
@@ -26,6 +26,16 @@ const MAIN_CATS = Object.keys(CATEGORY_MAP);
 
 type SourcingType = "READY" | "CUSTOM";
 
+// ── placeholder 상수 ──────────────────────────────────────────────────
+const READY_DETAIL_PLACEHOLDER = `[형식에 맞춰 작성해 주세요]
+
+* 컬러 / 사이즈 / 수량: (예: 블랙 / S / 10장)
+* 컬러 / 사이즈 / 수량: (예: 블랙 / M / 20장)
+* 컬러 / 사이즈 / 수량: (예: 화이트 / L / 10장)`;
+
+const CUSTOM_DETAIL_PLACEHOLDER = `파일 외에 강조하고 싶은 사항을 자유롭게 적어주세요.
+(예: 3페이지 컬러 샘플은 블랙을 우선 진행 부탁드립니다)`;
+
 // ── 타입 ──────────────────────────────────────────────────────────────
 interface SourcingItem {
   id: string;
@@ -37,7 +47,6 @@ interface SourcingItem {
   detail: string;
   // READY 전용
   unitPrice: string;
-  refUrl: string;
   refImageFile: File | null;
   // CUSTOM 전용
   mainCategory: string;
@@ -55,7 +64,6 @@ const makeItem = (): SourcingItem => ({
   deliveryDate: "",
   detail: "",
   unitPrice: "",
-  refUrl: "",
   refImageFile: null,
   mainCategory: "",
   subCategory: "",
@@ -98,6 +106,9 @@ function SourcingCard({
   const removeWorkFile = (idx: number) => {
     onChange(item.id, "workFiles", (item.workFiles ?? []).filter((_, i) => i !== idx));
   };
+
+  // 기성품 세부 요구사항 글자 수 체크 (경고 기준)
+  const isDetailTooShort = item.type === "READY" && item.detail.trim().length > 0 && item.detail.trim().length < 20;
 
   return (
     <div className="bg-white border border-border rounded-lg overflow-hidden">
@@ -142,7 +153,7 @@ function SourcingCard({
                   onChange={() => onChange(item.id, "type", t)}
                   className="accent-primary"
                 />
-                {t === "READY" ? "사입 (READY)" : "주문제작 (CUSTOM)"}
+                {t === "READY" ? "기성품 (READY)" : "주문제작 (CUSTOM)"}
               </label>
             ))}
           </div>
@@ -158,17 +169,26 @@ function SourcingCard({
           />
         )}
 
-        {field("세부 요구사항", false,
+        {/* 세부 요구사항 - 타입별 placeholder 분기 */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            세부 요구사항 {item.type === "READY" && <span className="text-primary">*</span>}
+            {item.type === "CUSTOM" && <span className="text-muted-foreground font-normal text-xs"> (선택)</span>}
+          </label>
           <textarea
             value={item.detail}
             onChange={(e) => onChange(item.id, "detail", e.target.value)}
-            rows={3}
-            placeholder={item.type === "READY"
-              ? "색상, 사이즈, 참고 URL 등 자유롭게 입력하세요."
-              : "사이즈, 색상, 재질, 디자인 특이사항 등 자유롭게 입력하세요."}
+            rows={item.type === "READY" ? 5 : 3}
+            placeholder={item.type === "READY" ? READY_DETAIL_PLACEHOLDER : CUSTOM_DETAIL_PLACEHOLDER}
             className={`${inputCls} resize-none`}
           />
-        )}
+          {/* 기성품 경고 문구 */}
+          {item.type === "READY" && (
+            <p className={`text-xs mt-1.5 ${isDetailTooShort ? "text-red-500" : "text-muted-foreground"}`}>
+              ⚠️ 컬러·사이즈·수량을 형식에 맞게 기재하지 않으면 매칭 정확도가 낮아질 수 있습니다.
+            </p>
+          )}
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           {field("희망 수량", true,
@@ -310,9 +330,11 @@ function SourcingCard({
               </div>
             )}
 
+            {/* 작업지시서 - 필수 */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
-                작업지시서 및 참고 파일 <span className="text-muted-foreground font-normal text-xs">(선택 · PDF/이미지 · 다중 첨부 가능)</span>
+                작업지시서 및 참고 파일 <span className="text-primary">*</span>
+                <span className="text-muted-foreground font-normal text-xs ml-1">(PDF/이미지 · 다중 첨부 가능)</span>
               </label>
               <input
                 ref={workRef}
@@ -337,11 +359,18 @@ function SourcingCard({
               )}
               <div
                 onClick={() => workRef.current?.click()}
-                className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer group"
+                className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer group ${
+                  item.workFiles.length === 0
+                    ? "border-red-300 hover:border-primary/50"
+                    : "border-border hover:border-primary/50"
+                }`}
               >
                 <Upload size={18} className="mx-auto text-muted-foreground mb-1 group-hover:text-primary transition-colors" />
                 <div className="text-xs text-muted-foreground">클릭하여 파일 추가 <span className="text-primary font-medium">파일 선택</span></div>
               </div>
+              {item.workFiles.length === 0 && (
+                <p className="text-xs text-red-500 mt-1.5">작업지시서는 필수 첨부 항목입니다.</p>
+              )}
             </div>
 
             <div>
@@ -381,14 +410,34 @@ function SourcingCard({
 // ── 유효성 검사 ───────────────────────────────────────────────────────
 const isItemValid = (item: SourcingItem): boolean => {
   const commonOk = !!(item.productName && item.quantity);
-  if (item.type === "READY") return commonOk && !!(item.unitPrice && item.mainCategory && item.subCategory);
-  if (item.type === "CUSTOM") return commonOk && !!(item.mainCategory && item.subCategory && item.totalBudget && item.needSample);
+  if (item.type === "READY")
+    return commonOk && !!(item.detail.trim() && item.unitPrice && item.mainCategory && item.subCategory);
+  if (item.type === "CUSTOM")
+    return commonOk && !!(item.mainCategory && item.subCategory && item.totalBudget && item.needSample && item.workFiles.length > 0);
   return false;
 };
 
 // ── 메인 페이지 ───────────────────────────────────────────────────────
+// 재요청 시 넘어오는 state 타입
+interface PrefillState {
+  prefillItem?: Omit<SourcingItem, "id" | "refImageFile" | "workFiles">;
+  isRerequest?: boolean;
+  originalRequestId?: string;
+}
+
 export function SourcingRequest() {
-  const [items, setItems] = useState<SourcingItem[]>([makeItem()]);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const prefill = (location.state as PrefillState) ?? {};
+
+  const makeInitialItems = (): SourcingItem[] => {
+    if (prefill.prefillItem) {
+      return [{ ...makeItem(), ...prefill.prefillItem }];
+    }
+    return [makeItem()];
+  };
+
+  const [items, setItems] = useState<SourcingItem[]>(makeInitialItems);
   const [submitted, setSubmitted] = useState(false);
 
   const updateItem = (id: string, key: keyof SourcingItem, value: unknown) =>
@@ -449,14 +498,29 @@ export function SourcingRequest() {
 
   return (
     <div className="max-w-[760px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
-      <Link to="/suppliers" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-6">
-        <ArrowLeft size={16} /> 공급업체 목록으로
-      </Link>
+      <button
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
+      >
+        <ArrowLeft size={16} /> 뒤로가기
+      </button>
 
       <div className="flex items-center gap-2 mb-1">
         <Package size={22} className="text-primary" />
-        <h1 className="text-2xl font-bold text-foreground">소싱 요청서</h1>
+        <h1 className="text-2xl font-bold text-foreground">
+          {prefill.isRerequest ? "소싱 재요청" : "소싱 요청서"}
+        </h1>
       </div>
+
+      {/* 재요청 안내 배너 */}
+      {prefill.isRerequest && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700 mb-4 flex items-center gap-2">
+          <span className="font-semibold">재요청</span> 기존 요청 내용이 불러와졌습니다. 내용을 수정 후 제출하면 새 요청으로 등록됩니다.
+          {prefill.originalRequestId && (
+            <span className="ml-auto text-xs font-mono text-amber-500">원본: {prefill.originalRequestId}</span>
+          )}
+        </div>
+      )}
       <p className="text-sm text-muted-foreground mb-8">
         원하는 상품을 상세히 입력하면 스타일허브 소싱팀이 최적의 공급업체를 매칭해 드립니다.
       </p>
