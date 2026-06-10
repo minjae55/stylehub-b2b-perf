@@ -266,8 +266,8 @@ const buyerShippingQuotesList = [
 ];
 
 export function MyPage() {
-  const [role, setRole] = useState<UserRole>("buyer");
   const [activeTab, setActiveTab] = useState<Tab>("orders");
+  const [role, setRole] = useState<UserRole>("seller");
   const [inquiryText, setInquiryText] = useState("");
   const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
   const [expandedSrc, setExpandedSrc] = useState<string | null>(null);
@@ -318,22 +318,6 @@ export function MyPage() {
         <User size={24} className="text-primary" /> 마이페이지
       </h1>
 
-      {/* Role Switch */}
-      <div className="flex items-center gap-2 mb-6 bg-white border border-border rounded-lg p-2 w-fit">
-        <button
-          onClick={() => { setRole("buyer"); setActiveTab("orders"); }}
-          className={`px-5 py-2 rounded text-sm font-semibold transition-colors flex items-center gap-2 ${role === "buyer" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          <ShoppingBag size={15} /> 바이어
-        </button>
-        <button
-          onClick={() => { setRole("seller"); setActiveTab("orders"); }}
-          className={`px-5 py-2 rounded text-sm font-semibold transition-colors flex items-center gap-2 ${role === "seller" ? "bg-[#2d4a35] text-white" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          <Star size={15} /> 셀러
-        </button>
-      </div>
-
       <div className="grid grid-cols-[240px_1fr] gap-6">
         {/* Sidebar */}
         <div className="space-y-2">
@@ -360,18 +344,6 @@ export function MyPage() {
               )}
             </button>
           ))}
-
-          <div className="pt-2 border-t border-border">
-            {role === "buyer" ? (
-              <Link to="/buyer" className="w-full bg-secondary border border-primary/20 text-primary hover:bg-primary hover:text-white py-2.5 rounded text-sm font-semibold transition-colors flex items-center justify-center gap-1.5">
-                바이어 전용 페이지 →
-              </Link>
-            ) : (
-              <Link to="/seller" className="w-full bg-[#f0f4f0] border border-[#2d4a35]/20 text-[#2d4a35] hover:bg-[#2d4a35] hover:text-white py-2.5 rounded text-sm font-semibold transition-colors flex items-center justify-center gap-1.5">
-                셀러 전용 페이지 →
-              </Link>
-            )}
-          </div>
         </div>
 
         {/* Content */}
