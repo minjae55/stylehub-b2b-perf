@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import {Link, useNavigate} from "react-router";
 import {
   Search, FileText, TrendingUp, ShoppingBag, ArrowUp,
   CheckCircle, Clock, Truck, AlertCircle, Heart,
   ChevronRight, BarChart2, Bell, Settings, Eye,
   Package, Star, MapPin, Filter, MessageSquare, Layers,
-  CreditCard, RefreshCcw, ThumbsUp,
+  CreditCard, RefreshCcw, ThumbsUp, MessageSquareWarning
 } from "lucide-react";
 
 // ────────────────────────────────────────────────
@@ -136,7 +136,7 @@ function ProductTag({ tag }: { tag: string }) {
 // 탭 타입
 // ────────────────────────────────────────────────
 
-type Tab = "overview" | "orders" | "inquiries" | "sellers";
+type Tab = "overview" | "orders" | "inquiries" | "sellers" | "negotiations";
 
 // ────────────────────────────────────────────────
 // 컴포넌트
@@ -145,6 +145,9 @@ type Tab = "overview" | "orders" | "inquiries" | "sellers";
 export function BuyerDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedPeriod, setSelectedPeriod] = useState("3months");
+  const [role, setRole] = useState<UserRole>("buyer");
+  const [activeTab, setActiveTab] = useState<Tab>("orders");
+  const navigate = useNavigate();
 
   const totalSpend  = purchaseStats.reduce((a, s) => a + s.total, 0);
   const totalOrders = purchaseStats.reduce((a, s) => a + s.count, 0);
@@ -152,10 +155,12 @@ export function BuyerDashboard() {
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "overview",  label: "개요",       icon: <BarChart2 size={15} /> },
-    { key: "orders",    label: "발주 내역",  icon: <ShoppingBag size={15} /> },
-    { key: "inquiries", label: "발주 문의",  icon: <FileText size={15} /> },
-    { key: "sellers",   label: "즐겨찾기 셀러", icon: <Heart size={15} /> },
+    { key: "orders",    label: "소싱 요청 내역",  icon: <FileText size={15} /> },
+    { key: "inquiries", label: "발주 내역",  icon: <Truck size={15} /> },
+    { key: "sellers",   label: "협의 내역", icon: <Heart size={15} /> },
+    { key: "negotiations",   label: "이의제기", icon: <MessageSquareWarning size={15} /> },
   ];
+  type UserRole = "buyer" | "seller";
 
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
@@ -172,6 +177,18 @@ export function BuyerDashboard() {
             <p className="text-blue-200/60 text-sm">스타일위크㈜ — 국내 여성복 B2B 구매 현황</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+                onClick={() => { setActiveTab("orders"); navigate("/buyer") }}
+                className={`px-5 py-2 rounded text-sm font-semibold transition-colors flex items-center gap-2 ${role === "buyer" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <ShoppingBag size={15} /> 바이어
+            </button>
+            <button
+                onClick={() => { setActiveTab("orders"); navigate("/seller");}}
+                className={`px-5 py-2 rounded text-sm font-semibold transition-colors flex items-center gap-2 ${role === "seller" ? "bg-[#2d4a35] text-white" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Star size={15} /> 셀러
+            </button>
             <Link
               to="/buyer/inquiry/new"
               className="flex items-center gap-1.5 bg-[#7eb3f5] hover:bg-[#6aa2e8] text-[#1a2744] text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -181,20 +198,24 @@ export function BuyerDashboard() {
             <button className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors">
               <Bell size={18} />
             </button>
-            <button className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors">
+            <Link
+                to="../mypage"
+                className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors"
+            >
               <Settings size={18} />
-            </button>
+            </Link>
           </div>
         </div>
       </div>
 
       {/* ── 퀵 네비 ── */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-5 gap-4 mb-6">
         {[
           { to: "/buyer",           icon: <BarChart2 size={20}      className="text-blue-600"   />, bg: "bg-blue-50 group-hover:bg-blue-100",   label: "구매 현황",   sub: "매출·발주 통계"   },
-          { to: "/buyer/my-sourcing",        icon: <Search size={20}         className="text-[#7eb3f5]"  />, bg: "bg-sky-50 group-hover:bg-sky-100",     label: "소싱 요청 내역",   sub: "소싱 요청·확인" },
+          { to: "/buyer/my-sourcing",        icon: <FileText size={20}         className="text-[#7eb3f5]"  />, bg: "bg-sky-50 group-hover:bg-sky-100",     label: "소싱 접수 내역",   sub: "소싱 접수·확인" },
           { to: "/orders",          icon: <Truck size={20}          className="text-amber-600"  />, bg: "bg-amber-50 group-hover:bg-amber-100", label: "발주 내역",   sub: "주문·배송 현황"   },
-          { to: "../negotiations",icon: <FileText size={20}      className="text-green-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "협의 내역",   sub: "협의 요청·확인"   },
+          { to: "../negotiations",icon: <Heart size={20}      className="text-green-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "협의 내역",   sub: "협의 요청·확인"   },
+          { to: "../disputes",icon: <MessageSquareWarning size={20}      className="text-green-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "이의제기",   sub: "이의 요청·확인"   }
         ].map((item) => (
           <Link
             key={item.to}
@@ -212,7 +233,7 @@ export function BuyerDashboard() {
       </div>
 
       {/* ── KPI 카드 4개 ── */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           {
             icon: <CreditCard size={20} className="text-blue-600" />,
@@ -231,15 +252,6 @@ export function BuyerDashboard() {
             sub: "+6.3% vs 이전 3개월",
             subColor: "text-green-600",
             arrow: <ArrowUp size={12} />,
-          },
-          {
-            icon: <Heart size={20} className="text-rose-500" />,
-            bg: "bg-rose-50",
-            label: "즐겨찾기 셀러",
-            value: `${favoriteSellers.length}개`,
-            sub: `이번 달 ${favoriteSellers.filter((_, i) => i < 2).length}곳 거래`,
-            subColor: "text-muted-foreground",
-            arrow: null,
           },
           {
             icon: <TrendingUp size={20} className="text-green-600" />,
@@ -287,7 +299,7 @@ export function BuyerDashboard() {
       {tab === "overview" && (
         <div className="grid grid-cols-[1fr_380px] gap-6">
 
-          {/* 월별 구매 통계 + 추천 상품 */}
+          {/* 월별 구매 통계 */}
           <div className="space-y-6">
             <div className="bg-white border border-border rounded-lg overflow-hidden">
               <div className="px-5 py-4 border-b border-border flex items-center justify-between">
@@ -330,37 +342,6 @@ export function BuyerDashboard() {
                 ))}
               </div>
             </div>
-
-            {/* 추천 상품 */}
-            <div className="bg-white border border-border rounded-lg overflow-hidden">
-              <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                <h2 className="font-bold text-foreground flex items-center gap-2">
-                  <Star size={18} className="text-amber-400" />
-                  맞춤 추천 상품
-                </h2>
-                <Link to="/products" className="text-xs text-[#3a7fd5] hover:underline">더보기</Link>
-              </div>
-              <div className="divide-y divide-border">
-                {recommendedProducts.map((p) => (
-                  <div key={p.id} className="px-5 py-3 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center flex-shrink-0">
-                      <Package size={18} className="text-slate-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm font-medium text-foreground truncate">{p.name}</span>
-                        <ProductTag tag={p.tag} />
-                      </div>
-                      <div className="text-xs text-muted-foreground">{p.seller} · {p.category} · MOQ {p.moq}장</div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="font-mono font-bold text-foreground text-sm">₩{p.price.toLocaleString()}</div>
-                      <button className="text-xs text-[#3a7fd5] hover:underline mt-0.5">문의하기</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* 오른쪽: 알림 + 진행 중 문의 */}
@@ -391,46 +372,46 @@ export function BuyerDashboard() {
             </div>
 
             {/* 즐겨찾기 셀러 */}
-            <div className="bg-white border border-border rounded-lg overflow-hidden">
-              <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                <h2 className="font-bold text-foreground flex items-center gap-2">
-                  <Heart size={18} className="text-rose-400" />
-                  즐겨찾기 셀러
-                </h2>
-                <button
-                  onClick={() => setTab("sellers")}
-                  className="text-xs text-[#3a7fd5] hover:underline"
-                >
-                  전체보기
-                </button>
-              </div>
-              <div className="divide-y divide-border">
-                {favoriteSellers.map((s, i) => (
-                  <div key={s.name} className="px-5 py-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 text-[#3a7fd5] flex items-center justify-center text-xs font-bold flex-shrink-0">
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm font-medium text-foreground">{s.name}</span>
-                        <SellerBadge badge={s.badge} />
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-0.5"><MapPin size={10} />{s.region}</span>
-                        <span>·</span>
-                        <span>{s.category}</span>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="flex items-center gap-1 text-xs text-amber-500 font-semibold justify-end">
-                        <Star size={11} fill="currentColor" />{s.rating}
-                      </div>
-                      <div className="text-xs text-muted-foreground font-mono">{s.orders}건 거래</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/*<div className="bg-white border border-border rounded-lg overflow-hidden">*/}
+            {/*  <div className="px-5 py-4 border-b border-border flex items-center justify-between">*/}
+            {/*    <h2 className="font-bold text-foreground flex items-center gap-2">*/}
+            {/*      <Heart size={18} className="text-rose-400" />*/}
+            {/*      즐겨찾기 셀러*/}
+            {/*    </h2>*/}
+            {/*    <button*/}
+            {/*      onClick={() => setTab("sellers")}*/}
+            {/*      className="text-xs text-[#3a7fd5] hover:underline"*/}
+            {/*    >*/}
+            {/*      전체보기*/}
+            {/*    </button>*/}
+            {/*  </div>*/}
+            {/*  <div className="divide-y divide-border">*/}
+            {/*    {favoriteSellers.map((s, i) => (*/}
+            {/*      <div key={s.name} className="px-5 py-3 flex items-center gap-3">*/}
+            {/*        <div className="w-8 h-8 rounded-full bg-blue-50 text-[#3a7fd5] flex items-center justify-center text-xs font-bold flex-shrink-0">*/}
+            {/*          {i + 1}*/}
+            {/*        </div>*/}
+            {/*        <div className="flex-1 min-w-0">*/}
+            {/*          <div className="flex items-center gap-2 mb-0.5">*/}
+            {/*            <span className="text-sm font-medium text-foreground">{s.name}</span>*/}
+            {/*            <SellerBadge badge={s.badge} />*/}
+            {/*          </div>*/}
+            {/*          <div className="flex items-center gap-2 text-xs text-muted-foreground">*/}
+            {/*            <span className="flex items-center gap-0.5"><MapPin size={10} />{s.region}</span>*/}
+            {/*            <span>·</span>*/}
+            {/*            <span>{s.category}</span>*/}
+            {/*          </div>*/}
+            {/*        </div>*/}
+            {/*        <div className="text-right flex-shrink-0">*/}
+            {/*          <div className="flex items-center gap-1 text-xs text-amber-500 font-semibold justify-end">*/}
+            {/*            <Star size={11} fill="currentColor" />{s.rating}*/}
+            {/*          </div>*/}
+            {/*          <div className="text-xs text-muted-foreground font-mono">{s.orders}건 거래</div>*/}
+            {/*        </div>*/}
+            {/*      </div>*/}
+            {/*    ))}*/}
+            {/*  </div>*/}
+            {/*</div>*/}
           </div>
         </div>
       )}

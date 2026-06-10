@@ -264,7 +264,7 @@ export function Home() {
         <div className="flex flex-col gap-3">
           <div className="bg-white rounded border border-border p-4">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">내 계정</div>
-            <Link to="/auth" className="w-full bg-primary text-white text-sm font-semibold py-2 rounded hover:bg-primary/90 transition-colors mb-2 block text-center">파트너십 등록</Link>
+            <Link to="/partner" className="w-full bg-primary text-white text-sm font-semibold py-2 rounded hover:bg-primary/90 transition-colors mb-2 block text-center">파트너십 등록</Link>
             <Link to="/auth?tab=signup&role=seller" className="block w-full text-center bg-accent hover:bg-accent/90 text-white text-xs font-semibold py-2 rounded transition-colors">셀러 등록하기</Link>
          
           </div>

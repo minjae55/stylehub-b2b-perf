@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import {Link, useNavigate} from "react-router";
 import {
   Package, FileText, TrendingUp, ShoppingBag, ArrowUp,
   CheckCircle, Clock, Truck, AlertCircle, Plus, ChevronRight,
-  BarChart2, Star, Bell, Settings, Eye, RotateCcw, Layers,
+  BarChart2, Star, Bell, Settings, Eye, RotateCcw, Layers, MessageSquareWarning, Heart,
 } from "lucide-react";
 
 // ────────────────────────────────────────────────
@@ -119,6 +119,7 @@ function StockBadge({ stock }: { stock: string }) {
 // ────────────────────────────────────────────────
 
 type Tab = "overview" | "orders" | "products" | "inquiries";
+type UserRole = "buyer" | "seller";
 
 // ────────────────────────────────────────────────
 // 컴포넌트
@@ -127,6 +128,9 @@ type Tab = "overview" | "orders" | "products" | "inquiries";
 export function SellerDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedPeriod, setSelectedPeriod] = useState("3months");
+  const [role, setRole] = useState<UserRole>("seller");
+  const [activeTab, setActiveTab] = useState<Tab>("orders");
+  const navigate = useNavigate();
 
   const totalRevenue = salesStats.reduce((a, s) => a + s.total, 0);
   const totalOrders  = salesStats.reduce((a, s) => a + s.count, 0);
@@ -154,29 +158,42 @@ export function SellerDashboard() {
               <p className="text-gray-400 text-sm">르솔레이유 — 국내 여성복 B2B 판매 현황</p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                  onClick={() => { setActiveTab("orders"); navigate("/buyer") }}
+                  className={`px-5 py-2 rounded text-sm font-semibold transition-colors flex items-center gap-2 ${role === "buyer" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <ShoppingBag size={15} /> 바이어
+              </button>
+              <button
+                  onClick={() => { setActiveTab("orders"); navigate("/seller");}}
+                  className={`px-5 py-2 rounded text-sm font-semibold transition-colors flex items-center gap-2 ${role === "seller" ? "bg-[#2d4a35] text-white" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Star size={15} /> 셀러
+              </button>
               <Link
                   to="/seller/products/new"
                   className="flex items-center gap-1.5 bg-[#C4956A] hover:bg-[#b3845a] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
               >
-                <Plus size={15} /> 소싱 요청
+                <Plus size={15} /> 제품 등록
               </Link>
               <button className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors">
                 <Bell size={18} />
               </button>
-              <button className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors">
+              <Link to="../mypage" className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors">
                 <Settings size={18} />
-              </button>
+              </Link>
             </div>
           </div>
         </div>
 
         {/* ── 퀵 네비 ── */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
           {[
             { to: "/seller",               icon: <BarChart2 size={20} className="text-blue-600"   />, bg: "bg-blue-50 group-hover:bg-blue-100",   label: "판매 현황",  sub: "매출·주문 통계"    },
-            { to: "/seller/sourcing-requests",  icon: <Plus size={20}      className="text-[#C4956A]"  />, bg: "bg-rose-50 group-hover:bg-rose-100",   label: "소싱 요청 내역",  sub: "소싱 요청·확인"    },
+            { to: "/seller/sourcing-requests",  icon: <FileText size={20}      className="text-[#C4956A]"  />, bg: "bg-rose-50 group-hover:bg-rose-100",   label: "소싱 요청 내역",  sub: "소싱 요청·확인"    },
             { to: "/orders",               icon: <Truck size={20}     className="text-amber-600"  />, bg: "bg-amber-50 group-hover:bg-amber-100", label: "발주 내역",  sub: "주문 처리 현황"    },
-            { to: "negotiations",icon: <FileText size={20}  className="text-green-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "협의 내역",  sub: "협의 요청·확인"  },
+            { to: "../negotiations",icon: <Heart size={20}  className="text-green-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "협의 내역",  sub: "협의 요청·확인"  },
+            { to: "../disputes",icon: <MessageSquareWarning size={20}      className="text-green-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "이의제기",   sub: "이의 요청·확인"   }
           ].map((item) => (
               <Link
                   key={item.to}
