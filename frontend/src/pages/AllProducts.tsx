@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Search, Filter, Heart, ShoppingCart, Grid3x3, List, ChevronDown } from "lucide-react";
 
-type Product = {
+export type Product = {
   id: string;
   name: string;
   brand: string;
@@ -54,7 +54,7 @@ const categories = [
   },
 ];
 
-const products: Product[] = [
+export const products: Product[] = [
   { id: "F001", name: "여성 린넨 블라우스 (7컬러)", brand: "동대문패션", price: 8900, category: "tops", subCategory: "블라우스/셔츠", image: "https://images.unsplash.com/photo-1594938298603-c8148c4b2e8e?w=400", moq: "50", moqUnit: "벌", sizes: ["S", "M", "L", "XL"] },
   { id: "F002", name: "크롭 반팔 티셔츠 (10컬러)", brand: "스타일컴퍼니", price: 5500, category: "tops", subCategory: "티셔츠/탑", image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400", moq: "100", moqUnit: "벌", sizes: ["S", "M", "L", "XL", "XXL"] },
   { id: "F003", name: "오버핏 줄무늬 티셔츠", brand: "캐주얼하우스", price: 7200, category: "tops", subCategory: "티셔츠/탑", image: "https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb?w=400", moq: "60", moqUnit: "벌", sizes: ["FREE"] },
@@ -88,8 +88,10 @@ export function AllProducts() {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(searchParams.get("category") || null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
-  const [favorites, setFavorites] = useState<string[]>([]);
-
+  const [favorites, setFavorites] = useState<string[]>(() => { 
+  const saved = localStorage.getItem("wishlist"); //좋아요 페이지 추가용
+  return saved ? JSON.parse(saved) : [];
+}); 
   useEffect(() => {
     const cat = searchParams.get("category") || "all";
     const sub = searchParams.get("sub") || "";
@@ -137,11 +139,15 @@ export function AllProducts() {
     return matchCategory && matchSub && matchSearch;
   });
 
-  const toggleFavorite = (productId: string) => {
-    setFavorites((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
-    );
-  };
+  const toggleFavorite = (productId: string) => { //좋아요 페이지 추가용
+  setFavorites((prev) => {
+    const next = prev.includes(productId)
+      ? prev.filter((id) => id !== productId)
+      : [...prev, productId];
+    localStorage.setItem("wishlist", JSON.stringify(next));
+    return next;
+  });
+};
 
   return (
     <div className="max-w-[1480px] mx-auto px-4 py-8 font-[Inter,sans-serif]">

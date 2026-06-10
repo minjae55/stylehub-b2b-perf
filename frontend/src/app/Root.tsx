@@ -48,7 +48,7 @@ const notifications = [
     color: "text-blue-500",
     title: "배송 출발",
     desc: "'스이쿤 패턴 슬랙스' 200벌 주문이 동대문 창고를 출발했습니다.",
-    time: "1시간 전",
+    time: "1시간 전" ,
     unread: true,
   },
   {
@@ -106,6 +106,7 @@ export function Root() {
   const [searchQuery, setSearchQuery] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
   const [readIds, setReadIds] = useState<number[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<number[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter(
@@ -251,7 +252,18 @@ export function Root() {
                               <span className={`text-sm font-medium ${isUnread ? "text-foreground" : "text-muted-foreground"}`}>
                                 {n.title}
                               </span>
-                                  {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
+							  <div className="flex items-center gap-1.5 flex-shrink-0">
+							    {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+							    <button
+							      onClick={(e) => {
+							        e.stopPropagation();
+							        setDismissedIds((prev) => [...prev, n.id]);
+							      }}
+							      className="text-muted-foreground hover:text-foreground transition-colors"
+							    >
+							      <X size={12} />
+							    </button>
+							  </div>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{n.desc}</p>
                                 <span className="text-[11px] text-muted-foreground mt-1 block">{n.time}</span>

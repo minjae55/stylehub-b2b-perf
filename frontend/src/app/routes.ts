@@ -50,7 +50,9 @@ import { SellerOrderDetail } from "../pages/seller/SellerOrderDetail";
 import { SellerQuoteWrite } from "../pages/seller/SellerQuoteWrite";
 import { PartnerPlan } from "../pages/PartnerPlan";
 import { SearchPage } from "@/pages/admin/SearchPage";
+import {Wishlist} from "../pages/Wishlist"; //좋아요 페이지 추가
 
+import {SellerProductManage} from "../pages/seller/SellerProductManage"; // 판매자 상품 관리 페이지 추가
 import { SellerContractSign } from "../pages/seller/SellerContractSign";
 import { BuyerContractSign } from "../pages/buyer/BuyerContractSign";
 import { Negotiations } from "../pages/Negotiations";
@@ -102,6 +104,8 @@ export const router = createBrowserRouter([
         { path: "seller/orders/:id", Component: SellerOrderDetail },
         { path: "seller/orders/:orderId/contract-sign", Component: SellerContractSign },
         { path: "seller", Component: SellerDashboard },
+		{ path: "wishlist", Component: Wishlist }, //좋아요 페이지 추가
+		{ path: "seller/products", Component: SellerProductManage }, // 판매자 상품 관리 페이지 추
 
         { path: "inspection", Component: BuyerInspection },
         { path: "admin/inspection", Component: AdminInspection },

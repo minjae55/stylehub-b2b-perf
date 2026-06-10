@@ -233,6 +233,26 @@ function CertUploadModal({
         </div>
 
         {/* 업로드된 파일 목록 */}
+         {/* 유효기간 입력 */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            인증서 유효기간
+          </label>
+    <div className="flex items-center gap-2">
+            <select className="border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors flex-1">
+              <option value="">년도</option>
+              {Array.from({ length: 10 }, (_, i) => (
+                <option key={i} value={2025 + i}>{2025 + i}년</option>
+              ))}
+            </select>
+            <select className="border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors flex-1">
+              <option value="">월</option>
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>{String(i + 1).padStart(2, "0")}월</option>
+              ))}
+            </select>
+          </div>
+        </div>
         {files.length > 0 && (
           <ul className="space-y-2 mb-4">
             {files.map((f) => (
