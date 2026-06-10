@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation } from "react-router";
 import {
-  ArrowLeft, CheckCircle, Upload, Package, Plus,
+  CheckCircle, Upload, Package, Plus,
   Trash2, FileText, ChevronRight, X,
 } from "lucide-react";
 
@@ -44,6 +44,7 @@ interface SourcingItem {
   productName: string;
   quantity: string;
   deliveryDate: string;
+  expiryDate: string;   // 소싱 요청 유효기간
   detail: string;
   // READY 전용
   unitPrice: string;
@@ -62,6 +63,7 @@ const makeItem = (): SourcingItem => ({
   productName: "",
   quantity: "",
   deliveryDate: "",
+  expiryDate: "",
   detail: "",
   unitPrice: "",
   refImageFile: null,
@@ -190,7 +192,7 @@ function SourcingCard({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {field("희망 수량", true,
             <div className="relative">
               <input
@@ -208,6 +210,14 @@ function SourcingCard({
             <input
               value={item.deliveryDate}
               onChange={(e) => onChange(item.id, "deliveryDate", e.target.value)}
+              type="date"
+              className={inputCls}
+            />
+          )}
+          {field("요청 유효기간", false,
+            <input
+              value={item.expiryDate}
+              onChange={(e) => onChange(item.id, "expiryDate", e.target.value)}
               type="date"
               className={inputCls}
             />
@@ -427,7 +437,6 @@ interface PrefillState {
 
 export function SourcingRequest() {
   const location = useLocation();
-  const navigate = useNavigate();
   const prefill = (location.state as PrefillState) ?? {};
 
   const makeInitialItems = (): SourcingItem[] => {
@@ -498,13 +507,6 @@ export function SourcingRequest() {
 
   return (
     <div className="max-w-[760px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
-      >
-        <ArrowLeft size={16} /> 뒤로가기
-      </button>
-
       <div className="flex items-center gap-2 mb-1">
         <Package size={22} className="text-primary" />
         <h1 className="text-2xl font-bold text-foreground">

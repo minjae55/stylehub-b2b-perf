@@ -3,18 +3,19 @@ import { useNavigate } from "react-router";
 import {
   Package, X, Zap, FileText, ChevronRight,
   CheckCircle, XCircle, RotateCcw, MessageSquare, Clock,
+  CreditCard, FlaskConical,
 } from "lucide-react";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 type RequestStatus = "대기중" | "견적수신" | "승인" | "거절" | "재요청됨" | "협의중";
-type BidStatus = "검토중" | "승인" | "거절" | "협의중";
+type BidStatus = "검토중" | "승인" | "거절" | "협의중" | "샘플대기중" | "샘플발송됨";
 type SourcingType = "READY" | "CUSTOM";
 
 interface Bid {
   bidId: string;
   supplierName: string;
-  unitPrice?: number;       // READY
-  totalBudget?: number;     // CUSTOM
+  unitPrice?: number;
+  totalBudget?: number;
   samplePrice?: number;
   availableDate: string;
   comment: string;
@@ -30,18 +31,15 @@ interface SourcingRequest {
   quantity: number;
   deliveryDate: string;
   detail: string;
-  // READY
   unitPrice?: number;
   mainCategory?: string;
   subCategory?: string;
-  // CUSTOM
   totalBudget?: number;
   needSample?: "Y" | "N";
   workFileCount?: number;
   status: RequestStatus;
   bids: Bid[];
   createdAt: string;
-  // 재요청용 프리필 데이터
   prefillData: Record<string, unknown>;
 }
 
@@ -53,7 +51,7 @@ const DUMMY_REQUESTS: SourcingRequest[] = [
     detail: "* 컬러/사이즈/수량: 아이보리 / S / 50장\n* 컬러/사이즈/수량: 아이보리 / M / 80장\n* 컬러/사이즈/수량: 베이지 / M / 70장",
     mainCategory: "하의", subCategory: "팬츠",
     status: "견적수신", createdAt: "2026-06-01",
-    prefillData: { type: "READY", productName: "여성 린넨 와이드 팬츠", quantity: "200", unitPrice: "18000", deliveryDate: "2026-06-20", detail: "* 컬러/사이즈/수량: 아이보리 / S / 50장\n* 컬러/사이즈/수량: 아이보리 / M / 80장\n* 컬러/사이즈/수량: 베이지 / M / 70장", mainCategory: "하의", subCategory: "팬츠", totalBudget: "", needSample: "", workFiles: [] },
+    prefillData: { type: "READY", productName: "여성 린넨 와이드 팬츠", quantity: "200", unitPrice: "18000", deliveryDate: "2026-06-20", detail: "* 컬러/사이즈/수량: 아이보리 / S / 50장", mainCategory: "하의", subCategory: "팬츠", totalBudget: "", needSample: "", workFiles: [] },
     bids: [
       { bidId: "BID-001", supplierName: "르블랑", unitPrice: 16500, availableDate: "2026-06-18", comment: "인증서 보유, 당일 퀵 가능합니다.", status: "검토중", submittedAt: "2026-06-03" },
       { bidId: "BID-002", supplierName: "패션마트", unitPrice: 17200, availableDate: "2026-06-19", comment: "동일 소재 재고 보유 중입니다.", status: "검토중", submittedAt: "2026-06-04" },
@@ -125,35 +123,134 @@ const STATUS_STYLE: Record<RequestStatus, string> = {
 };
 
 const BID_STATUS_STYLE: Record<BidStatus, string> = {
-  "검토중": "bg-secondary text-muted-foreground border-border",
-  "승인":   "bg-green-50 text-green-600 border-green-200",
-  "거절":   "bg-red-50 text-red-500 border-red-200",
-  "협의중": "bg-purple-50 text-purple-600 border-purple-200",
+  "검토중":     "bg-secondary text-muted-foreground border-border",
+  "승인":       "bg-green-50 text-green-600 border-green-200",
+  "거절":       "bg-red-50 text-red-500 border-red-200",
+  "협의중":     "bg-purple-50 text-purple-600 border-purple-200",
+  "샘플대기중": "bg-amber-50 text-amber-600 border-amber-200",
+  "샘플발송됨": "bg-teal-50 text-teal-600 border-teal-200",
 };
+
+// ── 샘플 결제 모달 ────────────────────────────────────────────────────
+function SamplePaymentModal({
+  bid,
+  request,
+  onClose,
+  onPaid,
+}: {
+  bid: Bid;
+  request: SourcingRequest;
+  onClose: () => void;
+  onPaid: (bidId: string) => void;
+}) {
+  const [step, setStep] = useState<"confirm" | "paying" | "done">("confirm");
+  const samplePrice = bid.samplePrice ?? 0;
+
+  const handlePay = () => {
+    setStep("paying");
+    setTimeout(() => {
+      onPaid(bid.bidId);
+      setStep("done");
+    }, 1500);
+  };
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={step !== "paying" ? onClose : undefined} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[400px] overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <FlaskConical size={16} className="text-amber-500" />
+            <h3 className="font-bold text-foreground">샘플 결제</h3>
+          </div>
+          {step !== "paying" && (
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1"><X size={18} /></button>
+          )}
+        </div>
+
+        {step === "done" ? (
+          <div className="px-6 py-10 text-center">
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle size={22} className="text-amber-500" />
+            </div>
+            <div className="font-bold text-foreground mb-1">샘플 결제 완료!</div>
+            <div className="text-sm text-muted-foreground mb-6">
+              공급사에게 알림이 전송됩니다.<br />샘플 출고 후 수령 확인이 가능합니다.
+            </div>
+            <button onClick={onClose} className="px-6 py-2 bg-primary text-white rounded font-semibold text-sm hover:bg-primary/90 transition-colors">확인</button>
+          </div>
+        ) : step === "paying" ? (
+          <div className="px-6 py-10 text-center">
+            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <CreditCard size={22} className="text-primary" />
+            </div>
+            <div className="font-bold text-foreground mb-1">결제 처리 중...</div>
+            <div className="text-sm text-muted-foreground">잠시만 기다려주세요.</div>
+          </div>
+        ) : (
+          <div className="px-6 py-5 space-y-4">
+            {/* 주문 요약 */}
+            <div className="bg-secondary rounded-lg p-4 space-y-2.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">공급사</span>
+                <span className="font-semibold text-foreground">{bid.supplierName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">상품명</span>
+                <span className="font-semibold text-foreground truncate ml-4">{request.productName}</span>
+              </div>
+              <div className="border-t border-border pt-2.5 flex justify-between">
+                <span className="text-sm font-semibold text-foreground">샘플비</span>
+                <span className="font-bold text-lg text-foreground">{samplePrice.toLocaleString()}원</span>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded px-3 py-2.5 leading-relaxed">
+              샘플비는 수령 후 발주 진행 여부와 무관하게 환불되지 않습니다.
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={onClose} className="flex-1 py-2.5 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors font-medium">취소</button>
+              <button
+                onClick={handlePay}
+                className="flex-1 py-2.5 bg-primary hover:bg-primary/90 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                <CreditCard size={14} /> {samplePrice.toLocaleString()}원 결제
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── 견적 상세 모달 ────────────────────────────────────────────────────
 function BidDetailModal({
-  request, bid, onClose, onAction,
+  request, bid, onClose, onAction, onSampleRequest,
 }: {
   request: SourcingRequest;
   bid: Bid;
   onClose: () => void;
   onAction: (bidId: string, action: "승인" | "거절" | "협의중", memo?: string) => void;
+  onSampleRequest: (bid: Bid) => void;
 }) {
   const [memo, setMemo] = useState("");
   const [showMemo, setShowMemo] = useState(false);
   const [confirmed, setConfirmed] = useState<"승인" | "거절" | "협의중" | null>(null);
 
+  const isCustom = request.type === "CUSTOM";
+  const needSample = request.needSample === "Y";
+
   const handleAction = (action: "승인" | "거절" | "협의중") => {
-    if (action === "협의중" && !showMemo) {
-      setShowMemo(true);
-      return;
-    }
+    if (action === "협의중" && !showMemo) { setShowMemo(true); return; }
     onAction(bid.bidId, action, memo || undefined);
     setConfirmed(action);
   };
 
   const inputCls = "w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors bg-white";
+
+  const isSampleFlow = isCustom && needSample;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -213,14 +310,13 @@ function BidDetailModal({
                 <div className="font-bold text-foreground">{bid.availableDate}</div>
               </div>
               {bid.samplePrice != null && (
-                <div className="bg-secondary rounded-lg p-3 text-center">
-                  <div className="text-xs text-muted-foreground mb-0.5">샘플비</div>
-                  <div className="font-bold text-foreground">{bid.samplePrice.toLocaleString()}원</div>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                  <div className="text-xs text-amber-600 mb-0.5">샘플비</div>
+                  <div className="font-bold text-amber-700">{bid.samplePrice.toLocaleString()}원</div>
                 </div>
               )}
             </div>
 
-            {/* 메모 */}
             {bid.comment && (
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1.5">공급사 메모</div>
@@ -228,7 +324,6 @@ function BidDetailModal({
               </div>
             )}
 
-            {/* 견적서 PDF */}
             {bid.quoteFileUrl && (
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1.5">견적서</div>
@@ -240,7 +335,6 @@ function BidDetailModal({
               </div>
             )}
 
-            {/* 협의 메모 입력 */}
             {showMemo && (
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -259,14 +353,15 @@ function BidDetailModal({
 
             {/* 액션 버튼 */}
             {bid.status === "검토중" && (
-              <div className={`grid gap-2 ${request.type === "CUSTOM" ? "grid-cols-3" : "grid-cols-2"}`}>
+              <div className={`grid gap-2 ${isSampleFlow ? "grid-cols-3" : "grid-cols-2"}`}>
                 <button
                   onClick={() => handleAction("거절")}
                   className="py-2.5 border border-red-200 text-red-500 hover:bg-red-50 rounded font-semibold text-sm transition-colors flex items-center justify-center gap-1.5"
                 >
                   <XCircle size={14} /> 거절
                 </button>
-                {request.type === "CUSTOM" && (
+                {/* CUSTOM + 협의 버튼 */}
+                {!isSampleFlow && request.type === "CUSTOM" && (
                   <button
                     onClick={() => handleAction("협의중")}
                     disabled={showMemo && !memo.trim()}
@@ -279,18 +374,80 @@ function BidDetailModal({
                     <MessageSquare size={14} /> {showMemo ? "전달하기" : "협의"}
                   </button>
                 )}
-                <button
-                  onClick={() => handleAction("승인")}
-                  className="py-2.5 bg-primary hover:bg-primary/90 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <CheckCircle size={14} /> 승인
-                </button>
+                {/* CUSTOM + 샘플 필요: 샘플 요청 버튼 */}
+                {isSampleFlow && (
+                  <button
+                    onClick={() => handleAction("협의중")}
+                    disabled={showMemo && !memo.trim()}
+                    className={`py-2.5 border rounded font-semibold text-sm transition-colors flex items-center justify-center gap-1.5 ${
+                      showMemo && !memo.trim()
+                        ? "border-border text-muted-foreground cursor-not-allowed"
+                        : "border-purple-200 text-purple-600 hover:bg-purple-50"
+                    }`}
+                  >
+                    <MessageSquare size={14} /> {showMemo ? "전달하기" : "협의"}
+                  </button>
+                )}
+                {isSampleFlow ? (
+                  // 샘플 필요한 CUSTOM → 승인 대신 샘플 요청
+                  <button
+                    onClick={() => onSampleRequest(bid)}
+                    className="py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <FlaskConical size={14} /> 샘플 요청
+                  </button>
+                ) : (
+                  // READY 또는 샘플 불필요 CUSTOM → 일반 승인
+                  <button
+                    onClick={() => handleAction("승인")}
+                    className="py-2.5 bg-primary hover:bg-primary/90 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle size={14} /> 승인
+                  </button>
+                )}
               </div>
             )}
 
-            {bid.status !== "검토중" && (
+            {/* 샘플 대기중 상태 — 승인/거절 버튼 */}
+            {bid.status === "샘플발송됨" && (
+              <div className="space-y-2">
+                <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-3 text-sm text-teal-700 flex items-center gap-2">
+                  <FlaskConical size={14} /> 샘플이 발송되었습니다. 수령 후 결정해주세요.
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleAction("거절")}
+                    className="py-2.5 border border-red-200 text-red-500 hover:bg-red-50 rounded font-semibold text-sm transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <XCircle size={14} /> 거절
+                  </button>
+                  <button
+                    onClick={() => handleAction("승인")}
+                    className="py-2.5 bg-primary hover:bg-primary/90 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle size={14} /> 승인
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bid.status === "샘플대기중" && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700 flex items-center gap-2">
+                <Clock size={14} /> 공급사가 샘플을 준비 중입니다.
+              </div>
+            )}
+
+            {(bid.status === "승인" || bid.status === "거절") && (
               <div className={`text-center py-3 rounded-lg text-sm font-medium border ${BID_STATUS_STYLE[bid.status]}`}>
                 이 견적은 <strong>{bid.status}</strong> 상태입니다
+              </div>
+            )}
+
+            {bid.status === "협의중" && (
+              <div className="space-y-2">
+                <div className={`text-center py-3 rounded-lg text-sm font-medium border ${BID_STATUS_STYLE[bid.status]}`}>
+                  협의 진행 중입니다
+                </div>
               </div>
             )}
           </div>
@@ -314,7 +471,6 @@ function BidListModal({
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[520px] overflow-hidden">
 
-        {/* 헤더 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
             <div className="text-xs text-muted-foreground font-mono mb-0.5">{request.id} · {request.type === "READY" ? "기성품" : "주문제작"}</div>
@@ -324,7 +480,6 @@ function BidListModal({
         </div>
 
         <div className="px-6 py-5 space-y-4">
-          {/* 요청 요약 */}
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-secondary rounded-lg p-3 text-center">
               <div className="text-xs text-muted-foreground mb-0.5">희망 수량</div>
@@ -344,7 +499,6 @@ function BidListModal({
             </div>
           </div>
 
-          {/* 견적 목록 */}
           <div>
             <div className="text-xs font-medium text-muted-foreground mb-2">
               접수된 견적 <span className="text-foreground font-bold">{request.bids.length}건</span>
@@ -374,6 +528,9 @@ function BidListModal({
                           ? `${bid.unitPrice?.toLocaleString()}원`
                           : `${((bid.totalBudget ?? 0) / 10000).toLocaleString()}만원`}
                       </div>
+                      {bid.samplePrice != null && (
+                        <div className="text-xs text-amber-600 font-medium">샘플 {bid.samplePrice.toLocaleString()}원</div>
+                      )}
                       <div className="text-xs text-muted-foreground">{bid.availableDate} 납품</div>
                     </div>
                     <ChevronRight size={14} className="text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
@@ -383,7 +540,6 @@ function BidListModal({
             )}
           </div>
 
-          {/* 재요청 버튼 */}
           {["견적수신", "대기중"].includes(request.status) && (
             <button
               onClick={() => onRerequest(request)}
@@ -399,12 +555,7 @@ function BidListModal({
 }
 
 // ── 요청 리스트 행 ────────────────────────────────────────────────────
-function RequestRow({
-  request, onClick,
-}: {
-  request: SourcingRequest;
-  onClick: () => void;
-}) {
+function RequestRow({ request, onClick }: { request: SourcingRequest; onClick: () => void }) {
   return (
     <div
       onClick={onClick}
@@ -466,6 +617,7 @@ export function BuyerSourcingList() {
 
   const [selectedRequest, setSelectedRequest] = useState<SourcingRequest | null>(null);
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
+  const [samplePayBid, setSamplePayBid] = useState<Bid | null>(null);
 
   const handleTabChange = (tab: SourcingType) => {
     setActiveTab(tab);
@@ -482,7 +634,6 @@ export function BuyerSourcingList() {
         return { ...req, bids: newBids, status: newStatus };
       })
     );
-    // selectedRequest도 동기화
     setSelectedRequest((prev) => {
       if (!prev) return prev;
       const newBids = prev.bids.map((b) => b.bidId === bidId ? { ...b, status: action } : b);
@@ -490,13 +641,28 @@ export function BuyerSourcingList() {
     });
   };
 
+  const handleSamplePaid = (bidId: string) => {
+    setRequests((prev) =>
+      prev.map((req) => {
+        if (req.id !== selectedRequest?.id) return req;
+        const newBids = req.bids.map((b) => b.bidId === bidId ? { ...b, status: "샘플대기중" as BidStatus } : b);
+        return { ...req, bids: newBids };
+      })
+    );
+    setSelectedRequest((prev) => {
+      if (!prev) return prev;
+      const newBids = prev.bids.map((b) => b.bidId === bidId ? { ...b, status: "샘플대기중" as BidStatus } : b);
+      if (selectedBid?.bidId === bidId) {
+        setSelectedBid({ ...selectedBid, status: "샘플대기중" });
+      }
+      return { ...prev, bids: newBids };
+    });
+    setSamplePayBid(null);
+  };
+
   const handleRerequest = (request: SourcingRequest) => {
     navigate("/sourcing-request", {
-      state: {
-        prefillItem: request.prefillData,
-        isRerequest: true,
-        originalRequestId: request.id,
-      },
+      state: { prefillItem: request.prefillData, isRerequest: true, originalRequestId: request.id },
     });
   };
 
@@ -506,14 +672,12 @@ export function BuyerSourcingList() {
 
   return (
     <div className="max-w-[900px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
-      {/* 헤더 */}
       <div className="flex items-center gap-2 mb-1">
         <Package size={22} className="text-primary" />
         <h1 className="text-2xl font-bold text-foreground">소싱 요청 관리</h1>
       </div>
       <p className="text-sm text-muted-foreground mb-6">접수된 견적을 확인하고 승인 또는 협의 진행하세요.</p>
 
-      {/* 탭 */}
       <div className="flex gap-1 bg-secondary border border-border rounded-lg p-1 mb-6 w-fit">
         {(["READY", "CUSTOM"] as const).map((tab) => (
           <button
@@ -533,7 +697,6 @@ export function BuyerSourcingList() {
         ))}
       </div>
 
-      {/* 요청 목록 */}
       <div className="space-y-3">
         {filtered.map((req) => (
           <RequestRow key={req.id} request={req} onClick={() => setSelectedRequest(req)} />
@@ -546,7 +709,6 @@ export function BuyerSourcingList() {
         )}
       </div>
 
-      {/* 견적 목록 모달 */}
       {selectedRequest && !selectedBid && (
         <BidListModal
           request={selectedRequest}
@@ -556,13 +718,22 @@ export function BuyerSourcingList() {
         />
       )}
 
-      {/* 견적 상세 모달 */}
-      {selectedRequest && selectedBid && (
+      {selectedRequest && selectedBid && !samplePayBid && (
         <BidDetailModal
           request={selectedRequest}
           bid={selectedBid}
           onClose={() => setSelectedBid(null)}
           onAction={handleBidAction}
+          onSampleRequest={(bid) => setSamplePayBid(bid)}
+        />
+      )}
+
+      {selectedRequest && samplePayBid && (
+        <SamplePaymentModal
+          bid={samplePayBid}
+          request={selectedRequest}
+          onClose={() => setSamplePayBid(null)}
+          onPaid={handleSamplePaid}
         />
       )}
     </div>

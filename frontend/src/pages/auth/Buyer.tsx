@@ -117,11 +117,7 @@ function Step1({ form, set, memberType }: { form: FormData; set: (f: Partial<For
             <Field label="담당자 연락처" required hint="주문·배송 관련 긴급 연락에 사용됩니다.">
                 <input type="tel" value={form.managerPhone} onChange={(e) => set({ managerPhone: e.target.value })} placeholder="010-0000-0000" className={inputCls} />
             </Field>
-                <PhoneAuthButton onAuthSuccess={(impUid: any) => {
-                    // 1. 서버에서 impUid로 인증된 번호를 조회해서 가져오는 로직 필요
-                    // 2. 여기서는 임시로 인증 성공 알림만 처리
-                    alert("인증 성공!");
-                }} />
+                
             {memberType === "employee" && (
                 <><hr className="border-border" />
                     <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Upload size={14} className="text-primary" /> 직원 증빙 서류</div>

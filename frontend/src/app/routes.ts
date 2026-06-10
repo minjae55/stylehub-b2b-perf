@@ -45,6 +45,7 @@ import { FindPw } from "../pages/auth/FindPw";
 import { AdminUsers } from "../pages/AdminUsers";
 import { BuyerOrderDetail } from "../pages/buyer/BuyerOrderDetail";
 import { BuyerSourcingList } from "../pages/buyer/BuyerSourcingList";
+import { BuyerSourcingDetail } from "../pages/buyer/BuyerSourcingDetail";
 import { SellerOrderDetail } from "../pages/seller/SellerOrderDetail";
 import { SellerQuoteWrite } from "../pages/seller/SellerQuoteWrite";
 import { PartnerPlan } from "../pages/PartnerPlan";
@@ -90,6 +91,7 @@ export const router = createBrowserRouter([
 
         { path: "buyer/shipping-quotes", Component: BuyerShippingQuotes },
         { path: "buyer/my-sourcing", Component: BuyerSourcingList },
+		{ path: "buyer/sourcing-detail", Component: BuyerSourcingDetail},
         { path: "buyer/orders/:id", Component: BuyerOrderDetail },
         { path: "buyer/orders/:orderId/contract-sign", Component: BuyerContractSign },
         { path: "buyer", Component: BuyerDashboard },
