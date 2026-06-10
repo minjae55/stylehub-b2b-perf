@@ -78,7 +78,6 @@ export function Checkout() {
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-8">
       <Link to="/cart" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-6">
-        <ArrowLeft size={16} /> 장바구니로 돌아가기
       </Link>
 
       <h1 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
@@ -159,7 +158,6 @@ export function Checkout() {
             </h2>
             <div className="space-y-3">
               {[
-                { value: "escrow", label: "에스크로 안전결제",  desc: "결제 대금을 보호하고 거래 완료 후 판매자에게 정산합니다", badge: "안전" },
                 { value: "wire",   label: "무통장 입금",         desc: "입금 확인 후 주문이 진행됩니다" },
                 { value: "card",   label: "법인카드 결제",       desc: "법인카드로 즉시 결제합니다" },
               ].map((m) => (

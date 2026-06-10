@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Upload, User, Building2, MapPin, AlertCircle, Tag } from "lucide-react";
 import { CategoryStep } from "./Category";
-import { PhoneAuthButton } from "@/app/components/ui/phone-auth-button"
 
 type MemberType = "ceo" | "employee";
 
