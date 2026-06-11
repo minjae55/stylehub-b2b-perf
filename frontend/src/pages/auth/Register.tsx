@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { User, Building2, ArrowRight, ChevronLeft } from "lucide-react";
 
 type Role = "buyer" | "seller";
-type MemberType = "ceo" | "employee";
+type MemberType = "president" | "employee";
 
 export function Register() {
     const navigate = useNavigate();
@@ -12,7 +12,22 @@ export function Register() {
 
     const handleNext = () => {
         if (!role || !memberType) return;
-        navigate(`/auth/register/${role}?type=${memberType}`);
+
+        if (memberType === "employee") {
+            navigate(`/auth/register/employee?role=${role}`);
+            return;
+        }
+
+        navigate(`/auth/register/${role}`);
+    };
+
+    const handleRoleSelect = (selectedRole: Role) => {
+        if (role === selectedRole) {
+            setRole(null); // 이미 선택된 걸 누르면 접기 (null로 초기화)
+            setMemberType(null); // 하위 메뉴도 같이 초기화하는 것을 추천합니다.
+        } else {
+            setRole(selectedRole); // 아니면 선택
+        }
     };
 
     return (
@@ -28,7 +43,7 @@ export function Register() {
                 <div className="grid grid-cols-2 gap-3">
                     <button
                         type="button"
-                        onClick={() => setRole("buyer")}
+                        onClick={() => handleRoleSelect("buyer")}
                         className={`border-2 rounded p-4 text-left transition-all ${
                             role === "buyer"
                                 ? "border-primary bg-secondary"
@@ -43,7 +58,7 @@ export function Register() {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setRole("seller")}
+                        onClick={() => handleRoleSelect("seller")}
                         className={`border-2 rounded p-4 text-left transition-all ${
                             role === "seller"
                                 ? "border-primary bg-secondary"
@@ -70,15 +85,15 @@ export function Register() {
                     <div className="grid grid-cols-2 gap-3">
                         <button
                             type="button"
-                            onClick={() => setMemberType("ceo")}
+                            onClick={() => setMemberType("president")}
                             className={`border-2 rounded p-4 text-left transition-all ${
-                                memberType === "ceo"
+                                memberType === "president"
                                     ? "border-primary bg-secondary"
                                     : "border-border hover:border-primary/40"
                             }`}
                         >
-                            <User size={18} className={`mb-2 ${memberType === "ceo" ? "text-primary" : "text-muted-foreground"}`} />
-                            <div className={`font-semibold text-sm ${memberType === "ceo" ? "text-primary" : "text-foreground"}`}>
+                            <User size={18} className={`mb-2 ${memberType === "president" ? "text-primary" : "text-muted-foreground"}`} />
+                            <div className={`font-semibold text-sm ${memberType === "president" ? "text-primary" : "text-foreground"}`}>
                                 대표자
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5">사업자 대표로 직접 가입</div>

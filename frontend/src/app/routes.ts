@@ -21,8 +21,8 @@ import { AdminInspection } from "../pages/AdminInspection";
 import { AdminAnalytics } from "../pages/AdminAnalytics";
 import { BuyerInspection } from "../pages/BuyerInspection";
 import { QuoteRequest } from "../pages/QuoteRequest";
-import { BuyerDashboard } from "../pages/BuyerDashboard";
-import { SellerDashboard } from "../pages/SellerDashboard";
+import { BuyerDashboard } from "../pages/buyer/BuyerDashboard";
+import { SellerDashboard } from "../pages/seller/SellerDashboard";
 import { SellerProductRegister } from "../pages/SellerProductRegister";
 import { OrderDetail } from "../pages/OrderDetail";
 import { SupplierRegister } from "../pages/SupplierRegister";
@@ -36,6 +36,7 @@ import { RestrictedBusinessTypes } from "../pages/RestrictedBusinessTypes";
 import { AuthLayout } from "../pages/auth/layout";
 import { Login } from "../pages/auth/Login";
 import { Register } from "../pages/auth/Register";
+import { RegisterEmployee } from "../pages/auth/Employee"
 import { RegisterBuyer } from "../pages/auth/Buyer";
 import { RegisterSeller } from "../pages/auth/Seller";
 import { RegisterSuccess } from "../pages/auth/Success";
@@ -50,7 +51,7 @@ import { SellerOrderDetail } from "../pages/seller/SellerOrderDetail";
 import { SellerQuoteWrite } from "../pages/seller/SellerQuoteWrite";
 import { PartnerPlan } from "../pages/PartnerPlan";
 import { SearchPage } from "@/pages/admin/SearchPage";
-import {Wishlist} from "../pages/Wishlist"; //좋아요 페이지 추가
+import { Wishlist } from "../pages/Wishlist"; //좋아요 페이지 추가
 
 import {SellerProductManage} from "../pages/seller/SellerProductManage"; // 판매자 상품 관리 페이지 추가
 import { SellerContractSign } from "../pages/seller/SellerContractSign";
@@ -60,6 +61,7 @@ import { Disputes } from "../pages/Disputes";
 
 import Settlements from "@/pages/admin/Settlements";
 import AdminSupport from "@/pages/admin/AdminSupport";
+import {EmployeeManagement} from "@/pages/EmployeeManagement";
 
 export const router = createBrowserRouter([
     {
@@ -67,7 +69,6 @@ export const router = createBrowserRouter([
     Component: Root,
     children: [
         { index: true, Component: Home },
-
         { path: "purchase-agency", Component: PurchaseAgency },
         { path: "shipping-agency", Component: ShippingAgency },
         { path: "products", Component: AllProducts },
@@ -90,6 +91,7 @@ export const router = createBrowserRouter([
         { path: "restricted-businesses", Component: RestrictedBusinessTypes },
         { path: "quote-request", Component: QuoteRequest },
         { path: "mypage", Component: MyPage },
+        { path: "employee-management", Component: EmployeeManagement},
 
         { path: "buyer/shipping-quotes", Component: BuyerShippingQuotes },
         { path: "buyer/my-sourcing", Component: BuyerSourcingList },
@@ -114,19 +116,21 @@ export const router = createBrowserRouter([
         { path: "disputes", Component: Disputes },
         { path: "partner", Component: PartnerPlan },
     ],
-},
+    },
     {
     path: "auth",
     Component: AuthLayout,
     children: [
+        { index: true, Component: Login},
         { path: "login", Component: Login },
         { path: "register", Component: Register },
         { path: "register/buyer", Component: RegisterBuyer },
         { path: "register/seller", Component: RegisterSeller },
+        { path: "register/employee", Component: RegisterEmployee },
         { path: "register/success", Component: RegisterSuccess },
         { path: "find-id", Component: FindId },
         { path: "find-pw", Component: FindPw },
-    ],
+    ]
     },
     {
     path: "admin",
