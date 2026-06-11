@@ -103,8 +103,8 @@ export function Login() {
 
                         {/* Greeting */}
                         <div className="mb-6">
-                            <h2 className="text-1xl font-bold text-foreground mb-1">사장님! 다른 플랫폼에서 방황하지 마세요.
-                            </h2>
+                            <h3 className="text-1xl font-bold text-foreground mb-2">사장님! 다른 플랫폼에서 방황하지 마세요.
+                            </h3>
                             <p className="text-sm text-muted-foreground">
                                 도매상품을 스타일 허브에서 만나보세요!
                             </p>
@@ -113,18 +113,16 @@ export function Login() {
                         {/* Form */}
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-[#333] mb-1.5">이메일</label>
                                 <input
                                     type="email"
                                     value={form.email}
                                     onChange={(e) => setForm({...form, email: e.target.value})}
-                                    placeholder="your@company.com"
+                                    placeholder="이메일"
                                     className="w-full border border-border rounded-lg px-4 py-3 text-sm outline-none focus:border-primary transition-colors bg-white"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-[#333] mb-1.5">비밀번호</label>
                                 <div className="relative">
                                     <input
                                         type={showPassword ? "text" : "password"}
@@ -144,6 +142,7 @@ export function Login() {
                             </div>
 
                             <div className="flex items-center justify-between">
+                                {/* 좌측 */}
                                 <label className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground">
                                     <input
                                         type="checkbox"
@@ -153,9 +152,17 @@ export function Login() {
                                     />
                                     로그인 상태 유지
                                 </label>
-                                <Link to="/auth/find-pw" className="text-xs text-primary hover:underline">
-                                    비밀번호 찾기
-                                </Link>
+
+                                {/* 우측 그룹화 */}
+                                <div className="flex items-center gap-1">
+                                    <Link to="/auth/find-id" className="text-xs text-primary hover:underline">
+                                        아이디 찾기
+                                    </Link>
+                                    <span className="text-xs">/</span>
+                                    <Link to="/auth/find-pw" className="text-xs text-primary hover:underline">
+                                        비밀번호 찾기
+                                    </Link>
+                                </div>
                             </div>
 
                             <Link
@@ -180,7 +187,20 @@ export function Login() {
                                 </Link>
                             </div>
                         </div>
-
+                        <div className="flex justify-center gap-4">
+                            <div className="w-20 h-20 mt-6" id="lSnsLinkNaver"><Link
+                                to="/ssl/member/snsLogin/mem_snsBridge.php?provider=naver&amp;back=aHR0cHM6Ly9kb21lbWVkYi5kb21lZ2dvb2suY29tL2luZGV4"
+                                title="네이버로그인"><img src="https://cdn1.domeggook.com/image/member/btn_naver.png"
+                                                    title="네이버로그인" alt="네이버로그인" width="48" height="48"/></Link></div>
+                            <div className="w-20 h-20 mt-6" id="lSnsLinkKakao"><Link
+                                to="/ssl/member/snsLogin/mem_snsBridge.php?provider=kakao&amp;back=aHR0cHM6Ly9kb21lbWVkYi5kb21lZ2dvb2suY29tL2luZGV4"
+                                title="카카오로그인"><img src="https://cdn1.domeggook.com/image/member/btn_kakao.png"
+                                                    title="카카오로그인" alt="카카오로그인" width="48" height="48"/></Link></div>
+                            <div className="w-20 h-20 mt-6" id="lSnsLinkApple"><Link
+                                to="/ssl/member/snsLogin/mem_snsBridge.php?provider=apple&amp;back=aHR0cHM6Ly9kb21lbWVkYi5kb21lZ2dvb2suY29tL2luZGV4"
+                                title="애플로그인"><img src="https://cdn1.domeggook.com/image/member/btn_apple.png"
+                                                   title="애플로그인" alt="애플로그인" width="48" height="48"/></Link></div>
+                        </div>
                     </div>
                 </div>
 

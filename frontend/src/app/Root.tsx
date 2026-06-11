@@ -19,7 +19,7 @@ import {
   Star
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import {BuyerDashboard} from "@/pages/BuyerDashboard";
+import {BuyerDashboard} from "@/pages/buyer/BuyerDashboard";
 
 // const navLinks = [
 //   { label: "홈", path: "/" },

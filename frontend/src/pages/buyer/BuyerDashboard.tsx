@@ -1,11 +1,10 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {Link, useNavigate} from "react-router";
 import {
-  Search, FileText, TrendingUp, ShoppingBag, ArrowUp,
-  CheckCircle, Clock, Truck, AlertCircle, Heart,
+  Search, FileText, ShoppingBag, Clock, Truck, AlertCircle, Heart,
   ChevronRight, BarChart2, Bell, Settings, Eye,
-  Package, Star, MapPin, Filter, MessageSquare, Layers,
-  CreditCard, RefreshCcw, ThumbsUp, MessageSquareWarning
+  Star, MapPin, MessageSquare,
+  RefreshCcw, ThumbsUp, MessageSquareWarning
 } from "lucide-react";
 
 // ────────────────────────────────────────────────
@@ -68,13 +67,6 @@ const favoriteSellers = [
   { name: "케이스타일",    region: "동대문",  category: "액세서리", rating: 4.8, orders: 9,  badge: null },
 ];
 
-const recommendedProducts = [
-  { id: 1, seller: "르솔레이유", name: "썸머 린넨 세트업", category: "세트", price: 64000, moq: 3, tag: "신상" },
-  { id: 2, seller: "트렌드메이커", name: "스트라이프 니트 가디건", category: "상의", price: 38000, moq: 5, tag: "인기" },
-  { id: 3, seller: "모아패션", name: "크롭 데님 자켓", category: "아우터", price: 52000, moq: 3, tag: "재입고" },
-  { id: 4, seller: "케이스타일", name: "레이어드 골드 체인 목걸이", category: "액세서리", price: 18000, moq: 10, tag: "신상" },
-];
-
 // ────────────────────────────────────────────────
 // 뱃지 헬퍼
 // ────────────────────────────────────────────────
@@ -119,19 +111,6 @@ function SellerBadge({ badge }: { badge: string | null }) {
   );
 }
 
-function ProductTag({ tag }: { tag: string }) {
-  const map: Record<string, string> = {
-    신상:   "bg-rose-100 text-rose-600",
-    인기:   "bg-amber-100 text-amber-600",
-    재입고: "bg-blue-100 text-blue-600",
-  };
-  return (
-    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${map[tag] ?? "bg-muted text-muted-foreground"}`}>
-      {tag}
-    </span>
-  );
-}
-
 // ────────────────────────────────────────────────
 // 탭 타입
 // ────────────────────────────────────────────────
@@ -145,13 +124,9 @@ type Tab = "overview" | "orders" | "inquiries" | "sellers" | "negotiations";
 export function BuyerDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedPeriod, setSelectedPeriod] = useState("3months");
-  const [role, setRole] = useState<UserRole>("buyer");
-  const [activeTab, setActiveTab] = useState<Tab>("orders");
+  const [role] = useState<UserRole>("buyer");
+  const [, setActiveTab] = useState<Tab>("orders");
   const navigate = useNavigate();
-
-  const totalSpend  = purchaseStats.reduce((a, s) => a + s.total, 0);
-  const totalOrders = purchaseStats.reduce((a, s) => a + s.count, 0);
-  const avgOrderValue = Math.round(totalSpend / totalOrders);
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "overview",  label: "개요",       icon: <BarChart2 size={15} /> },
@@ -190,7 +165,7 @@ export function BuyerDashboard() {
               <Star size={15} /> 셀러
             </button>
             <Link
-              to="/buyer/inquiry/new"
+              to="../sourcing-request" // TODO 경로 재설정
               className="flex items-center gap-1.5 bg-[#7eb3f5] hover:bg-[#6aa2e8] text-[#1a2744] text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
             >
               <MessageSquare size={15} /> 소싱 요청
@@ -199,7 +174,7 @@ export function BuyerDashboard() {
               <Bell size={18} />
             </button>
             <Link
-                to="../mypage"
+                to="/employee-management"
                 className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors"
             >
               <Settings size={18} />
@@ -215,7 +190,7 @@ export function BuyerDashboard() {
           { to: "/buyer/my-sourcing",        icon: <FileText size={20}         className="text-[#7eb3f5]"  />, bg: "bg-sky-50 group-hover:bg-sky-100",     label: "소싱 접수 내역",   sub: "소싱 접수·확인" },
           { to: "/orders",          icon: <Truck size={20}          className="text-amber-600"  />, bg: "bg-amber-50 group-hover:bg-amber-100", label: "발주 내역",   sub: "주문·배송 현황"   },
           { to: "../negotiations",icon: <Heart size={20}      className="text-green-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "협의 내역",   sub: "협의 요청·확인"   },
-          { to: "../disputes",icon: <MessageSquareWarning size={20}      className="text-green-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "이의제기",   sub: "이의 요청·확인"   }
+          { to: "../disputes",icon: <MessageSquareWarning size={20}      className="text-navy-600"  />, bg: "bg-green-50 group-hover:bg-green-100", label: "이의제기",   sub: "이의 요청·확인"   }
         ].map((item) => (
           <Link
             key={item.to}
@@ -229,52 +204,6 @@ export function BuyerDashboard() {
             </div>
             <ChevronRight size={15} className="text-muted-foreground group-hover:text-[#7eb3f5] transition-colors" />
           </Link>
-        ))}
-      </div>
-
-      {/* ── KPI 카드 4개 ── */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {[
-          {
-            icon: <CreditCard size={20} className="text-blue-600" />,
-            bg: "bg-blue-50",
-            label: "총 구매액 (3개월)",
-            value: `₩${(totalSpend / 10000).toFixed(0)}만`,
-            sub: "+9.8% vs 이전 3개월",
-            subColor: "text-green-600",
-            arrow: <ArrowUp size={12} />,
-          },
-          {
-            icon: <ShoppingBag size={20} className="text-amber-600" />,
-            bg: "bg-amber-50",
-            label: "총 발주 건수",
-            value: `${totalOrders}건`,
-            sub: "+6.3% vs 이전 3개월",
-            subColor: "text-green-600",
-            arrow: <ArrowUp size={12} />,
-          },
-          {
-            icon: <TrendingUp size={20} className="text-green-600" />,
-            bg: "bg-green-50",
-            label: "평균 발주액",
-            value: `₩${(avgOrderValue / 1000).toFixed(0)}천`,
-            sub: "+2.1% vs 이전 3개월",
-            subColor: "text-green-600",
-            arrow: <ArrowUp size={12} />,
-          },
-        ].map((card) => (
-          <div key={card.label} className="bg-white border border-border rounded-lg p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`${card.bg} p-2.5 rounded`}>{card.icon}</div>
-              <div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wide">{card.label}</div>
-                <div className="text-2xl font-bold text-foreground font-mono">{card.value}</div>
-              </div>
-            </div>
-            <div className={`flex items-center gap-1 text-xs ${card.subColor}`}>
-              {card.arrow}{card.sub}
-            </div>
-          </div>
         ))}
       </div>
 
@@ -370,48 +299,6 @@ export function BuyerDashboard() {
                 ))}
               </div>
             </div>
-
-            {/* 즐겨찾기 셀러 */}
-            {/*<div className="bg-white border border-border rounded-lg overflow-hidden">*/}
-            {/*  <div className="px-5 py-4 border-b border-border flex items-center justify-between">*/}
-            {/*    <h2 className="font-bold text-foreground flex items-center gap-2">*/}
-            {/*      <Heart size={18} className="text-rose-400" />*/}
-            {/*      즐겨찾기 셀러*/}
-            {/*    </h2>*/}
-            {/*    <button*/}
-            {/*      onClick={() => setTab("sellers")}*/}
-            {/*      className="text-xs text-[#3a7fd5] hover:underline"*/}
-            {/*    >*/}
-            {/*      전체보기*/}
-            {/*    </button>*/}
-            {/*  </div>*/}
-            {/*  <div className="divide-y divide-border">*/}
-            {/*    {favoriteSellers.map((s, i) => (*/}
-            {/*      <div key={s.name} className="px-5 py-3 flex items-center gap-3">*/}
-            {/*        <div className="w-8 h-8 rounded-full bg-blue-50 text-[#3a7fd5] flex items-center justify-center text-xs font-bold flex-shrink-0">*/}
-            {/*          {i + 1}*/}
-            {/*        </div>*/}
-            {/*        <div className="flex-1 min-w-0">*/}
-            {/*          <div className="flex items-center gap-2 mb-0.5">*/}
-            {/*            <span className="text-sm font-medium text-foreground">{s.name}</span>*/}
-            {/*            <SellerBadge badge={s.badge} />*/}
-            {/*          </div>*/}
-            {/*          <div className="flex items-center gap-2 text-xs text-muted-foreground">*/}
-            {/*            <span className="flex items-center gap-0.5"><MapPin size={10} />{s.region}</span>*/}
-            {/*            <span>·</span>*/}
-            {/*            <span>{s.category}</span>*/}
-            {/*          </div>*/}
-            {/*        </div>*/}
-            {/*        <div className="text-right flex-shrink-0">*/}
-            {/*          <div className="flex items-center gap-1 text-xs text-amber-500 font-semibold justify-end">*/}
-            {/*            <Star size={11} fill="currentColor" />{s.rating}*/}
-            {/*          </div>*/}
-            {/*          <div className="text-xs text-muted-foreground font-mono">{s.orders}건 거래</div>*/}
-            {/*        </div>*/}
-            {/*      </div>*/}
-            {/*    ))}*/}
-            {/*  </div>*/}
-            {/*</div>*/}
           </div>
         </div>
       )}
