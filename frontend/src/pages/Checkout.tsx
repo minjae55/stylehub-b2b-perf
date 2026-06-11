@@ -220,7 +220,8 @@ export function Checkout() {
                 <span>상품 금액</span><span className="font-mono">{formatPrice(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>국내 배송비</span><span className="font-mono">{shipping === 0 ? "무료배송" : formatPrice(shipping)}</span>
+                <span>국내 배송비</span>
+                <span className="font-mono">착불</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>플랫폼 이용 수수료</span><span className="font-mono">{formatPrice(platformFee)}</span>

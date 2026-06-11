@@ -89,7 +89,10 @@ export function Cart() {
 
   const selectedItems = items.filter((i) => selected.includes(i.id));
   const subtotal = selectedItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
-  const shippingEst = subtotal >= 1000000 ? "무료배송" : "3,000원";
+  const shippingEst = "착불";
+  // const shippingEst = subtotal >= 1000000 ? "무료배송" : "3,000원";
+  
+
   const shippingFee = subtotal >= 1000000 || subtotal === 0 ? 0 : 3000;
   const total = subtotal + shippingFee;
 

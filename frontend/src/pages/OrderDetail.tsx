@@ -458,7 +458,7 @@ export function OrderDetail() {
               onClick={() => setActiveTab("inquiry")}
               className="w-full flex items-center justify-center gap-1.5 border border-border text-muted-foreground hover:border-[#C4956A] hover:text-[#C4956A] text-xs px-3 py-2 rounded transition-colors"
             >
-              <MessageCircle size={13} /> 공급사 문의잉
+              <MessageCircle size={13} /> 공급사 문의잉 
             </button>
           </div>
         </aside>
