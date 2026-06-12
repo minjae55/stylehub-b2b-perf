@@ -62,7 +62,8 @@ import { QuoteDetail } from "../pages/quote/QuoteDetail";
 
 import Settlements from "@/pages/admin/Settlements";
 import AdminSupport from "@/pages/admin/AdminSupport";
-import {EmployeeManagement} from "@/pages/EmployeeManagement";
+import {CompanySettings} from "@/pages/CompanySettings";
+import {Inquiry} from "@/pages/Inquiry";
 
 export const router = createBrowserRouter([
     {
@@ -88,9 +89,10 @@ export const router = createBrowserRouter([
         { path: "product/:id", Component: ProductDetail },
         { path: "supplier-register", Component: SupplierRegister },
         { path: "restricted-businesses", Component: RestrictedBusinessTypes },
+        { path: "inquiry", Component: Inquiry },
 
         { path: "mypage", Component: MyPage },
-        { path: "employee-management", Component: EmployeeManagement},
+        { path: "employee-management", Component: CompanySettings},
 
         { path: "buyer/shipping-quotes", Component: BuyerShippingQuotes }, 
         { path: "buyer/my-sourcing", Component: BuyerSourcingList },
