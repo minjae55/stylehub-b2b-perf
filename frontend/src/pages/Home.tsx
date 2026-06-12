@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
 import {
   Package,
@@ -12,6 +12,7 @@ import {
   CheckCircle,
   ShoppingCart,
   Tag,
+  ChevronDown,
 } from "lucide-react";
 
 const categories = [
@@ -113,6 +114,16 @@ const categories = [
   },
 ];
 
+// [추가] 브랜드 대분류 - AllProducts.tsx와 동일한 구조
+const brandGroups = [
+  { id: "all", name: "전체", icon: "🏷️", brands: [] },
+  { id: "women", name: "여성복", icon: "👗", brands: ["동대문패션", "스타일컴퍼니", "엘레강스모드", "트렌드하우스", "페미닌스타일", "내추럴보이", "세트스타일", "코지니트"] },
+  { id: "men", name: "남성복", icon: "👔", brands: ["캐주얼하우스", "진워크스", "프리미엄어패럴"] },
+  { id: "sports", name: "스포츠", icon: "🏃", brands: ["액티브웨어코리아", "스포츠라이프"] },
+  { id: "home", name: "홈·이너", icon: "🩱", brands: ["베이직이너", "코지홈"] },
+  { id: "acc", name: "액세서리·신발", icon: "👜", brands: ["패션액세서리몰", "슈즈마켓"] },
+];
+
 const featuredProducts = [
   { id: 1, name: "여성 린넨 블라우스 (7컬러)", supplier: "동대문패션(주)", price: "₩8,900", unit: "/벌", moq: "50벌", image: "https://images.unsplash.com/photo-1594938298603-c8148c4b2e8e?w=320&h=240&fit=crop&auto=format", verified: true, bookmarked: false },
   { id: 2, name: "와이드 슬랙스 스트레이트", supplier: "스타일컴퍼니", price: "₩15,800", unit: "/벌", moq: "40벌", image: "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=320&h=240&fit=crop&auto=format", verified: true, bookmarked: true },
@@ -136,10 +147,38 @@ const fashionServices = [
   { icon: <Tag size={32} />, title: "시즌 할인", desc: "대량 주문 시 추가 할인 협의 가능", detail: "MOQ 조건부 특가 제공", path: "/products" },
 ];
 
+// [추가] 히어로 슬라이더 데이터 - public/images/ 폴더에 banner1~4.png 파일 넣어야 함
+const heroSlides = [
+  { image: "/images/banner1.png", label: "내추럴 무드" },
+  { image: "/images/banner2.png", label: "국내 패션 B2B 도매" },
+  { image: "/images/banner3.png", label: "시즌 컬렉션" },
+  { image: "/images/banner4.png", label: "스트리트 무드" },
+];
+
 export function Home() {
   const [hoveredProduct, setHoveredProduct] = useState<number | null>(null);
   const [bookmarks, setBookmarks] = useState<number[]>(featuredProducts.filter(p => p.bookmarked).map(p => p.id));
   const [activeCat, setActiveCat] = useState<string | null>(null);
+  // [추가] 카테고리/브랜드 사이드탭 토글 state
+  const [sidebarTab, setSidebarTab] = useState<"category" | "brand">("category");
+  // [추가] 브랜드 대분류 펼침 state
+  const [expandedBrandGroup, setExpandedBrandGroup] = useState<string | null>(null);
+  // [추가] 히어로 슬라이더 현재 인덱스
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // [추가] 슬라이드 이전/다음 핸들러
+  const prevSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
+  }, []);
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+  }, []);
+
+  // [추가] 5초 자동 슬라이드
+  useEffect(() => {
+    const timer = setInterval(nextSlide, 5000);
+    return () => clearInterval(timer);
+  }, [nextSlide]);
 
   const toggleBookmark = (id: number) => {
     setBookmarks(prev =>
@@ -147,125 +186,90 @@ export function Home() {
     );
   };
 
+  // [추가] 브랜드 대분류 펼침 핸들러
+  const handleBrandGroupClick = (groupId: string) => {
+    if (groupId === "all") {
+      setExpandedBrandGroup(null);
+      return;
+    }
+    setExpandedBrandGroup(expandedBrandGroup === groupId ? null : groupId);
+  };
+
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-5">
       {/* Hero + Category Grid */}
-      <div className="grid grid-cols-[220px_1fr_200px] gap-4 mb-6">
-        {/* Left: Category Menu */}
-        <div className="bg-white rounded border border-border overflow-hidden relative">
-          <div className="bg-primary text-white px-4 py-2.5 text-sm font-semibold">전체 카테고리</div>
-          {categories.map((cat) => (
-            <div key={cat.name} className="relative border-b border-muted last:border-0">
-              <div className={`flex items-center gap-2.5 transition-colors ${activeCat === cat.name ? "bg-secondary text-primary" : "hover:bg-secondary hover:text-primary"}`}>
-                <Link
-                  to={`/products?category=${cat.id}`}
-                  className="flex-1 flex items-center gap-2.5 px-4 py-2.5 text-sm text-left"
-                >
-                  <span className="text-base">{cat.icon}</span>
-                  <span className="flex-1 font-medium">{cat.name}</span>
-                </Link>
-                <button
-                  onClick={() => setActiveCat(activeCat === cat.name ? null : cat.name)}
-                  className="px-3 py-2.5"
-                >
-                  <ChevronRight size={13} className={`transition-transform ${activeCat === cat.name ? "rotate-90 text-primary" : "text-muted-foreground"}`} />
-                </button>
-              </div>
-              {activeCat === cat.name && (
-              <div className="flex absolute left-full top-0 bg-white border border-border shadow-lg z-30 min-w-[720px] p-5 gap-5">
-                {/* Sub Categories */}
-                <div className="w-[180px] flex-shrink-0 border-r border-border pr-5">
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">세부 카테고리</div>
-                  <div className="space-y-1">
-                    {cat.sub.map((s) => (
-                      <Link
-                        key={s}
-                        to={`/products?category=${cat.id}&q=${encodeURIComponent(s)}`}
-                        onClick={() => setActiveCat(null)}
-                        className="block px-3 py-2 text-sm rounded hover:bg-secondary hover:text-primary transition-colors"
-                      >{s}</Link>
-                    ))}
-                    <Link
-                      to={`/products?category=${cat.id}`}
-                      onClick={() => setActiveCat(null)}
-                      className="block px-3 py-2 text-sm rounded text-primary font-semibold hover:bg-secondary transition-colors mt-1"
-                    >전체 보기 →</Link>
-                  </div>
-                </div>
-
-                {/* Product List */}
-                <div className="flex-1">
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">인기 상품</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {cat.products.map((product) => (
-                      <Link
-                        key={product.id}
-                        to={`/product/${product.id}`}
-                        onClick={() => setActiveCat(null)}
-                        className="flex gap-3 p-2 rounded border border-transparent hover:border-primary hover:bg-secondary/50 transition-all group/item"
-                      >
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          className="w-16 h-16 object-cover rounded flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-medium text-foreground line-clamp-2 leading-snug mb-1 group-hover/item:text-primary">{product.name}</h4>
-                          <div className="text-primary font-bold text-sm">{product.price}</div>
-                          <div className="text-xs text-muted-foreground">MOQ {product.moq}</div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              )}
-            </div>
-          ))}
-        </div>
+      {/* [변경] grid-cols-[220px_1fr_200px] → grid-cols-[1fr_200px] : 왼쪽 카테고리 사이드바 제거 */}
+      <div className="grid grid-cols-[1fr_200px] gap-4 mb-6">
+        {/* [변경] Left: Category Menu 블록 전체 삭제 */}
 
         {/* Center: Hero Banner */}
-        <div className="relative rounded overflow-hidden bg-gradient-to-br from-[#1a0e2e] to-[#2d1a4e] min-h-[400px] flex flex-col justify-end">
-          <img
-            src="https://images.unsplash.com/photo-1490481703813-8a8d0912db7e?w=800&h=420&fit=crop&auto=format"
-            alt="StyleHub 국내 여성복 B2B 도매 플랫폼"
-            className="absolute inset-0 w-full h-full object-cover opacity-35"
-          />
-          <div className="relative z-10 p-8">
-            <div className="inline-block bg-primary text-white text-xs font-mono px-2 py-1 rounded mb-3 tracking-wider uppercase">국내 패션 B2B 도매</div>
-            <h1 className="text-white text-3xl font-bold leading-tight mb-3">
-              국내 여성복 도매,<br />
-              <span className="text-accent">스타일허브에서 한 번에</span>
-            </h1>
-            <p className="text-[#ccc] text-sm mb-5 max-w-md">
-              동대문 패션 셀러와 전국 바이어를 직접 연결합니다. 중간 유통 없이 합리적인 가격으로 최신 트렌드 의류를 도매로 구매하세요.
-            </p>
-            <div className="flex gap-3">
-              <Link to="/products" className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded text-sm font-semibold transition-colors">
-                전체 상품 보기
-              </Link>
-            </div>
+        {/* [변경] 오버레이/텍스트/버튼/통계 블록 전체 제거, 이미지 opacity-100으로 변경 */}
+        <div className="relative rounded overflow-hidden min-h-[400px] flex flex-col justify-end">
+          {/* 슬라이드 이미지들 */}
+          {heroSlides.map((slide, i) => (
+            <img
+              key={slide.image}
+              src={slide.image}
+              alt={slide.label}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${i === currentSlide ? "opacity-100" : "opacity-0"}`}
+            />
+          ))}
+
+          {/* 좌측 화살표 */}
+          <button
+            onClick={prevSlide}
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors"
+          >
+            <ChevronRight size={18} className="rotate-180" />
+          </button>
+          {/* 우측 화살표 */}
+          <button
+            onClick={nextSlide}
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors"
+          >
+            <ChevronRight size={18} />
+          </button>
+
+          {/* 하단 점 인디케이터 */}
+          <div className="absolute bottom-[72px] left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+            {heroSlides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentSlide(i)}
+                className={`rounded-full transition-all ${i === currentSlide ? "w-5 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}`}
+              />
+            ))}
           </div>
-          <div className="relative z-10 border-t border-white/10 bg-black/30 backdrop-blur-sm grid grid-cols-3 divide-x divide-white/10">
+
+          {/* [복구] 하단 통계 바 */}
+          {/* [변경] 배경 bg-black/30 → bg-black/60, 텍스트 흰색 고정으로 밝은 이미지에서도 잘 보이게 */}
+          <div className="relative z-10 border-t border-white/10 bg-black/60 backdrop-blur-sm grid grid-cols-3 divide-x divide-white/10">
             {[
               { label: "등록 셀러", value: "1,200+" },
               { label: "취급 아이템", value: "8만+" },
               { label: "월 거래액", value: "₩85억+" },
             ].map((stat) => (
               <div key={stat.label} className="py-3 text-center">
-                <div className="text-accent font-bold text-lg font-mono">{stat.value}</div>
-                <div className="text-[#aaa] text-xs">{stat.label}</div>
+                <div className="text-primary font-bold text-lg font-mono">{stat.value}</div>
+                <div className="text-white/70 text-xs">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
+        {/* [변경 끝] */}
 
         {/* Right: Quick Links */}
         <div className="flex flex-col gap-3">
           <div className="bg-white rounded border border-border p-4">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">내 계정</div>
-            <Link to="/partner" className="w-full bg-primary text-white text-sm font-semibold py-2 rounded hover:bg-primary/90 transition-colors mb-2 block text-center">파트너십 등록</Link>
-            <Link to="/auth?tab=signup&role=seller" className="block w-full text-center bg-accent hover:bg-accent/90 text-white text-xs font-semibold py-2 rounded transition-colors">셀러 등록하기</Link>
+			
+			<Link to="/auth" className="w-full bg-primary text-white text-sm font-semibold py-2 rounded hover:bg-primary/70 transition-colors mb-2 block text-center">
+						  파트너십 등록
+						</Link>
+						<Link to="/auth?tab=signup&role=seller" className="block w-full text-center bg-primary/20 text-primary text-sm font-semibold py-2 rounded hover:bg-primary/30 transition-colors">
+						  셀러 등록하기
+						</Link> {/* 디자인수정 */}
+
          
           </div>
           <div className="bg-secondary rounded border border-primary/20 p-4">
@@ -281,6 +285,50 @@ export function Home() {
           </div>
         </div>
       </div>
+
+      {/* [추가] Category Circles: 히어로 아래 원형 카테고리 아이콘 행 */}
+      {/* [변경] slice(0,5) → 전체 categories + 나머지 카테고리 더보기 원 + 브랜드 보러가기 원 추가 */}
+      <div className="flex justify-center gap-8 mb-6">
+        {categories.map((cat) => (
+          <Link
+            key={cat.id}
+            to={`/products?category=${cat.id}`}
+            className="flex flex-col items-center gap-2 group"
+          >
+            <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-3xl group-hover:border-primary group-hover:bg-primary/5 transition-all">
+              {cat.icon}
+            </div>
+            <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">
+              {cat.name}
+            </span>
+          </Link>
+        ))}
+        {/* [추가] 전체 카테고리 더보기 원 */}
+        <Link
+          to="/products"
+          className="flex flex-col items-center gap-2 group"
+        >
+          <div className="w-20 h-20 rounded-full border-2 border-dashed border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all">
+            ＋
+          </div>
+          <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors font-medium">
+            전체보기
+          </span>
+        </Link>
+        {/* [추가] 브랜드 보러가기 원 */}
+        <Link
+          to="/suppliers"
+          className="flex flex-col items-center gap-2 group"
+        >
+          <div className="w-20 h-20 rounded-full border-2 border-dashed border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all">
+            🏷️
+          </div>
+          <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors font-medium">
+            브랜드
+          </span>
+        </Link>
+      </div>
+      {/* [추가 끝] */}
 
       {/* Fashion Services */}
       <section className="mb-6">
@@ -366,7 +414,7 @@ export function Home() {
                   <td className="px-3 py-3"><span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded">{s.category}</span></td>
                   <td className="px-3 py-3 text-right font-mono text-muted-foreground">{s.products.toLocaleString()}</td>
                   <td className="px-3 py-3 text-right font-mono text-muted-foreground">{s.years}년</td>
-                  <td className="px-5 py-3 text-center">{s.verified && <CheckCircle size={16} className="text-green-500 mx-auto" />}</td>
+                  <td className="px5 py-3 text-center">{s.verified && <CheckCircle size={16} className="text-green-500 mx-auto" />}</td>
                 </tr>
               ))}
             </tbody>

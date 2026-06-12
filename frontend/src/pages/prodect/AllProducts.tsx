@@ -54,6 +54,16 @@ const categories = [
   },
 ];
 
+// [추가] 브랜드 대분류 - 카테고리와 동일한 구조
+const brandGroups = [
+  { id: "all", name: "전체", brands: [] },
+  { id: "women", name: "여성복", brands: ["동대문패션", "스타일컴퍼니", "엘레강스모드", "트렌드하우스", "페미닌스타일", "내추럴보이", "세트스타일", "코지니트"] },
+  { id: "men", name: "남성복", brands: ["캐주얼하우스", "진워크스", "프리미엄어패럴"] },
+  { id: "sports", name: "스포츠", brands: ["액티브웨어코리아", "스포츠라이프"] },
+  { id: "home", name: "홈·이너", brands: ["베이직이너", "코지홈"] },
+  { id: "acc", name: "액세서리·신발", brands: ["패션액세서리몰", "슈즈마켓"] },
+];
+
 export const products: Product[] = [
   { id: "F001", name: "여성 린넨 블라우스 (7컬러)", brand: "동대문패션", price: 8900, category: "tops", subCategory: "블라우스/셔츠", image: "https://images.unsplash.com/photo-1594938298603-c8148c4b2e8e?w=400", moq: "50", moqUnit: "벌", sizes: ["S", "M", "L", "XL"] },
   { id: "F002", name: "크롭 반팔 티셔츠 (10컬러)", brand: "스타일컴퍼니", price: 5500, category: "tops", subCategory: "티셔츠/탑", image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400", moq: "100", moqUnit: "벌", sizes: ["S", "M", "L", "XL", "XXL"] },
@@ -88,6 +98,12 @@ export function AllProducts() {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(searchParams.get("category") || null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  // [추가] 브랜드 필터 state
+  const [selectedBrand, setSelectedBrand] = useState("");
+  // [추가] 사이드바 토글 state
+  const [sidebarTab, setSidebarTab] = useState<"category" | "brand">("category");
+  // [추가] 브랜드 대분류 펼침 state - 카테고리와 동일한 방식
+  const [expandedBrandGroup, setExpandedBrandGroup] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>(() => { 
   const saved = localStorage.getItem("wishlist"); //좋아요 페이지 추가용
   return saved ? JSON.parse(saved) : [];
@@ -129,14 +145,31 @@ export function AllProducts() {
     setSearchParams(params);
   };
 
+  // [추가] 브랜드 대분류 펼침 핸들러
+  const handleBrandGroupClick = (groupId: string) => {
+    if (groupId === "all") {
+      setSelectedBrand("");
+      setExpandedBrandGroup(null);
+      return;
+    }
+    setExpandedBrandGroup(expandedBrandGroup === groupId ? null : groupId);
+    setSelectedBrand("");
+  };
+
   const filteredProducts = products.filter((p) => {
     const matchCategory = selectedCategory === "all" || p.category === selectedCategory;
     const matchSub = !selectedSubCategory || p.subCategory === selectedSubCategory;
+    // [추가] 브랜드 필터 조건
+    const matchBrand = !selectedBrand || p.brand === selectedBrand;
+    // [추가] 브랜드 대분류 필터 - 펼쳐진 그룹의 브랜드만 필터
+    const expandedGroup = brandGroups.find((g) => g.id === expandedBrandGroup);
+    const matchBrandGroup = !expandedBrandGroup || (expandedGroup?.brands.includes(p.brand) ?? false);
     const matchSearch = !searchQuery ||
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.subCategory.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCategory && matchSub && matchSearch;
+    // [수정] matchBrand, matchBrandGroup 추가
+    return matchCategory && matchSub && matchBrand && matchBrandGroup && matchSearch;
   });
 
   const toggleFavorite = (productId: string) => { //좋아요 페이지 추가용
@@ -190,53 +223,128 @@ export function AllProducts() {
       </div>
 
       <div className="grid grid-cols-[240px_1fr] gap-6">
-        {/* Category Sidebar */}
-        <div className="space-y-1">
-          <h3 className="font-semibold text-foreground mb-3 text-sm uppercase tracking-wide">카테고리</h3>
-          {categories.map((cat) => (
-            <div key={cat.id}>
-              {/* 대분류 버튼 */}
-              <button
-                onClick={() => handleCategoryChange(cat.id)}
-                className={`w-full text-left px-4 py-2.5 rounded-lg transition-all text-sm ${
-                  selectedCategory === cat.id && !selectedSubCategory
-                    ? "bg-primary text-white font-semibold shadow-sm"
-                    : selectedCategory === cat.id
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "bg-white border border-border text-foreground hover:border-primary hover:text-primary"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>{cat.name}</span>
-                  {cat.subCategories.length > 0 && (
-                    <ChevronDown
-                      size={13}
-                      className={`transition-transform ${expandedCategory === cat.id ? "rotate-180" : ""} ${selectedCategory === cat.id && !selectedSubCategory ? "text-white/80" : "text-muted-foreground"}`}
-                    />
+        {/* Sidebar */}
+        <div>
+          {/* [추가] 사이드바 토글 버튼 */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setSidebarTab("category")}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                sidebarTab === "category"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white text-foreground border-border hover:border-primary hover:text-primary"
+              }`}
+            >
+              카테고리
+            </button>
+            <button
+              onClick={() => setSidebarTab("brand")}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                sidebarTab === "brand"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white text-foreground border-border hover:border-primary hover:text-primary"
+              }`}
+            >
+              브랜드
+            </button>
+          </div>
+          {/* [추가 끝] */}
+
+          {/* [추가] 카테고리 패널 */}
+          {sidebarTab === "category" && (
+            <div className="space-y-1">
+              {categories.map((cat) => (
+                <div key={cat.id}>
+                  <button
+                    onClick={() => handleCategoryChange(cat.id)}
+                    className={`w-full text-left px-4 py-2.5 rounded-lg transition-all text-sm ${
+                      selectedCategory === cat.id && !selectedSubCategory
+                        ? "bg-primary text-white font-semibold shadow-sm"
+                        : selectedCategory === cat.id
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "bg-white border border-border text-foreground hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{cat.name}</span>
+                      {cat.subCategories.length > 0 && (
+                        <ChevronDown
+                          size={13}
+                          className={`transition-transform ${expandedCategory === cat.id ? "rotate-180" : ""} ${selectedCategory === cat.id && !selectedSubCategory ? "text-white/80" : "text-muted-foreground"}`}
+                        />
+                      )}
+                    </div>
+                  </button>
+                  {expandedCategory === cat.id && cat.subCategories.length > 0 && (
+                    <div className="ml-3 mt-1 space-y-0.5 border-l-2 border-primary/20 pl-3">
+                      {cat.subCategories.map((sub) => (
+                        <button
+                          key={sub}
+                          onClick={() => handleSubCategoryChange(sub)}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
+                            selectedSubCategory === sub
+                              ? "bg-primary text-white font-semibold"
+                              : "text-muted-foreground hover:text-primary hover:bg-primary/5"
+                          }`}
+                        >
+                          {sub}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-              </button>
-
-              {/* 하위 카테고리 */}
-              {expandedCategory === cat.id && cat.subCategories.length > 0 && (
-                <div className="ml-3 mt-1 space-y-0.5 border-l-2 border-primary/20 pl-3">
-                  {cat.subCategories.map((sub) => (
-                    <button
-                      key={sub}
-                      onClick={() => handleSubCategoryChange(sub)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
-                        selectedSubCategory === sub
-                          ? "bg-primary text-white font-semibold"
-                          : "text-muted-foreground hover:text-primary hover:bg-primary/5"
-                      }`}
-                    >
-                      {sub}
-                    </button>
-                  ))}
-                </div>
-              )}
+              ))}
             </div>
-          ))}
+          )}
+
+          {/* [추가] 브랜드 패널 - 카테고리와 완전히 동일한 구조 */}
+          {sidebarTab === "brand" && (
+            <div className="space-y-1">
+              {brandGroups.map((group) => (
+                <div key={group.id}>
+                  <button
+                    onClick={() => handleBrandGroupClick(group.id)}
+                    className={`w-full text-left px-4 py-2.5 rounded-lg transition-all text-sm ${
+                      expandedBrandGroup === group.id
+                        ? "bg-primary text-white font-semibold shadow-sm"
+                        : group.id === "all" && !expandedBrandGroup
+                        ? "bg-primary text-white font-semibold shadow-sm"
+                        : "bg-white border border-border text-foreground hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{group.name}</span>
+                      {group.brands.length > 0 && (
+                        <ChevronDown
+                          size={13}
+                          className={`transition-transform ${expandedBrandGroup === group.id ? "rotate-180" : ""} ${expandedBrandGroup === group.id ? "text-white/80" : "text-muted-foreground"}`}
+                        />
+                      )}
+                    </div>
+                  </button>
+                  {expandedBrandGroup === group.id && group.brands.length > 0 && (
+                    <div className="ml-3 mt-1 space-y-0.5 border-l-2 border-primary/20 pl-3">
+                      {group.brands.map((brand) => (
+                        <button
+                          key={brand}
+                          onClick={() => setSelectedBrand(selectedBrand === brand ? "" : brand)}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
+                            selectedBrand === brand
+                              ? "bg-primary text-white font-semibold"
+                              : "text-muted-foreground hover:text-primary hover:bg-primary/5"
+                          }`}
+                        >
+                          {brand}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {/* [추가 끝] */}
+
         </div>
 
         {/* Product Grid/List */}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { products } from "../AllProducts";
+import { products } from "../prodect/AllProducts";
 import {
   Package, Search, Filter, Edit2, Trash2, AlertTriangle,
   ChevronDown, ShieldAlert, Plus

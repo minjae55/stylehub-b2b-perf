@@ -81,7 +81,7 @@ export function Admin() {
     {/* 첫 번째 줄 */}
     <div className="grid grid-cols-3 gap-4 mb-6">
       {/* 1. 대시보드 */}
-      <Link to="/admin/dashboard" className="bg-white border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary hover:shadow-md transition-all group">
+      {/* <Link to="/admin/dashboard" className="bg-white border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary hover:shadow-md transition-all group">
         <div className="bg-blue-50 p-3 rounded-lg group-hover:bg-blue-100 transition-colors">
           <LayoutDashboard size={22} className="text-blue-600" />
         </div>
@@ -90,7 +90,7 @@ export function Admin() {
           <div className="text-xs text-muted-foreground">통계 및 현황 분석</div>
         </div>
         <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
-      </Link>
+      </Link> */}
 
       {/* 2. 소싱 요청서 관리 */}
       <Link to="/admin/sourcing-requests" className="bg-white border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary hover:shadow-md transition-all group">
@@ -115,10 +115,7 @@ export function Admin() {
         </div>
         <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
       </Link>
-    </div>
-
-      {/* 두 번째 줄 */}
-    <div className="grid grid-cols-3 gap-4 mb-6">
+      
       {/* 4. 회원 / 업체 관리 */}
       <Link to="/admin/users" className="bg-white border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary hover:shadow-md transition-all group">
         <div className="bg-purple-50 p-3 rounded-lg group-hover:bg-purple-100 transition-colors">
@@ -130,6 +127,10 @@ export function Admin() {
         </div>
         <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
       </Link>
+    </div>
+
+      {/* 두 번째 줄 */}
+    <div className="grid grid-cols-3 gap-4 mb-6">
 
       {/* 5. 필요한 경우 여기에 카드 추가 */}
       <Link to="/admin/adminsupport" className="bg-white border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary hover:shadow-md transition-all group">
@@ -333,7 +334,7 @@ export function Admin() {
                 </div>
               </div>
             </div>
-            <div className="border-t border-border pt-4">
+            {/* <div className="border-t border-border pt-4">
               <h3 className="text-xs font-semibold text-foreground mb-3 uppercase tracking-wide">TOP 바이어</h3>
               <div className="space-y-2">
                 {topBuyers.map((buyer, i) => (
@@ -352,7 +353,7 @@ export function Admin() {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -384,7 +385,7 @@ export function Admin() {
                 </div>
               </div>
             </div>
-            <div className="border-t border-border pt-4">
+            {/* <div className="border-t border-border pt-4">
               <h3 className="text-xs font-semibold text-foreground mb-3 uppercase tracking-wide">TOP 셀러</h3>
               <div className="space-y-2">
                 {topSellers.map((seller, i) => (
@@ -403,7 +404,7 @@ export function Admin() {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

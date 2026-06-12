@@ -4,6 +4,7 @@ import {
   Package, MapPin, CreditCard, FileText, ArrowLeft,
   CheckCircle, X, ShoppingBag, PenLine, AlertCircle,
 } from "lucide-react";
+import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 
 // ── 더미 주문 데이터 ──────────────────────────────────────────────────
 const READY_ITEMS = [
@@ -38,10 +39,11 @@ const CUSTOM_ITEMS: Record<string, { id: number; name: string; supplier: string;
   ],
 };
 
-// 전자서명 완료 여부 체크 (실제로는 API 조회)
 const isSignedMap: Record<string, boolean> = {
   "ORD-2024-0901": false,
 };
+
+const TOSS_CLIENT_KEY = "test_ck_GePWvyJnrKme6gpAnkz63gLzN97E";
 
 export function Checkout() {
   const [searchParams] = useSearchParams();
@@ -57,7 +59,8 @@ export function Checkout() {
     ? (CUSTOM_ITEMS[orderId] ?? READY_ITEMS)
     : READY_ITEMS;
 
-  const [paymentMethod, setPaymentMethod] = useState("escrow");
+  // 상태 타입 명시적으로 지정
+  const [paymentMethod, setPaymentMethod] = useState<"wire" | "card">("wire");
   const [agreeTerms, setAgreeTerms]       = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [orderNumber, setOrderNumber]     = useState("");
@@ -68,16 +71,45 @@ export function Checkout() {
   const total         = subtotal + shipping + platformFee;
   const formatPrice   = (n: number) => `${n.toLocaleString()}원`;
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!agreeTerms || !isSigned) return;
+
     const newOrderNumber = `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
     setOrderNumber(newOrderNumber);
-    setShowSuccessModal(true);
-  };
+    
+    try {
+      const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
+      const payment = tossPayments.payment({ customerKey: "ANONYMOUS" });
+
+      const methodType = paymentMethod === "card" ? "CARD" : "VIRTUAL_ACCOUNT";
+
+      const orderName = orderItems.length > 1 
+        ? `${orderItems[0].name} 외 ${orderItems.length - 1}건`
+        : orderItems[0].name;
+
+      await payment.requestPayment({
+        method: methodType,
+        amount: {
+          currency: "KRW",
+          value: total,
+        },
+        orderId: newOrderNumber,
+        orderName: orderName,
+        successUrl: `${window.location.origin}/payment/success?type=${orderType}&orderId=${orderId}`,
+        failUrl: `${window.location.origin}/payment/fail`,
+        customerName: "홍길동",
+      }as any);
+
+    } catch (error) {
+      console.error("토스페이먼츠 결제창 호출 에러:", error);
+      alert("결제창을 여는 중 에러가 발생했습니다.");
+    }
+  }; 
 
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-8">
       <Link to="/cart" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-6">
+        <ArrowLeft size={16} /> 장바구니로 돌아가기
       </Link>
 
       <h1 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
@@ -158,23 +190,23 @@ export function Checkout() {
             </h2>
             <div className="space-y-3">
               {[
-                { value: "wire",   label: "무통장 입금",         desc: "입금 확인 후 주문이 진행됩니다" },
-                { value: "card",   label: "법인카드 결제",       desc: "법인카드로 즉시 결제합니다" },
+                { value: "wire",   label: "무통장 입금",        desc: "입금 확인 후 주문이 진행됩니다" },
+                { value: "card",   label: "법인카드 결제",      desc: "법인카드로 즉시 결제합니다" },
               ].map((m) => (
                 <label key={m.value} className="flex items-center gap-3 border border-border rounded p-4 cursor-pointer hover:border-primary transition-colors">
                   <input
                     type="radio"
                     name="payment"
                     value={m.value}
+                    // m.value가 string이므로 paymentMethod와 완벽히 비교 가능하도록 단언 혹은 가드 처리
                     checked={paymentMethod === m.value}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    onChange={() => setPaymentMethod(m.value as "wire" | "card")}
                     className="w-4 h-4"
                   />
                   <div className="flex-1">
                     <div className="font-semibold text-foreground">{m.label}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">{m.desc}</div>
                   </div>
-                  {m.badge && <span className="text-xs bg-primary text-white px-2 py-0.5 rounded font-semibold">{m.badge}</span>}
                 </label>
               ))}
             </div>
@@ -234,12 +266,9 @@ export function Checkout() {
               </div>
             </div>
 
-            {/* 전자서명 상태 표시 — 주문제작만 */}
             {isCustom && (
               <div className={`mt-4 rounded p-3 text-xs flex items-center gap-2 ${isSigned ? "bg-green-50 border border-green-200 text-green-700" : "bg-amber-50 border border-amber-200 text-amber-700"}`}>
-                {isSigned
-                  ? <><CheckCircle size={13} /> 전자서명 완료</>
-                  : <><PenLine size={13} /> 전자서명 대기 중</>}
+                {isSigned ? <><CheckCircle size={13} /> 전자서명 완료</> : <><PenLine size={13} /> 전자서명 대기 중</>}
               </div>
             )}
 
@@ -265,7 +294,7 @@ export function Checkout() {
         </div>
       </div>
 
-      {/* 결제 완료 모달 */}
+      {/* 결제 완료 모달 (타입 불일치 조건문 수정) */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
@@ -292,7 +321,8 @@ export function Checkout() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">결제 방법</span>
                   <span className="font-medium text-foreground">
-                    {paymentMethod === "escrow" ? "에스크로 안전결제" : paymentMethod === "wire" ? "무통장 입금" : "법인카드 결제"}
+                    {/* 기존 "escrow" 분기 제거하고 정의된 상태값에 맞춰 텍스트 변경 */}
+                    {paymentMethod === "wire" ? "무통장 입금" : "법인카드 결제"}
                   </span>
                 </div>
                 <div className="border-t border-pink-200 pt-3 flex justify-between">

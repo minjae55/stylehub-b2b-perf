@@ -35,7 +35,7 @@ export interface AdminHeaderProps {
 const DEFAULT_NAV: NavItem[] = [
   { label: "홈", href: "/admin", icon: "home" },
   { label: "사용자", href: "/admin/users", icon: "users" },
-  { label: "결제", href: "/admin/payments", icon: "receipt" }, 
+  { label: "결제", href: "/admin/settlements", icon: "receipt" }, 
   { label: "통계", href: "/admin/analytics", icon: "chart-bar" },
 ];
 
@@ -266,8 +266,8 @@ const handleLogout = async () => {
   </button>
 
   {userMenuOpen && (
-    <div style={styles.userDropdown}>
-      <div style={styles.userDropdownInfo}>
+    <div style={styles.dropdown}>
+      <div style={styles.dropdownHeader}>
         <p style={styles.userDropdownName}>{user.name}</p>
         <p style={styles.userDropdownRole}>{user.role}</p>
       </div>

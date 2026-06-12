@@ -4,8 +4,8 @@ import { ArrowLeft, Bookmark, ShoppingCart, Truck, Shield, CheckCircle, Award, M
 
 type CertKey = "KC" | "OEKO-TEX" | "GOTS" | "GRS" | "비건" | "Fair Trade" | "REACH" | "CPSIA" | "UKCA" | "어린이안전" | "환경마크" | "섬유품질";
 
-const certConfig: Record<CertKey, { label: string; bg: string; border: string; color: string; iconBg: string; icon: React.ReactNode }> = {
-  "KC":        { label: "KC 인증",         bg: "#EEF2FF", border: "#C7D2FE", color: "#3730A3", iconBg: "#4338CA", icon: <span style={{ fontSize: 9, fontWeight: 700 }}>KC</span> },
+const certConfig: Record<CertKey, { label: string; bg: string; border: string; color: string; iconBg: string; icon: React.ReactNode; expiry?: string }> = 
+{  "KC":        { label: "KC 인증",         bg: "#EEF2FF", border: "#C7D2FE", color: "#3730A3", iconBg: "#4338CA", icon: <span style={{ fontSize: 9, fontWeight: 700 }}>KC</span> },
   "OEKO-TEX": { label: "OEKO-TEX",        bg: "#ECFDF5", border: "#A7F3D0", color: "#065F46", iconBg: "#059669", icon: <CheckCircle size={11} /> },
   "GOTS":      { label: "GOTS",            bg: "#F0FDF4", border: "#BBF7D0", color: "#14532D", iconBg: "#16A34A", icon: <Leaf size={11} /> },
   "GRS":       { label: "GRS",             bg: "#FFFBEB", border: "#FDE68A", color: "#78350F", iconBg: "#D97706", icon: <RefreshCw size={11} /> },
@@ -58,6 +58,9 @@ export function ProductDetail() {
     unit: "/벌",
     moq: 100,
     verified: true,
+
+    productType: "OEM/ODM" as "기성품" | "OEM/ODM", // 제품 유형 추가
+
     images: [
       "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&h=600&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb?w=600&h=600&fit=crop&auto=format",
@@ -132,9 +135,19 @@ export function ProductDetail() {
         <div>
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1">
-              {product.verified && (
-                <span className="inline-block bg-primary text-white text-xs px-2 py-1 rounded font-semibold mb-2">인증 공급업체</span>
-              )}
+              <div className="flex items-center gap-2 mb-2">
+  {product.verified && (
+    <span className="inline-block bg-primary text-white text-xs px-2 py-1 rounded font-semibold">인증 공급업체</span>
+  )}
+  <span className={`inline-block text-xs px-2 py-1 rounded font-semibold ${
+    product.productType === "OEM/ODM"
+      ? "bg-purple-100 text-purple-700"
+      : "bg-blue-100 text-blue-700"
+  }`}>
+    {product.productType}
+    {product.productType === "OEM/ODM" && " · 자체 라벨 가능"}
+  </span>
+</div>
               <h1 className="text-2xl font-bold text-foreground leading-tight mb-2">{product.name}</h1>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">{product.brand}</span>
