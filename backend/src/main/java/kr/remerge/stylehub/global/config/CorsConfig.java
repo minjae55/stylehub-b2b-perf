@@ -16,8 +16,7 @@ public class CorsConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOrigins(List.of(
-                "http://localhost:5173",    // 로컬 프론트엔드
-                "https://remerge.kr"        // 운영 도메인
+                "http://localhost:5173"    // 로컬 프론트엔드
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));         // 모든 헤더 허용
