@@ -1008,7 +1008,7 @@ function OrderActions({
         <>
           <ActionButton tone="ghost" icon={<XCircle size={13} />} onClick={() => onCancel(order)}>샘플 거절</ActionButton>
           <ActionButton tone="orange" icon={<RefreshCw size={13} />} onClick={() => onRenegotiate(order)}>재협상 요청</ActionButton>
-          <LinkButton to={`/buyer/orders/${order.id}/contract-sign`} icon={<PenLine size={13} />}>본생산 확정</LinkButton>
+          <LinkButton to={`/buyer/checkout`} icon={<PenLine size={13} />}>본생산 확정</LinkButton>
         </>
       )}
 

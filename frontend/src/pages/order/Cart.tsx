@@ -283,7 +283,7 @@ export function Cart() {
             tab={tab}
             count={currentCount}
             subtotal={currentSubtotal}
-            onContinuePath={tab === "SAMPLE" ? "/checkout?type=sample" : "/checkout"}
+            onContinuePath={tab === "SAMPLE" ? "/buyer/checkout?type=sample" : "/buyer/checkout"}
           />
         </div>
       </div>
@@ -296,17 +296,11 @@ function PageTitle({ itemCount, sampleCount }: { itemCount: number; sampleCount:
     <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div>
         <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-primary">
-          <ShoppingCart size={13} />
-          Cart
         </div>
         <h1 className="text-2xl font-bold text-slate-950">장바구니</h1>
         <p className="mt-1 text-sm text-slate-500">
           일반 주문과 샘플 주문을 나눠 확인하고 결제를 진행하세요.
         </p>
-      </div>
-      <div className="grid w-full grid-cols-2 gap-2 md:w-auto">
-        <MiniStat label="일반 상품" value={`${itemCount}개`} />
-        <MiniStat label="샘플 상품" value={`${sampleCount}개`} />
       </div>
     </header>
   );
@@ -660,8 +654,9 @@ function OrderSummary({
 
         <div className="flex items-end justify-between border-b border-slate-100 py-5">
           <div>
-            <p className="text-xs text-slate-500">결제 예정 금액</p>
-            <p className="mt-1 text-xs text-slate-400">배송비와 플랫폼 수수료는 결제 단계에서 확인</p>
+                <h2 className="text-sm font-bold text-slate-950">
+                    결제 예정 금액
+                </ h2>
           </div>
           <p className="whitespace-nowrap text-right text-xl font-black leading-none text-primary md:text-2xl">
             {formatPrice(subtotal)}
@@ -669,7 +664,7 @@ function OrderSummary({
         </div>
 
         <div className="my-4 rounded-lg border border-primary/15 bg-secondary/60 px-3 py-2.5 text-xs leading-5 text-slate-700">
-          플랫폼 이용 수수료는 결제 단계에서 별도 계산됩니다.
+          플랫폼 이용 수수료와 배송비는 결제 단계에서 별도 계산됩니다.
         </div>
 
         {count === 0 ? (
