@@ -1,166 +1,166 @@
-import {createElement} from "react";
-import {createBrowserRouter} from "react-router";
+import { createBrowserRouter } from "react-router";
 
-import {Root} from "./Root";
-import {Home} from "../pages/Home";
+import { Root } from "./Root";
+import { Home } from "@/pages/Home";
 
-import {Suppliers} from "../pages/Suppliers";
-import {CustomsClearance} from "../pages/CustomsClearance";
-import {Support} from "../pages/inquiry/Support";
-import {Cart} from "../pages/Cart";
-import {Orders} from "../pages/Orders";
-import {Admin, AdminLayout} from "../pages/Admin";
-import {Checkout} from "../pages/Checkout";
-import {MyPage} from "../pages/user/MyPage";
-import {ProductDetail} from "../pages/product/ProductDetail";
-import {AdminDashboard} from "../pages/AdminDashboard";
-import {AdminSourcingRequests} from "../pages/AdminSourcingRequests";
-import {AdminShippingQuotes} from "../pages/AdminShippingQuotes";
-import {AdminAnalytics} from "../pages/AdminAnalytics";
+import { Admin, AdminLayout } from "@/pages/admin/Admin";
+import { AdminDashboard } from "@/pages/admin/AdminDashboard";
+import { AdminSourcingRequests } from "@/pages/admin/AdminSourcingRequests";
+import { AdminShippingQuotes } from "@/pages/admin/AdminShippingQuotes";
+import { AdminAnalytics } from "@/pages/admin/AdminAnalytics";
+import { AdminUsers } from "@/pages/admin/AdminUsers";
+import { SearchPage } from "@/pages/admin/SearchPage";
 
-import {BuyerDashboard} from "../pages/buyer/BuyerDashboard";
-import {SellerDashboard} from "../pages/seller/SellerDashboard";
-import {SellerProductRegister} from "../pages/SellerProductRegister";
-import {OrderDetail} from "../pages/OrderDetail";
-import {SupplierRegister} from "../pages/SupplierRegister";
-import {SourcingRequest} from "../pages/SourcingRequest";
-import {SellerRequestList} from "../pages/seller/SellerRequestList";
+import { RegisterBuyer } from "@/pages/auth/Buyer";
+import { RegisterSeller } from "@/pages/auth/Seller";
+import { AuthLayout } from "@/pages/auth/layout";
+import { Login } from "@/pages/auth/Login";
+import { Register } from "@/pages/auth/Register";
+import { RegisterEmployee } from "@/pages/auth/Employee";
+import { RegisterSuccess } from "@/pages/auth/Success";
+import { FindId } from "@/pages/auth/FindId";
+import { FindPw } from "@/pages/auth/FindPw";
 
-import {BuyerShippingQuotes} from "../pages/BuyerShippingQuotes";
-import {AllProducts} from "../pages/product/AllProducts";
-import {RestrictedBusinessTypes} from "../pages/RestrictedBusinessTypes";
+import { BuyerOrderDetail } from "@/pages/buyer/BuyerOrderDetail";
+import { BuyerSourcingList } from "@/pages/buyer/BuyerSourcingList";
+import { BuyerDashboard } from "@/pages/buyer/BuyerDashboard";
+import { BuyerShippingQuotes } from "@/pages/buyer/BuyerShippingQuotes";
 
-import {AuthLayout} from "../pages/auth/layout";
-import {Login} from "../pages/auth/Login";
-import {Register} from "../pages/auth/Register";
-import {RegisterEmployee} from "../pages/auth/Employee"
-import {RegisterBuyer} from "../pages/auth/Buyer";
-import {RegisterSeller} from "../pages/auth/Seller";
-import {RegisterSuccess} from "../pages/auth/Success";
-import {FindId} from "../pages/auth/FindId";
-import {FindPw} from "../pages/auth/FindPw";
+import { CompanySettings } from "@/pages/company/CompanySettings";
 
-import {AdminUsers} from "../pages/AdminUsers";
-import {BuyerOrderDetail} from "../pages/buyer/BuyerOrderDetail";
-import {BuyerSourcingList} from "../pages/buyer/BuyerSourcingList";
-import {BuyerSourcingDetail} from "../pages/buyer/BuyerSourcingDetail";
-import {SellerOrderDetail} from "../pages/seller/SellerOrderDetail";
-import {SellerQuoteWrite} from "../pages/seller/SellerQuoteWrite";
-import {PartnerPlan} from "../pages/PartnerPlan";
-import {SearchPage} from "@/pages/admin/SearchPage";
-import {Wishlist} from "../pages/product/Wishlist";
+import { SellerContractSign } from "@/pages/contract/SellerContractSign";
+import { BuyerContractSign } from "@/pages/contract/BuyerContractSign";
 
+import { Inquiry } from "@/pages/inquiry/Inquiry";
+import { Support } from "@/pages/inquiry/Support";
 
-import {SellerProductManage} from "../pages/seller/SellerProductManage"; // 판매자 상품 관리 페이지 추가
-import {SellerContractSign} from "../pages/seller/SellerContractSign";
-import {BuyerContractSign} from "../pages/buyer/BuyerContractSign";
-import {Negotiations} from "../pages/Negotiations";
-import {Disputes} from "../pages/Disputes";
+import { Cart } from "@/pages/order/Cart";
+import { Orders } from "@/pages/order/Orders";
+import { Checkout } from "@/pages/order/Checkout";
+import { OrderDetail } from "@/pages/order/OrderDetail";
 
-// 견적 상세보기
-import {QuoteDetail} from "../pages/quote/QuoteDetail";
+import { ProductDetail } from "@/pages/product/ProductDetail";
+import { AllProducts } from "@/pages/product/AllProducts";
+import { Wishlist } from "@/pages/product/Wishlist";
+import { SellerProductRegister } from "@/pages/product/SellerProductRegister";
+
+import { QuoteDetail } from "@/pages/quote/QuoteDetail";
+import { SellerQuoteWrite } from "@/pages/quote/SellerQuoteWrite";
+import BuyerQuoteList from "@/pages/quote/BuyerQuoteList";
+
+import { SellerDashboard } from "@/pages/seller/SellerDashboard";
+import { SellerProductManage } from "@/pages/seller/SellerProductManage";
+import { SellerOrderDetail } from "@/pages/seller/SellerOrderDetail";
+
+import { Negotiations } from "@/pages/trade/Negotiations";
+import { Disputes } from "@/pages/trade/Disputes";
+
+import { MyPage } from "@/pages/user/MyPage";
+
+import { PartnerPlan } from "@/pages/policy/PartnerPlan";
+import { RestrictedBusinessTypes } from "@/pages/policy/RestrictedBusinessTypes";
+
+import { SourcingRequest } from "@/pages/sourcing/SourcingRequest";
+import { SellerRequestList } from "@/pages/sourcing/SellerRequestList";
+import { BuyerSourcingDetail } from "@/pages/sourcing/BuyerSourcingDetail";
 
 import Settlements from "@/pages/admin/Settlements";
 import AdminSupport from "@/pages/admin/AdminSupport";
-import {CompanySettings} from "@/pages/company/CompanySettings";
-import {Inquiry} from "@/pages/inquiry/Inquiry";
+
+import { SupplierRegister } from "@/pages/company/SupplierRegister";
 
 export const router = createBrowserRouter([
     {
         path: "/",
         Component: Root,
         children: [
-            {index: true, Component: Home},
-            {path: "products", Component: AllProducts},
-            {path: "suppliers", Component: Suppliers}, //삭제
-            {path: "sourcing-request", Component: SourcingRequest},
-            {path: "seller/sourcing-requests", Component: SellerRequestList},
-            {path: "customs", Component: CustomsClearance}, //삭제
-            {path: "support", Component: Support},
-            {path: "cart", Component: Cart},
-            {path: "checkout", Component: Checkout},
+            { index: true, Component: Home },
+            { path: "support", Component: Support },
+            { path: "restricted-businesses", Component: RestrictedBusinessTypes },
+            { path: "supplier-register", Component: SupplierRegister },
+            { path: "inquiry", Component: Inquiry },
+            { path: "mypage", Component: MyPage },
+            { path: "employee-management", Component: CompanySettings },
+            { path: "partner", Component: PartnerPlan },
+            { path: "quotes/:quoteId", Component: QuoteDetail },
 
-            {path: "orders", Component: Orders},
-            {path: "orders/:id", Component: OrderDetail},
+            // Order Flow
+            { path: "cart", Component: Cart },
+            { path: "orders", Component: Orders },
+            { path: "orders/:id", Component: OrderDetail },
+            { path: "checkout", Component: Checkout },
 
-            {path: "buyer/orders", element: createElement(Orders, {role: "BUYER"})},
-            {path: "seller/orders", element: createElement(Orders, {role: "SELLER"})},
-
-            {path: "product/:id", Component: ProductDetail},
-            {path: "supplier-register", Component: SupplierRegister},
-            {path: "restricted-businesses", Component: RestrictedBusinessTypes},
-            {path: "inquiry", Component: Inquiry},
-
-            {path: "mypage", Component: MyPage},
-            {path: "employee-management", Component: CompanySettings},
-
-            {path: "buyer/shipping-quotes", Component: BuyerShippingQuotes},
-            {path: "buyer/my-sourcing", Component: BuyerSourcingList},
-            {path: "buyer/sourcing-detail", Component: BuyerSourcingDetail},
-            {path: "buyer/orders/:id", Component: BuyerOrderDetail},
-            {path: "buyer/orders/:orderId/contract-sign", Component: BuyerContractSign},
-
-            {path: "seller/products/new", Component: SellerProductRegister},
-            {path: "seller/sourcing/:requestId/quote", Component: SellerQuoteWrite},
-            {path: "seller/orders/:id", Component: SellerOrderDetail},
-            {path: "seller/orders/:orderId/contract-sign", Component: SellerContractSign},
-
-
-            {path: "wishlist", Component: Wishlist}, //좋아요 페이지 추가
-            {path: "seller/products", Component: SellerProductManage}, // 판매자 상품 관리 페이지 추
-
-
-            {path: "negotiations", Component: Negotiations},
-            {path: "disputes", Component: Disputes},
-            {path: "partner", Component: PartnerPlan},
-            //import { QuoteDetail } from "../pages/quote/QuoteDetail";
-            {path: "quote/quoted-detail", Component: QuoteDetail},
+            // Trade Flow
+            { path: "orders/:orderId/negotiations", Component: Negotiations },
+            { path: "orders/:orderId/disputes", Component: Disputes },
         ],
     },
     {
         path: "auth",
         Component: AuthLayout,
         children: [
-            {index: true, Component: Login},
-            {path: "login", Component: Login},
-            {path: "register", Component: Register},
-            {path: "register/buyer", Component: RegisterBuyer},
-            {path: "register/seller", Component: RegisterSeller},
-            {path: "register/employee", Component: RegisterEmployee},
-            {path: "register/success", Component: RegisterSuccess},
-            {path: "find-id", Component: FindId},
-            {path: "find-pw", Component: FindPw},
-        ]
+            { index: true, Component: Login },
+            { path: "login", Component: Login },
+            { path: "register", Component: Register },
+            { path: "register/buyer", Component: RegisterBuyer },
+            { path: "register/seller", Component: RegisterSeller },
+            { path: "register/employee", Component: RegisterEmployee },
+            { path: "register/success", Component: RegisterSuccess },
+            { path: "find-id", Component: FindId },
+            { path: "find-pw", Component: FindPw },
+        ],
     },
     {
         path: "admin",
         Component: AdminLayout,
         children: [
-            {index: true, Component: Admin},
-            {path: "dashboard", Component: AdminDashboard},
-            {path: "sourcing-requests", Component: AdminSourcingRequests},
-            {path: "users", Component: AdminUsers},
-            {path: "analytics", Component: AdminAnalytics},
-            {path: "shipping-quotes", Component: AdminShippingQuotes},
-            {path: "search", Component: SearchPage},
-            {path: "settlements", Component: Settlements},
-            {path: "adminsupport", Component: AdminSupport},
+            { index: true, Component: Admin },
+            { path: "dashboard", Component: AdminDashboard },
+            { path: "sourcing-requests", Component: AdminSourcingRequests },
+            { path: "users", Component: AdminUsers },
+            { path: "analytics", Component: AdminAnalytics },
+            { path: "shipping-quotes", Component: AdminShippingQuotes },
+            { path: "search", Component: SearchPage },
+            { path: "settlements", Component: Settlements },
+            { path: "adminsupport", Component: AdminSupport },
         ],
     },
     {
         path: "buyer",
         Component: Root,
-        handle: { role: "BUYER" }, // useMatches 훅으로 쉽게 꺼낼 수 있음
+        handle: { role: "BUYER" },
         children: [
-            {index: true, Component: BuyerDashboard},
+            { index: true, Component: BuyerDashboard },
+            { path: "quotes", Component: BuyerQuoteList },
+            { path: "sourcing-request", Component: SourcingRequest },
+            { path: "orders/:orderId/contract-sign", Component: BuyerContractSign },
+            { path: "shipping-quotes", Component: BuyerShippingQuotes },
+            { path: "my-sourcing", Component: BuyerSourcingList },
+            { path: "sourcing-detail", Component: BuyerSourcingDetail },
+            { path: "orders/:id", Component: BuyerOrderDetail },
         ],
     },
     {
         path: "seller",
         Component: Root,
-        handle: { role: "SELLER" }, // useMatches 훅으로 쉽게 꺼낼 수 있음
+        handle: { role: "SELLER" },
         children: [
-            {index: true, Component: SellerDashboard},
+            { index: true, Component: SellerDashboard },
+            { path: "products/new", Component: SellerProductRegister },
+            { path: "products", Component: SellerProductManage },
+            { path: "sourcing-requests", Component: SellerRequestList },
+            { path: "orders/:id", Component: SellerOrderDetail },
+            { path: "sourcing/:requestId/quote", Component: SellerQuoteWrite },
+            { path: "orders/:orderId/contract-sign", Component: SellerContractSign },
         ],
-    }
+    },
+    {
+        path: "products",
+        Component: Root,
+        children: [
+            { index: true, Component: AllProducts },
+            { path: "wishlist", Component: Wishlist },
+            { path: ":id", Component: ProductDetail },
+        ],
+    },
 ]);

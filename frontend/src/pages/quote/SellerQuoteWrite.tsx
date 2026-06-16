@@ -371,9 +371,6 @@ export function SellerQuoteWrite() {
             <ChevronLeft size={16} />
             소싱 요청 목록
           </Link>
-          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
-            요청 번호 {requestId ?? "SRC-2024-0142"}
-          </span>
         </div>
 
         <header className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:p-7">

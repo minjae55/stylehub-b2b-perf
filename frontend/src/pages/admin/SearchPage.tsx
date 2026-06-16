@@ -1,5 +1,5 @@
 import { useSearchParams } from "react-router";
-import { INITIAL_USERS } from "../AdminUsers";
+import { INITIAL_USERS } from "../admin/AdminUsers";
 
 export function SearchPage() {
   const [searchParams] = useSearchParams();
