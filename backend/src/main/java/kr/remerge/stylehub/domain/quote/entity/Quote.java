@@ -3,7 +3,6 @@ package kr.remerge.stylehub.domain.quote.entity;
 import jakarta.persistence.*;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequest;
 import kr.remerge.stylehub.domain.user.entity.User;
-import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -21,7 +20,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class Quote extends BaseEntity {
+public class Quote{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -101,6 +100,9 @@ public class Quote extends BaseEntity {
     @Builder.Default
     @Column(nullable = false, length = 30)
     private String status = "SUBMITTED";
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 
     @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;

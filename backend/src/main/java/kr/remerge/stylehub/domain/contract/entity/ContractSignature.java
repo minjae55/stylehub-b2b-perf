@@ -18,7 +18,7 @@ public class ContractSignature {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "contract_signature_id")
-    private Long contractSignatureId;
+    private Integer contractSignatureId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id", nullable = false)
