@@ -8,16 +8,18 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Entity
 @Table(name = "contract_items")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ContractItem extends BaseEntity {
+public class ContractItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "contract_item_id")
-    private Long contractItemId;
+    private Integer contractItemId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id", nullable = false)
@@ -48,6 +50,14 @@ public class ContractItem extends BaseEntity {
 
     @Column(name = "total_price", nullable = false)
     private Long totalPrice;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 
     public ContractItem(
             Contract contract,

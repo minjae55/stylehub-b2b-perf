@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.contract.enumtype.ContractStatus;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
-import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,12 +15,13 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "contracts")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Contract extends BaseEntity {
+
+public class Contract {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "contract_id")
-    private Long contractId;
+    private Integer contractId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quote_id", nullable = false)
@@ -40,6 +40,13 @@ public class Contract extends BaseEntity {
     @Column(name = "contract_no", nullable = false, unique = true, length = 30)
     private String contractNo;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_contract_id")
+    private Contract parentContract;
+
+    @Column(nullable = false)
+    private Integer version;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ContractStatus status = ContractStatus.DRAFT;
@@ -53,6 +60,9 @@ public class Contract extends BaseEntity {
     @Column(name = "pdf_url", length = 2000)
     private String pdfUrl;
 
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
     @Column(name = "buyer_signed_at")
     private LocalDateTime buyerSignedAt;
 
@@ -61,6 +71,12 @@ public class Contract extends BaseEntity {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @Column(name = "submitted_at")
+    private LocalDateTime submittedAt;
+
+    @Column(name = "canceled_at")
+    private LocalDateTime canceledAt;
 
     public Contract(
             Quote quote,
@@ -77,6 +93,7 @@ public class Contract extends BaseEntity {
         this.contractNo = contractNo;
         this.contractAmount = contractAmount;
         this.status = ContractStatus.DRAFT;
+        this.version = 1;
     }
 
     public void sellerSign() {
@@ -92,6 +109,11 @@ public class Contract extends BaseEntity {
     public void complete() {
         this.status = ContractStatus.COMPLETED;
         this.completedAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
     }
 
     public void cancel() {

@@ -19,7 +19,7 @@ public class Negotiation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "negotiation_id")
-    private Long negotiationId;
+    private Integer negotiationId;
 
     @Column(name = "negotiation_type", nullable = false, length = 30)
     private String negotiationType;
