@@ -1,6 +1,6 @@
 package kr.remerge.stylehub.global.auth.security;
 
-import kr.remerge.stylehub.domain.user.UserRepository;
+import kr.remerge.stylehub.domain.user.repository.UserRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;

@@ -23,7 +23,7 @@ public class DisputeFile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "dispute_file_id")
-    private Long disputeFileId;
+    private Integer disputeFileId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dispute_id", nullable = false)

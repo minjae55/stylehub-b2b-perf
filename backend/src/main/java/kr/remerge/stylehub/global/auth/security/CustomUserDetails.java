@@ -19,7 +19,7 @@ public class CustomUserDetails implements UserDetails {
     // ───────────────────────────────────────────
 
     // DB의 users 테이블에서 가져온 정보들
-    private final Long userId;
+    private final Integer userId;
     private final String email;
     private final String password;
     private final String role;          // ADMIN / PRESIDENT / EMPLOYEE
@@ -33,7 +33,7 @@ public class CustomUserDetails implements UserDetails {
     // User 엔티티를 받아서 필요한 필드만 꺼내 저장
     // 엔티티 전체를 들고 다니지 않고 필요한 값만 복사하는 게 포인트
     public CustomUserDetails(User user) {
-        this.userId = user.getUserId().longValue();
+        this.userId = user.getUserId();
         this.email = user.getEmail();
         this.password = user.getPassword();
         this.role = user.getRole().name();

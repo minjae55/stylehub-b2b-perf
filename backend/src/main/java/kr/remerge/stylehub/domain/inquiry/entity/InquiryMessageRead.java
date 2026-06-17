@@ -17,7 +17,7 @@ public class InquiryMessageRead {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "message_read_id")
-    private Long messageReadId;
+    private Integer messageReadId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "message_id", nullable = false)

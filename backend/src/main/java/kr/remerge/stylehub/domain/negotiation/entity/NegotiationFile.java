@@ -17,7 +17,7 @@ public class NegotiationFile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "negotiation_file_id")
-    private Long negotiationFileId;
+    private Integer negotiationFileId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "negotiation_request_id", nullable = false)

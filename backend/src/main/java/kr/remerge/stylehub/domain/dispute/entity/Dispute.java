@@ -32,7 +32,7 @@ public class Dispute extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "dispute_id")
-    private Long disputeId;
+    private Integer disputeId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)

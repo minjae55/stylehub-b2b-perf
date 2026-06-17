@@ -2,6 +2,9 @@ package kr.remerge.stylehub.domain.user.entity;
 
 import jakarta.persistence.*;
 import kr.remerge.stylehub.domain.product.entity.Category;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -18,6 +21,9 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_user_id", columnList = "user_id")
         }
 )
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class UserPreferredCategory {
 
     @Id

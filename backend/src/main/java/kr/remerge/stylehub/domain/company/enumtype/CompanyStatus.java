@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.domain.company.entity;
+package kr.remerge.stylehub.domain.company.enumtype;
 
 public enum CompanyStatus {
     PENDING,

@@ -37,12 +37,12 @@ public class JwtProvider {
 
     // 액세스 토큰 생성
     // userId, role, businessRole을 토큰 안에 담아서 발급
-    public String generateAccessToken(Long userId, String role, String businessRole) {
+    public String generateAccessToken(Integer userId, String role, String businessRole) {
         return buildToken(userId, role, businessRole, jwtProperties.getAccessTokenExpiration());
     }
 
     // 리프레시 토큰 생성
-    public String generateRefreshToken(Long userId) {
+    public String generateRefreshToken(Integer userId) {
         // [변경 후] jjwt 0.12.x 버전의 빌더 문법 적용
         // 1. setSubject(), setIssuedAt(), setExpiration() -> 모두 'set'이 제거된 최신 메서드로 변경
         // 2. signWith(Key, 알고리즘) -> signWith(Key) 하나로 변경 (jjwt가 키 길이를 보고 최적의 알고리즘을 자동 세팅함)
@@ -55,7 +55,7 @@ public class JwtProvider {
     }
 
     // 실제 토큰을 조립하는 내부 메서드
-    private String buildToken(Long userId, String role, String businessRole, long expiration) {
+    private String buildToken(Integer userId, String role, String businessRole, long expiration) {
         // [변경 후] generateRefreshToken과 동일하게 최신형 빌더 문법으로 리팩토링
         return Jwts.builder()
                 .subject(String.valueOf(userId))  // 토큰 주인 (userId)

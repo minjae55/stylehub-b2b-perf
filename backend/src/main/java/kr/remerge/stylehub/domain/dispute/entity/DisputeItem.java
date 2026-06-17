@@ -18,7 +18,7 @@ public class DisputeItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "dispute_product_id")
-    private Long disputeProductId;
+    private Integer disputeProductId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dispute_id", nullable = false)
