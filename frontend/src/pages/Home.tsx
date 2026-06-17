@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   Tag,
   ChevronDown,
+  Heart,
 } from "lucide-react";
 
 const categories = [
@@ -20,6 +21,7 @@ const categories = [
     name: "상의",
     id: "tops",
     icon: "👕",
+    iconImg: "/images/top.png",
     sub: ["티셔츠/탑", "블라우스/셔츠", "니트/스웨터", "후드/맨투맨"],
     products: [
       { id: 101, name: "여성 린넨 블라우스", price: "₩8,900", moq: "50벌", image: "https://images.unsplash.com/photo-1594938298603-c8148c4b2e8e?w=200&h=150&fit=crop" },
@@ -32,6 +34,7 @@ const categories = [
     name: "하의",
     id: "bottoms",
     icon: "👖",
+    iconImg: "/images/bottom.png",
     sub: ["팬츠/슬랙스", "스커트", "진/데님", "레깅스"],
     products: [
       { id: 201, name: "와이드 슬랙스", price: "₩15,800", moq: "40벌", image: "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=200&h=150&fit=crop" },
@@ -44,6 +47,7 @@ const categories = [
     name: "원피스/세트",
     id: "dresses",
     icon: "👗",
+    iconImg: "/images/one_piece.png",
     sub: ["원피스", "투피스세트", "점프수트", "코디세트"],
     products: [
       { id: 301, name: "플로럴 랩 원피스", price: "₩22,000", moq: "30벌", image: "https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=200&h=150&fit=crop" },
@@ -56,6 +60,7 @@ const categories = [
     name: "아우터",
     id: "outerwear",
     icon: "🧥",
+    iconImg: "/images/outer.png",
     sub: ["코트", "재킷/점퍼", "가디건", "패딩/베스트"],
     products: [
       { id: 401, name: "울 혼방 롱코트", price: "₩58,000", moq: "20벌", image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=200&h=150&fit=crop" },
@@ -67,7 +72,8 @@ const categories = [
   {
     name: "이너/언더웨어",
     id: "innerwear",
-    icon: "🩱",
+    icon: "🩱",        
+    iconImg: "/images/inner.png",
     sub: ["이너웨어", "브라/속옷", "잠옷/홈웨어", "수영복"],
     products: [
       { id: 501, name: "면 이너 민소매 (3팩)", price: "₩9,900", moq: "100세트", image: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=200&h=150&fit=crop" },
@@ -80,6 +86,7 @@ const categories = [
     name: "스포츠/애슬레저",
     id: "sports",
     icon: "🏃",
+    iconImg: "/images/sports.png",
     sub: ["스포츠탑", "스포츠레깅스", "트레이닝복", "요가복"],
     products: [
       { id: 601, name: "하이웨이스트 요가 레깅스", price: "₩22,000", moq: "50벌", image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=200&h=150&fit=crop" },
@@ -92,6 +99,7 @@ const categories = [
     name: "액세서리",
     id: "accessories",
     icon: "👜",
+    iconImg: "/images/accessory.png",
     sub: ["가방/백", "스카프/모자", "벨트/양말", "쥬얼리"],
     products: [
       { id: 701, name: "에코백 캔버스 토트", price: "₩12,000", moq: "100개", image: "https://images.unsplash.com/photo-1591561954557-26941169b49e?w=200&h=150&fit=crop" },
@@ -104,6 +112,7 @@ const categories = [
     name: "신발",
     id: "shoes",
     icon: "👠",
+    iconImg: "/images/shoes.png",
     sub: ["스니커즈", "힐/구두", "부츠/앵클부츠", "샌들/슬리퍼"],
     products: [
       { id: 801, name: "플랫폼 스니커즈", price: "₩38,000", moq: "30켤레", image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=150&fit=crop" },
@@ -147,12 +156,29 @@ const fashionServices = [
   { icon: <Tag size={32} />, title: "시즌 할인", desc: "대량 주문 시 추가 할인 협의 가능", detail: "MOQ 조건부 특가 제공", path: "/products" },
 ];
 
-// [추가] 히어로 슬라이더 데이터 - public/images/ 폴더에 banner1~4.png 파일 넣어야 함
+// [추가] 신규 상품 데이터
+const newProducts = [
+  { id: 11, name: "루즈핏 린넨 셔츠 (3컬러)", supplier: "내추럴보이", price: "₩12,000", unit: "/벌", moq: "40벌", image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=320&h=240&fit=crop&auto=format", verified: true, bookmarked: false },
+  { id: 12, name: "스트라이프 니트 가디건", supplier: "코지니트", price: "₩19,500", unit: "/벌", moq: "30벌", image: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=320&h=240&fit=crop&auto=format", verified: false, bookmarked: false },
+  { id: 13, name: "플리츠 미디 스커트 (5컬러)", supplier: "엘레강스모드", price: "₩14,000", unit: "/벌", moq: "50벌", image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=320&h=240&fit=crop&auto=format", verified: true, bookmarked: false },
+  { id: 14, name: "오버핏 크롭 후드집업", supplier: "캐주얼하우스", price: "₩22,000", unit: "/벌", moq: "40벌", image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=320&h=240&fit=crop&auto=format", verified: false, bookmarked: false },
+  { id: 15, name: "실크 새틴 슬립 드레스", supplier: "페미닌스타일", price: "₩28,000", unit: "/벌", moq: "20벌", image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=320&h=240&fit=crop&auto=format", verified: true, bookmarked: false },
+  { id: 16, name: "버킷햇 코튼 (4컬러)", supplier: "패션액세서리몰", price: "₩8,500", unit: "/개", moq: "80개", image: "https://images.unsplash.com/photo-1520975861611-9272f9c2a78c?w=320&h=240&fit=crop&auto=format", verified: false, bookmarked: false },
+];
 const heroSlides = [
   { image: "/images/banner1.png", label: "내추럴 무드" },
   { image: "/images/banner2.png", label: "국내 패션 B2B 도매" },
   { image: "/images/banner3.png", label: "시즌 컬렉션" },
   { image: "/images/banner4.png", label: "스트리트 무드" },
+];
+
+// [추가] 인기 브랜드 데이터 - 로고 이미지는 추후 /images/brands/ 폴더에 추가
+const popularBrands = [
+  { name: "동대문패션(주)", logo: "/images/brands/ddm.png" },
+  { name: "트렌드하우스", logo: "/images/brands/trend.png" },
+  { name: "프리미엄어패럴", logo: "/images/brands/premium.png" },
+  { name: "액티브웨어코리아", logo: "/images/brands/active.png" },
+  { name: "패션액세서리몰", logo: "/images/brands/acc.png" },
 ];
 
 export function Home() {
@@ -259,44 +285,69 @@ export function Home() {
         {/* [변경 끝] */}
 
         {/* Right: Quick Links */}
-        <div className="flex flex-col gap-3">
-          <div className="bg-white rounded border border-border p-4">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">내 계정</div>
-			
-			<Link to="/auth" className="w-full bg-primary text-white text-sm font-semibold py-2 rounded hover:bg-primary/70 transition-colors mb-2 block text-center">
-						  파트너십 등록
-						</Link>
-						<Link to="/auth?tab=signup&role=seller" className="block w-full text-center bg-primary/20 text-primary text-sm font-semibold py-2 rounded hover:bg-primary/30 transition-colors">
-						  셀러 등록하기
-						</Link> {/* 디자인수정 */}
-
-         
-          </div>
+        <div className="flex flex-col gap-3 self-start">
+          {/* [수정] 실시간 인기 상품 (썸네일 + 상승률) */}
           <div className="bg-secondary rounded border border-primary/20 p-4">
-            <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-2 flex items-center gap-1">
-              <TrendingUp size={12} /> 이번 주 인기
+            <div className="text-xs font-semibold text-primary tracking-wider mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1"><TrendingUp size={12} /> 실시간 인기 상품 🔥</span>
+              <a href="/products" className="text-muted-foreground hover:text-primary font-normal text-[11px]"></a>
             </div>
-            {["여성 린넨 블라우스", "와이드 슬랙스", "플로럴 원피스", "오버핏 코트", "요가 레깅스", "카와이다케쟈다메데스까", "비기 제1장 집 가버리기", "블랙 패턴 셔츠"].map((item, i) => (
-              <div key={item} className="flex items-center gap-2 py-1.5 border-b border-primary/20 last:border-0 text-sm">
-                <span className={`font-mono text-[11px] font-bold w-4 ${i < 3 ? "text-primary" : "text-muted-foreground"}`}>{i + 1}</span>
-                <a href="#" className="hover:text-primary transition-colors">{item}</a>
+            {[
+              { name: "여성 린넨 블라우스", rate: 12, image: "https://images.unsplash.com/photo-1594938298603-c8148c4b2e8e?w=40&h=40&fit=crop" },
+              { name: "와이드 슬랙스", rate: 9, image: "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=40&h=40&fit=crop" },
+              { name: "플로럴 원피스", rate: 8, image: "https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=40&h=40&fit=crop" },
+              { name: "오버핏 자켓", rate: 7, image: "https://images.unsplash.com/photo-1551537482-f2075a1d41f2?w=40&h=40&fit=crop" },
+              { name: "요가 레깅스", rate: 6, image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=40&h=40&fit=crop" },
+            ].map((item, i) => (
+              <div key={item.name} className="flex items-center gap-2 py-1 border-b border-primary/20 last:border-0">
+                <span className={`font-mono text-[11px] font-bold w-4 flex-shrink-0 ${i < 3 ? "text-primary" : "text-muted-foreground"}`}>{i + 1}</span>
+                <img src={item.image} alt={item.name} className="w-7 h-7 rounded object-cover flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <a href="#" className="text-xs hover:text-primary transition-colors line-clamp-1">{item.name}</a>
+                  <div className="text-[10px] text-primary font-semibold">▲ {item.rate}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* [추가] 인기 브랜드 */}
+          <div className="bg-secondary rounded border border-primary/20 p-4">
+            <div className="text-xs font-semibold text-primary tracking-wider mb-3 flex items-center justify-between">
+              <span>🏆 인기 브랜드</span>
+              <Link to="/suppliers" className="text-muted-foreground hover:text-primary font-normal text-[11px]"></Link>
+            </div>
+            {popularBrands.map((brand, i) => (
+              <div key={brand.name} className="flex items-center gap-2 py-1 border-b border-primary/20 last:border-0">
+                <span className={`font-mono text-[11px] font-bold w-4 flex-shrink-0 ${i < 3 ? "text-primary" : "text-muted-foreground"}`}>{i + 1}</span>
+                <div className="w-7 h-7 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <img
+                    src={brand.logo}
+                    alt={brand.name}
+                    className="w-full h-full object-contain"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                </div>
+                <span className="text-xs text-foreground truncate">{brand.name}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* [추가] Category Circles: 히어로 아래 원형 카테고리 아이콘 행 */}
-      {/* [변경] slice(0,5) → 전체 categories + 나머지 카테고리 더보기 원 + 브랜드 보러가기 원 추가 */}
-      <div className="flex justify-center gap-8 mb-6">
+      {/* [수정] Category Circles: full width 단독 배치 */}
+      <div className="flex justify-center gap-6 mb-6">
         {categories.map((cat) => (
           <Link
             key={cat.id}
             to={`/products?category=${cat.id}`}
             className="flex flex-col items-center gap-2 group"
           >
-            <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-3xl group-hover:border-primary group-hover:bg-primary/5 transition-all">
-              {cat.icon}
+            {/* 카테고리 버튼에 이미지 추가 */}
+            <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-3xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
+              {cat.iconImg ? (
+                <img src={cat.iconImg} alt={cat.name} className="w-15 h-15 object-contain" />
+              ) : (
+                cat.icon
+              )}
             </div>
             <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">
               {cat.name}
@@ -308,10 +359,10 @@ export function Home() {
           to="/products"
           className="flex flex-col items-center gap-2 group"
         >
-          <div className="w-20 h-20 rounded-full border-2 border-dashed border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all">
-            ＋
+          <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
+            <img src="/images/all.png" alt="전체보기" className="w-12 h-12 object-contain" />
           </div>
-          <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors font-medium">
+          <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">
             전체보기
           </span>
         </Link>
@@ -320,29 +371,27 @@ export function Home() {
           to="/suppliers"
           className="flex flex-col items-center gap-2 group"
         >
-          <div className="w-20 h-20 rounded-full border-2 border-dashed border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all">
-            🏷️
+          <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
+            <img src="/images/brand.png" alt="브랜드" className="w-18 h-18 object-contain" />
           </div>
-          <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors font-medium">
+          <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">
             브랜드
           </span>
         </Link>
+        {/* [추가] 시즌할인 원 */}
+        <Link
+          to="/products"
+          className="flex flex-col items-center gap-2 group"
+        >
+          <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
+            <img src="/images/discount.png" alt="시즌할인" className="w-18 h-18 object-contain" />
+          </div>
+          <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">
+            시즌할인
+          </span>
+          </Link>
       </div>
-      {/* [추가 끝] */}
-
-      {/* Fashion Services */}
-      <section className="mb-6">
-        <div className="grid grid-cols-4 gap-4">
-          {fashionServices.map((svc) => (
-            <Link key={svc.title} to={svc.path} className="bg-white rounded border border-border p-5 hover:border-primary hover:shadow-md transition-all group cursor-pointer">
-              <div className="text-primary mb-3 group-hover:scale-110 transition-transform inline-block">{svc.icon}</div>
-              <h3 className="font-semibold text-foreground mb-1">{svc.title}</h3>
-              <p className="text-xs text-muted-foreground mb-2 leading-relaxed">{svc.desc}</p>
-              <p className="text-xs text-primary font-mono">{svc.detail}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {/* [수정 끝] */}
 
       {/* Featured Products */}
       <section className="mb-6">
@@ -361,9 +410,7 @@ export function Home() {
               <Link to={`/product/${product.id}`} className="block">
                 <div className="relative overflow-hidden bg-muted">
                   <img src={product.image} alt={product.name} className={`w-full h-40 object-cover transition-transform duration-300 ${hoveredProduct === product.id ? "scale-105" : ""}`} />
-                  {product.verified && (
-                    <div className="absolute top-2 left-2 bg-primary text-white text-[10px] px-1.5 py-0.5 rounded font-semibold">인증</div>
-                  )}
+
                 </div>
                 <div className="p-3">
                   <div className="text-xs text-muted-foreground mb-1 truncate">{product.supplier}</div>
@@ -379,7 +426,7 @@ export function Home() {
                   onClick={(e) => { e.stopPropagation(); toggleBookmark(product.id); }}
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
-                  <Bookmark size={14} className={bookmarks.includes(product.id) ? "fill-primary text-primary" : ""} />
+                  <Heart size={14} className={bookmarks.includes(product.id) ? "fill-red-500 text-red-500" : ""} />
                 </button>
                 <Link to="/cart" className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors text-xs">
                   <ShoppingCart size={12} /> 담기
@@ -390,7 +437,51 @@ export function Home() {
         </div>
       </section>
 
-      {/* Suppliers + Why Us */}
+      {/* [추가] 신규 상품 */}
+      <section className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-foreground">신규 상품</h2>
+          <Link to="/products" className="text-sm text-primary hover:underline flex items-center gap-1">전체보기 <ArrowRight size={14} /></Link>
+        </div>
+        <div className="grid grid-cols-6 gap-4">
+          {newProducts.map((product) => (
+            <div
+              key={product.id}
+              onMouseEnter={() => setHoveredProduct(product.id)}
+              onMouseLeave={() => setHoveredProduct(null)}
+              className="bg-white rounded border border-border overflow-hidden hover:shadow-lg hover:border-primary/40 transition-all"
+            >
+              <Link to={`/product/${product.id}`} className="block">
+                <div className="relative overflow-hidden bg-muted">
+                  <img src={product.image} alt={product.name} className={`w-full h-40 object-cover transition-transform duration-300 ${hoveredProduct === product.id ? "scale-105" : ""}`} />
+                  <div className="absolute top-2 right-2 bg-[#6B21A8] text-white text-[10px] px-1.5 py-0.5 rounded font-semibold">NEW</div>
+                </div>
+                <div className="p-3">
+                  <div className="text-xs text-muted-foreground mb-1 truncate">{product.supplier}</div>
+                  <h4 className="text-sm font-medium text-foreground mb-2 line-clamp-2 leading-snug">{product.name}</h4>
+                  <div className="text-primary font-bold text-base">{product.price}<span className="text-xs font-normal text-muted-foreground">{product.unit}</span></div>
+                  <div className="flex items-center justify-between mt-2 text-xs">
+                    <span className="text-muted-foreground">최소 {product.moq}</span>
+                  </div>
+                </div>
+              </Link>
+              <div className="px-3 pb-3 flex items-center justify-between">
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleBookmark(product.id); }}
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Heart size={14} className={bookmarks.includes(product.id) ? "fill-red-500 text-red-500" : ""} />
+                </button>
+                <Link to="/cart" className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors text-xs">
+                  <ShoppingCart size={12} /> 담기
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+            {/* Suppliers + Why Us */}
       <div className="grid grid-cols-[1fr_340px] gap-4 mb-6">
         <section className="bg-white rounded border border-border overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">

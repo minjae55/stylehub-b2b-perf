@@ -98,14 +98,11 @@ export function AllProducts() {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(searchParams.get("category") || null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
-  // [추가] 브랜드 필터 state
   const [selectedBrand, setSelectedBrand] = useState("");
-  // [추가] 사이드바 토글 state
   const [sidebarTab, setSidebarTab] = useState<"category" | "brand">("category");
-  // [추가] 브랜드 대분류 펼침 state - 카테고리와 동일한 방식
   const [expandedBrandGroup, setExpandedBrandGroup] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>(() => { 
-  const saved = localStorage.getItem("wishlist"); //좋아요 페이지 추가용
+  const saved = localStorage.getItem("wishlist");
   return saved ? JSON.parse(saved) : [];
 }); 
   useEffect(() => {
@@ -362,7 +359,7 @@ export function AllProducts() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {filteredProducts.map((product) => (
                 <div key={product.id} className="bg-white border border-border rounded-lg overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all group">
-                  <Link to={`/product/${product.id}`} className="block relative">
+                  <Link to={`/products/${product.id}`} className="block relative">
                     <div className="aspect-square overflow-hidden bg-muted">
                       <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     </div>
@@ -375,7 +372,7 @@ export function AllProducts() {
                   </Link>
                   <div className="p-4">
                     <div className="text-xs text-muted-foreground mb-1">{product.brand}</div>
-                    <Link to={`/product/${product.id}`} className="block">
+                    <Link to={`/products/${product.id}`} className="block">
                       <h3 className="font-semibold text-foreground mb-2 line-clamp-2 hover:text-primary transition-colors">{product.name}</h3>
                     </Link>
                     <div className="flex items-baseline gap-1 mb-2">
@@ -417,7 +414,7 @@ export function AllProducts() {
                       <div className="flex items-start justify-between gap-4 mb-2">
                         <div className="flex-1">
                           <div className="text-xs text-muted-foreground mb-1">{product.brand} · {product.subCategory}</div>
-                          <Link to={`/product/${product.id}`}>
+                          <Link to={`/products/${product.id}`}>
                             <h3 className="font-semibold text-foreground text-lg mb-1 hover:text-primary transition-colors">{product.name}</h3>
                           </Link>
                           <div className="flex items-baseline gap-1 mb-2">
@@ -450,7 +447,7 @@ export function AllProducts() {
                           <ShoppingCart size={16} />
                           장바구니
                         </button>
-                        <Link to={`/product/${product.id}`} className="border border-border text-foreground hover:border-primary hover:text-primary px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors">
+                        <Link to={`/products/${product.id}`} className="border border-border text-foreground hover:border-primary hover:text-primary px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors">
                           상세보기
                         </Link>
                       </div>

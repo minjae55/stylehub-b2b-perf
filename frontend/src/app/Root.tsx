@@ -111,8 +111,15 @@ export function Root() {
         return () => document.removeEventListener("mousedown", handler);
     }, []);
 
-    return (
-        <div className="min-h-screen bg-background font-[Inter,sans-serif] flex flex-col">
+    return ( //폰트변경
+            <div className="min-h-screen bg-background font-[Pretendard,sans-serif] flex flex-col">
+            {/* [추가] 셀러 등록 상단 바 */}
+            <div className="bg-primary/10 border-b border-primary/20 py-1.5 text-center text-xs text-primary flex items-center justify-center gap-3">
+                <span>🏷️ 지금 셀러로 등록하고 전국 바이어와 연결되세요!</span>
+                <Link to="/auth?tab=signup&role=seller" className="bg-primary text-white text-[11px] font-semibold px-3 py-0.5 rounded-full hover:bg-primary/80 transition-colors">
+                    셀러 등록하기 →
+                </Link>
+            </div>
             {/* Main Header */}
             <header className="bg-white shadow-sm sticky top-0 z-50 flex-shrink-0 py-4">
                 <div className="max-w-[1280px] mx-auto px-4 py-3 flex justify-between">
