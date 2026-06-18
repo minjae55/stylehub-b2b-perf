@@ -1,31 +1,11 @@
-import { useState } from "react";
-import { Link } from "react-router";
-import { ArrowLeft, Bookmark, ShoppingCart, Truck, Shield, CheckCircle, Award, MapPin, Phone, Mail, Plus, Minus, Leaf, RefreshCw, Heart, Users, ShieldCheck } from "lucide-react";
 import api from "@/api/axios";
-import { useAuthStore } from "@/store/useAuthStore";
-
-type TemporaryProductOption = {
-  productOptionId: number;
-  optionLabel: string;
-  color: string;
-  size: string;
-  additionalPrice: number;
-  stockQuantity: number;
-};
-
-// 상품 상세 API가 완성되면 이 배열만 API 응답으로 교체하면 된다.
-const temporaryProductOptions: TemporaryProductOption[] = [
-  { productOptionId: 1, optionLabel: "블랙 / M", color: "블랙", size: "M", additionalPrice: 0, stockQuantity: 500 },
-  { productOptionId: 2, optionLabel: "블랙 / L", color: "블랙", size: "L", additionalPrice: 0, stockQuantity: 400 },
-  { productOptionId: 3, optionLabel: "화이트 / M", color: "화이트", size: "M", additionalPrice: 0, stockQuantity: 350 },
-  { productOptionId: 4, optionLabel: "화이트 / L", color: "화이트", size: "L", additionalPrice: 0, stockQuantity: 300 },
-  { productOptionId: 5, optionLabel: "네이비 / M", color: "네이비", size: "M", additionalPrice: 500, stockQuantity: 250 },
-  { productOptionId: 6, optionLabel: "네이비 / L", color: "네이비", size: "L", additionalPrice: 500, stockQuantity: 200 },
-];
+import { useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { ArrowLeft, Bookmark, ShoppingCart, Truck, Shield, CheckCircle, Award, MapPin, Phone, Mail, Plus, Minus, Leaf, RefreshCw, Heart, Users, ShieldCheck } from "lucide-react";
 
 type CertKey = "KC" | "OEKO-TEX" | "GOTS" | "GRS" | "비건" | "Fair Trade" | "REACH" | "CPSIA" | "UKCA" | "어린이안전" | "환경마크" | "섬유품질";
 
-const certConfig: Record<CertKey, { label: string; bg: string; border: string; color: string; iconBg: string; icon: React.ReactNode; expiry?: string }> = 
+const certConfig: Record<CertKey, { label: string; bg: string; border: string; color: string; iconBg: string; icon: React.ReactNode; expiry?: string }> =
 {  "KC":        { label: "KC 인증",         bg: "#EEF2FF", border: "#C7D2FE", color: "#3730A3", iconBg: "#4338CA", icon: <span style={{ fontSize: 9, fontWeight: 700 }}>KC</span> },
   "OEKO-TEX": { label: "OEKO-TEX",        bg: "#ECFDF5", border: "#A7F3D0", color: "#065F46", iconBg: "#059669", icon: <CheckCircle size={11} /> },
   "GOTS":      { label: "GOTS",            bg: "#F0FDF4", border: "#BBF7D0", color: "#14532D", iconBg: "#16A34A", icon: <Leaf size={11} /> },
@@ -64,7 +44,7 @@ function CertBadge({ certKey }: { certKey: CertKey }) {
 }
 
 export function ProductDetail() {
-  const user = useAuthStore((state) => state.user);
+  const navigate = useNavigate();
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [quantity, setQuantity] = useState(100);
@@ -74,6 +54,7 @@ export function ProductDetail() {
 
   const product = {
     id: "F002",
+    productOptionId: 1, // TODO: 상품 상세 API 연동 후 선택한 옵션 ID로 교체
     name: "크롭 반팔 티셔츠 (10컬러)",
     brand: "스타일컴퍼니",
     category: "상의 · 티셔츠/탑",
@@ -126,46 +107,20 @@ export function ProductDetail() {
     if (next >= product.moq) setQuantity(next);
   };
 
-  const availableColors = [...new Set(temporaryProductOptions.map((option) => option.color))];
-  const availableSizes = [...new Set(
-    temporaryProductOptions
-      .filter((option) => option.color === selectedColor)
-      .map((option) => option.size)
-  )];
-  const selectedOption = temporaryProductOptions.find(
-    (option) => option.color === selectedColor && option.size === selectedSize
-  );
-  const unitPrice = product.price + (selectedOption?.additionalPrice ?? 0);
-  const total = unitPrice * quantity;
+  const total = product.price * quantity;
 
   const handleAddToCart = async () => {
-    if (!user) {
-      window.alert("로그인이 필요합니다.");
-      return;
-    }
-
-    if (!selectedOption) {
-      window.alert("색상과 사이즈를 선택해주세요.");
-      return;
-    }
-
-    if (quantity > selectedOption.stockQuantity) {
-      window.alert(`주문 가능한 재고는 ${selectedOption.stockQuantity}개입니다.`);
-      return;
-    }
-
     try {
       setIsAddingToCart(true);
       await api.post("/cart", {
-        userId: user.userId,
-        productOptionId: selectedOption.productOptionId,
+        productOptionId: product.productOptionId,
         quantity,
         cartType: "NORMAL",
       });
-      window.alert(`${selectedOption.optionLabel} 옵션을 장바구니에 담았습니다.`);
-    } catch (error) {
-      console.error("장바구니 추가 실패", error);
-      window.alert("장바구니에 담지 못했습니다. 잠시 후 다시 시도해주세요.");
+
+      navigate("/cart");
+    } catch {
+      window.alert("장바구니에 담지 못했습니다. 로그인 상태와 상품 옵션을 확인해주세요.");
     } finally {
       setIsAddingToCart(false);
     }
@@ -243,13 +198,10 @@ export function ProductDetail() {
                   컬러 {selectedColor && <span className="text-primary font-semibold">· {selectedColor}</span>}
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {availableColors.map((color) => (
+                  {product.colors.map((color) => (
                     <button
                       key={color}
-                      onClick={() => {
-                        setSelectedColor(color);
-                        setSelectedSize("");
-                      }}
+                      onClick={() => setSelectedColor(color)}
                       className={`px-3 py-1.5 text-xs rounded border transition-colors ${
                         selectedColor === color
                           ? "bg-primary text-white border-primary"
@@ -268,7 +220,7 @@ export function ProductDetail() {
                   사이즈 {selectedSize && <span className="text-primary font-semibold">· {selectedSize}</span>}
                 </label>
                 <div className="flex gap-2">
-                  {availableSizes.map((size) => (
+                  {product.sizes.map((size) => (
                     <button
                       key={size}
                       onClick={() => setSelectedSize(size)}
@@ -323,7 +275,7 @@ export function ProductDetail() {
                   type="button"
                   onClick={handleAddToCart}
                   disabled={isAddingToCart}
-                  className="flex-1 bg-white border-2 border-primary text-primary hover:bg-secondary py-3.5 rounded font-semibold transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 bg-white border-2 border-primary text-primary hover:bg-secondary py-3.5 rounded font-semibold transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <ShoppingCart size={18} />
                   {isAddingToCart ? "담는 중..." : "장바구니 담기"}
