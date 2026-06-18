@@ -1,6 +1,8 @@
 import {useState} from "react";
-import {Link} from "react-router";
-import {Eye, EyeOff, ArrowRight, TrendingUp, Users, ShoppingBag} from "lucide-react";
+import {Link, useNavigate} from "react-router";
+import {ArrowRight, Eye, EyeOff, ShoppingBag, TrendingUp, Users} from "lucide-react";
+import {useAuthStore} from "@/store/useAuthStore";
+import {getMe, login} from "@/api/auth";
 
 const STATS = [
     {icon: <ShoppingBag size={16}/>, value: "2,400+", label: "입점 브랜드"},
@@ -13,6 +15,37 @@ const TAGS = ["여성 캐주얼", "남성 스트릿", "아우터", "데님", "�
 export function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [form, setForm] = useState({email: "", password: "", remember: false});
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const navigate = useNavigate();
+    const setUser = useAuthStore((state) => state.setUser);
+
+    // 로그인 처리 함수
+    const handleLogin = async () => {
+        setError(null);
+        setLoading(true);
+
+        try {
+            // 1. 로그인 요청 → 서버가 쿠키로 토큰 발급
+            await login({email: form.email, password: form.password});
+
+            // 2. 로그인 성공했으니 내 정보 조회
+            const user = await getMe();
+
+            // 3. zustand store에 저장 → 다른 컴포넌트에서 꺼내 쓸 수 있음
+            setUser(user);
+
+            // 4. 페이지 이동
+            navigate("/buyer");
+
+        } catch (err: any) {
+            const message = err.response?.data?.message ?? "로그인에 실패했습니다.";
+            setError(message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="h-screen overflow-hidden flex flex-col lg:flex-row">
@@ -139,6 +172,8 @@ export function Login() {
                                         {showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
                                     </button>
                                 </div>
+                                {/* 에러 메시지 표시 */}
+                                {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
                             </div>
 
                             <div className="flex items-center justify-between">
@@ -155,22 +190,22 @@ export function Login() {
 
                                 {/* 우측 그룹화 */}
                                 <div className="flex items-center gap-1">
-                                    <Link to="/auth/find-id" className="text-xs text-primary hover:underline">
-                                        아이디 찾기
-                                    </Link>
+                                    <Link to="/auth/find-id" className="text-xs text-primary hover:underline">아이디
+                                        찾기</Link>
                                     <span className="text-xs">/</span>
-                                    <Link to="/auth/find-pw" className="text-xs text-primary hover:underline">
-                                        비밀번호 찾기
-                                    </Link>
+                                    <Link to="/auth/find-pw" className="text-xs text-primary hover:underline">비밀번호
+                                        찾기</Link>
                                 </div>
                             </div>
 
-                            <Link
-                                to="/buyer"
-                                className="w-full bg-primary hover:bg-primary/90 text-white py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2"
+                            <button
+                                type="button"
+                                onClick={handleLogin}
+                                disabled={loading}
+                                className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-white py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2"
                             >
-                                로그인 <ArrowRight size={15}/>
-                            </Link>
+                                {loading ? "로그인 중..." : "로그인"} <ArrowRight size={15}/>
+                            </button>
                         </div>
 
                         {/* Bottom CTA */}

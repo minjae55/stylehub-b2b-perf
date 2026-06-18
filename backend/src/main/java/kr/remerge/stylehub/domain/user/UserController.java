@@ -1,21 +1,22 @@
 package kr.remerge.stylehub.domain.user;
 
 import jakarta.validation.Valid;
+import kr.remerge.stylehub.domain.user.dto.request.SignUpRequest;
+import kr.remerge.stylehub.domain.user.dto.request.UpdateUserRequest;
+import kr.remerge.stylehub.domain.user.dto.response.UserResponse;
+import kr.remerge.stylehub.global.auth.security.AuthUser;
+import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
+import kr.remerge.stylehub.global.auth.security.LoginUser;
+import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import kr.remerge.stylehub.domain.user.dto.request.SignUpRequest;
-import kr.remerge.stylehub.domain.user.dto.request.UpdateUserRequest;
-import kr.remerge.stylehub.domain.user.dto.response.UserResponse;
-import kr.remerge.stylehub.global.response.ApiResponse;
-import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
-
 // 유저 관련 API 엔드포인트
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -48,9 +49,13 @@ public class UserController {
     // @AuthenticationPrincipal : JwtFilter에서 SecurityContext에 저장한 유저 꺼내기
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getMe(
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+            @LoginUser AuthUser user) {
 
-        UserResponse response = userService.getMe(userDetails.getUserId());
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        UserResponse response = userService.getMe(user.userId());
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -79,9 +84,9 @@ public class UserController {
     // JWT 인증 필요
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<Void>> deleteMe(
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+            @LoginUser AuthUser user) {
 
-        userService.deleteMe(userDetails.getUserId());
+        userService.deleteMe(user.userId());
 
         return ResponseEntity.ok(ApiResponse.success("회원 탈퇴가 완료되었습니다."));
     }

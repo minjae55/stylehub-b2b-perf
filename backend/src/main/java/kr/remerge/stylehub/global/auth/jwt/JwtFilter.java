@@ -74,8 +74,8 @@ public class JwtFilter extends OncePerRequestFilter {
                 // 4. 토큰에서 userId 추출
                 Integer userId = jwtProvider.getUserId(token);
 
-                // 5. userId로 DB에서 유저 정보 로드
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(String.valueOf(userId));
+                // 5. email로 DB에서 유저 정보 로드
+                UserDetails userDetails = customUserDetailsService.loadUserByUserId(userId);
 
                 // 6. 인증 객체 생성
                 UsernamePasswordAuthenticationToken authentication =

@@ -39,7 +39,6 @@ api.interceptors.response.use(
 
             } catch (refreshError) {
                 // 리프레시 토큰도 만료 → 로그인 페이지로 이동
-                window.location.href = "/auth/login";
                 return Promise.reject(refreshError);
             }
         }

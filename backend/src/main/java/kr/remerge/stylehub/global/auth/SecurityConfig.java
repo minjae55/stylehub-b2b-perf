@@ -89,7 +89,7 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_URLS).permitAll()
 
                         // /api/admin/** 은 ADMIN 역할만 접근 가능
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")1
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
