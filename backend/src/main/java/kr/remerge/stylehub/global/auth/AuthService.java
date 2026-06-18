@@ -81,7 +81,6 @@ public class AuthService {
                 user.getBusinessRole().name()
         );
         String refreshToken = jwtProvider.generateRefreshToken(user.getUserId());
-
         return TokenResponse.of(accessToken, refreshToken);
     }
 
