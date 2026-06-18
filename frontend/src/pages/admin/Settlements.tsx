@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   RefreshCcw
 } from 'lucide-react';
+import { settlementApi, SettlementResponse } from './Settlement'; // 백엔드와 주고받을 정산 데이터 타입 정의
 
 export default function Settlements() {
   // 상태 관리 (필터 탭 및 검색어)
@@ -17,27 +18,58 @@ export default function Settlements() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // 가상 정산 데이터 샘플 (포트원 연동 및 정산 프로세스 반영)
-  const [settlement, setSettlement] = useState([
-    { id: 'ST-20260610-01', date: '2026.06.10', buyer: '(주)에이비씨코리아', partner: '김파트너 컴퍼니', amount: 5000000, fee: 500000, status: '대기' },
-    { id: 'ST-20260609-12', date: '2026.06.09', buyer: '(주)글로벌디에프', partner: '이파트너 팩토리', amount: 2000000, fee: 200000, status: '완료' },
-    { id: 'ST-20260608-05', date: '2026.06.08', buyer: '하이픈 무역', partner: '박파트너 무역', amount: 3500000, fee: 350000, status: '환불요청' },
-    { id: 'ST-20260607-02', date: '2026.06.07', buyer: '(주)씨엠에스', partner: '최파트너 산업', amount: 1200000, fee: 120000, status: '완료' },
-  ]);
+  const [settlement, setSettlement] = useState<SettlementResponse[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
+  const loadSettlementData = async () => {
+    try {
+      setLoading(true);
+      const data = await settlementApi.getSettlements();
+      setSettlement(data);
+    } catch (error) {
+      console.error('정산 데이터 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSettlementData();
+  }, []);
   // 정산 승인 액션 함수
-  const handleApprove = (id: string) => {
+  const handleApprove = async (settlement_id: number) => {
     if (window.confirm('해당 건의 정산 지급을 승인하시겠습니까?')) {
-      setSettlement(prev => prev.map(item => item.id === id ? { ...item, status: '완료' } : item));
+      try {
+        await settlementApi.updateSettlementStatus(settlement_id.toString(), '완료');
+        alert('정산 승인이 완료되었습니다.');
+        loadSettlementData(); // 변경사항을 반영하기 위해 서버 데이터 재조회
+      } catch (error) {
+        alert('정산 승인 처리 중 오류가 발생했습니다.');
+      }
     }
   };
 
   // 환불 처리 액션 함수 (포트원 연동 시 환불 API 호출부)
-  const handleRefund = (id: string) => {
+  const handleRefund = async (settlement_id: number) => {
     if (window.confirm('포트원을 통해 결제 취소(환불)를 진행하시겠습니까?')) {
-      alert('환불 처리가 완료되었습니다.');
-      setSettlement(prev => prev.filter(item => item.id !== id)); // 혹은 상태를 '환불완료'로 변경
+      try {
+        await settlementApi.updateSettlementStatus(settlement_id.toString(), '환불완료'); // 혹은 상태에 맞춰 전송
+        alert('환불 처리가 완료되었습니다.');
+        loadSettlementData(); // 서버 데이터 재조회
+      } catch (error) {
+        alert('환불 처리 중 오류가 발생했습니다.');
+      }
     }
   };
+
+  const totalGMV = settlement.reduce((acc, cur) => acc + cur.total_amount, 0);
+  const totalFee = settlement.reduce((acc, cur) => acc + cur.platform_fee, 0);
+  const pendingAmount = settlement.filter(item => item.status === '대기').reduce((acc, cur) => acc + cur.total_amount, 0);
+  const refundRequestAmount = settlement.filter(item => item.status === '환불요청').reduce((acc, cur) => acc + cur.total_amount, 0);
+
+  if (loading) {
+    return <div className="p-6 text-center text-muted-foreground">정산 데이터를 로딩 중입니다...</div>;
+  }
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen text-foreground">
@@ -60,7 +92,7 @@ export default function Settlements() {
             <span className="text-sm font-medium">총 거래액 (GMV)</span>
             <TrendingUp size={18} className="text-blue-500" />
           </div>
-          <div className="text-2xl font-bold">11,700,000원</div>
+          <div className="text-2xl font-bold">{totalGMV.toLocaleString()}원</div>
           <span className="text-xs text-green-600 font-medium">전월 대비 +12.4%</span>
         </div>
 
@@ -69,7 +101,7 @@ export default function Settlements() {
             <span className="text-sm font-medium">플랫폼 수수료 수익</span>
             <DollarSign size={18} className="text-green-500" />
           </div>
-          <div className="text-2xl font-bold">1,170,000원</div>
+          <div className="text-2xl font-bold">{totalFee.toLocaleString()}원</div>
           <span className="text-xs text-muted-foreground">평균 수수료율 10%</span>
         </div>
 
@@ -78,7 +110,7 @@ export default function Settlements() {
             <span className="text-sm font-medium">정산 대기 금액</span>
             <Clock size={18} className="text-orange-500" />
           </div>
-          <div className="text-2xl font-bold text-orange-600">4,500,000원</div>
+          <div className="text-2xl font-bold text-orange-600">{pendingAmount.toLocaleString()}원</div>
           <span className="text-xs text-orange-600 font-medium">지급 승인 대기 1건</span>
         </div>
 
@@ -87,7 +119,7 @@ export default function Settlements() {
             <span className="text-sm font-medium">환불 / 취소 요청</span>
             <AlertCircle size={18} className="text-red-500" />
           </div>
-          <div className="text-2xl font-bold text-red-600">3,500,000원</div>
+          <div className="text-2xl font-bold text-red-600">{refundRequestAmount.toLocaleString()}원</div>
           <span className="text-xs text-red-600 font-medium">빠른 처리가 필요합니다.</span>
         </div>
       </div>
@@ -153,55 +185,83 @@ export default function Settlements() {
             <tbody className="divide-y divide-border">
               {settlement
                 .filter(item => activeTab === 'all' || item.status === activeTab)
-                .filter(item => item.buyer.includes(searchTerm) || item.partner.includes(searchTerm))
+                .filter(item => 
+                        item.order_no.includes(searchTerm) || 
+                        String(item.buyer_id).includes(searchTerm) || 
+                        String(item.seller_id).includes(searchTerm)
+                      )
                 .map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 font-mono text-xs">
-                      <span className="font-semibold text-foreground block">{row.id}</span>
-                      <span className="text-muted-foreground">{row.date}</span>
-                    </td>
-                    <td className="p-4 font-medium">{row.buyer}</td>
-                    <td className="p-4 text-muted-foreground">{row.partner}</td>
-                    <td className="p-4 text-right font-medium">{row.amount.toLocaleString()}원</td>
-                    <td className="p-4 text-right text-slate-500">{row.fee.toLocaleString()}원</td>
-                    <td className="p-4 text-right font-semibold text-primary">{(row.amount - row.fee).toLocaleString()}원</td>
-                    <td className="p-4 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                        row.status === '완료' ? 'bg-green-50 text-green-700' :
-                        row.status === '대기' ? 'bg-orange-50 text-orange-700' :
-                        'bg-red-50 text-red-700'
-                      }`}>
-                        {row.status === '완료' && <CheckCircle2 size={12} />}
-                        {row.status === '대기' && <Clock size={12} />}
-                        {row.status === '환불요청' && <AlertCircle size={12} />}
-                        정산 {row.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      {row.status === '대기' && (
-                        <button 
-                          onClick={() => handleApprove(row.id)}
-                          className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-1.5 rounded-md font-medium shadow-sm transition-colors"
-                        >
-                          정산 승인
-                        </button>
-                      )}
-                      {row.status === '완료' && (
-                        <span className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                          <CheckCircle2 size={12} className="text-green-500" /> 지급 완료
-                        </span>
-                      )}
-                      {row.status === '환불요청' && (
-                        <button 
-                          onClick={() => handleRefund(row.id)}
-                          className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-md font-medium shadow-sm transition-colors flex items-center gap-1 mx-auto"
-                        >
-                          <RefreshCcw size={12} /> 환불 승인
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-              ))}
+    <tr key={row.settlement_id} className="hover:bg-slate-50/50 transition-colors">
+      {/* 주문번호 / 일시 */}
+      <td className="p-4 font-mono text-xs">
+        <span className="font-semibold text-foreground block">{row.order_no}</span>
+        <span className="text-muted-foreground">
+          {/* Date 객체 포맷팅 (예: 2026-06-17 형태로 변환하여 출력) */}
+          {new Date(row.created_at).toLocaleDateString()}
+        </span>
+      </td>
+      
+      {/* 바이어(수요자) ID */}
+      <td className="p-4 font-medium">ID: {row.buyer_id}</td>
+      
+      {/* 공급사(판매자) ID */}
+      <td className="p-4 text-muted-foreground">ID: {row.seller_id}</td>
+      
+      {/* 결제 금액 */}
+      <td className="p-4 text-right font-medium">
+        {row.total_amount.toLocaleString()}원
+      </td>
+      
+      {/* 플랫폼 수수료 */}
+      <td className="p-4 text-right text-slate-500">
+        {row.platform_fee.toLocaleString()}원
+      </td>
+      
+      {/* 정산 예정액 (백엔드의 final_amount 직결) */}
+      <td className="p-4 text-right font-semibold text-primary">
+        {row.final_amount.toLocaleString()}원
+      </td>
+      
+      {/* 상태 뱃지 */}
+      <td className="p-4 text-center">
+        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+          row.status === '완료' ? 'bg-green-50 text-green-700' :
+          row.status === '대기' ? 'bg-orange-50 text-orange-700' :
+          'bg-red-50 text-red-700'
+        }`}>
+          {row.status === '완료' && <CheckCircle2 size={12} />}
+          {row.status === '대기' && <Clock size={12} />}
+          {row.status === '환불요청' && <AlertCircle size={12} />}
+          정산 {row.status}
+        </span>
+      </td>
+      
+      {/* 관리 액션 버튼들 */}
+      <td className="p-4 text-center">
+        {row.status === '대기' && (
+          <button 
+            onClick={() => handleApprove(row.settlement_id)} // 기존 id -> settlement_id
+            className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-1.5 rounded-md font-medium shadow-sm transition-colors"
+          >
+            정산 승인
+          </button>
+        )}
+        {row.status === '완료' && (
+          <span className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+            <CheckCircle2 size={12} className="text-green-500" /> 지급 완료
+          </span>
+        )}
+        {row.status === '환불요청' && (
+          <button 
+            onClick={() => handleRefund(row.settlement_id)} // 기존 id -> settlement_id
+            className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-md font-medium shadow-sm transition-colors flex items-center gap-1 mx-auto"
+          >
+            <RefreshCcw size={12} /> 환불 승인
+          </button>
+        )}
+      </td>
+    </tr>
+))}
             </tbody>
           </table>
         </div>

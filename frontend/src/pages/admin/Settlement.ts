@@ -1,0 +1,32 @@
+import axios from 'axios';
+
+// 백엔드와 주고받을 정산 데이터 타입 정의
+export interface SettlementResponse {
+  settlement_id: number;
+  seller_id: number;
+  buyer_id: number;
+  admin_id: number;
+  order_no: string;
+  total_amount: number;
+  platform_fee: number;
+  final_amount: number;
+  settled_at: Date;
+  created_at: Date;
+  status: '대기' | '완료' | '환불요청'; // 백엔드 코드값에 맞춰 매핑
+}
+
+const API_BASE_URL = 'http://localhost:5173/settlements';
+
+export const settlementApi = {
+  // 1. 정산 데이터 목록 조회
+  getSettlements: async (): Promise<SettlementResponse[]> => {
+    const response = await axios.get<SettlementResponse[]>(API_BASE_URL);
+    return response.data;
+  },
+
+  // 2. 정산 상태 변경 (승인 또는 환불 등)
+  // 백엔드 구현에 따라 PATCH /api/settlements/{id}/status 형태를 주로 사용합니다.
+  updateSettlementStatus: async (id: string, status: string): Promise<void> => {
+    await axios.patch(`${API_BASE_URL}/${id}/status`, { status });
+  }
+};

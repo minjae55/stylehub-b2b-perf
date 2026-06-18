@@ -147,29 +147,29 @@ export function Checkout() {
     )}`;
     setOrderNumber(newOrderNumber);
 
-    try {
-      const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
-      const payment = tossPayments.payment({ customerKey: "ANONYMOUS" });
-      const methodType = paymentMethod === "card" ? "CARD" : "VIRTUAL_ACCOUNT";
-      const orderName =
-        orderItems.length > 1 ? `${orderItems[0].name} 외 ${orderItems.length - 1}건` : orderItems[0].name;
+    // try {
+    // //   const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
+    //   // const payment = tossPayments.payment({ customerKey: "ANONYMOUS" });
+    //   const methodType = paymentMethod === "card" ? "CARD" : "VIRTUAL_ACCOUNT";
+    //   const orderName =
+    //     orderItems.length > 1 ? `${orderItems[0].name} 외 ${orderItems.length - 1}건` : orderItems[0].name;
 
-      await payment.requestPayment({
-        method: methodType,
-        amount: {
-          currency: "KRW",
-          value: total,
-        },
-        orderId: newOrderNumber,
-        orderName,
-        successUrl: `${window.location.origin}/payment/success?type=${orderType}&orderId=${orderId}`,
-        failUrl: `${window.location.origin}/payment/fail`,
-        customerName: "홍길동",
-      } as any);
-    } catch (error) {
-      console.error("결제창 호출 오류:", error);
-      alert("결제창을 여는 중 오류가 발생했습니다.");
-    }
+    //   await payment.requestPayment({
+    //     method: methodType,
+    //     amount: {
+    //       currency: "KRW",
+    //       value: total,
+    //     },
+    //     orderId: newOrderNumber,
+    //     orderName,
+    //     successUrl: `${window.location.origin}/payment/success?type=${orderType}&orderId=${orderId}`,
+    //     failUrl: `${window.location.origin}/payment/fail`,
+    //     customerName: "홍길동",
+    //   } as any);
+    // } catch (error) {
+    //   console.error("결제창 호출 오류:", error);
+    //   alert("결제창을 여는 중 오류가 발생했습니다.");
+    // }
   };
 
   return (

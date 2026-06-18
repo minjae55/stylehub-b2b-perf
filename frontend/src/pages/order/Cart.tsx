@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+
 type CartItem = {
   id: number;
   name: string;
