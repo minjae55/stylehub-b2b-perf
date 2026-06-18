@@ -1,6 +1,7 @@
-package kr.remerge.stylehub.domain.tosspayment;
+package kr.remerge.stylehub.domain.tosspayment.entity;
 
 import jakarta.persistence.*;
+import kr.remerge.stylehub.domain.tosspayment.enumtype.PaymentStatus;
 import lombok.*;
 import java.time.LocalDateTime;
 

@@ -23,4 +23,12 @@ public class TossPaymentsClient {
                 .bodyToMono(PaymentResult.class)
                 .block(); // 비동기 호출 결과를 동기적으로 반환
     }
+    public PaymentResult cancel(String paymentKey, PaymentCancelRequest request) {
+        return tossWebClient.post()
+                .uri("/v1/payments/{paymentKey}/cancel", paymentKey)
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(PaymentResult.class)
+                .block();
+    }
 }

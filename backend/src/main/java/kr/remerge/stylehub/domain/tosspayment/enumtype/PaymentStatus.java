@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.domain.tosspayment;
+package kr.remerge.stylehub.domain.tosspayment.enumtype;
 
 public enum PaymentStatus {
     READY,      // 결제 준비
