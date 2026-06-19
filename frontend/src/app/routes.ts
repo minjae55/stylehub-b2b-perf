@@ -12,12 +12,12 @@ import {AdminAnalytics} from "@/pages/admin/AdminAnalytics";
 import {AdminUsers} from "@/pages/admin/AdminUsers";
 import {SearchPage} from "@/pages/admin/SearchPage";
 
-import {RegisterBuyer} from "@/pages/auth/BuyerResister";
-import {RegisterSeller} from "@/pages/auth/SellerResister";
+import {RegisterBuyer} from "@/pages/auth/BuyerRegister";
+import {RegisterSeller} from "@/pages/auth/SellerRegister";
 import {AuthLayout} from "@/pages/auth/layout";
 import {Login} from "@/pages/auth/Login";
 import {Register} from "@/pages/auth/Register";
-import {RegisterEmployee} from "@/pages/auth/EmployeeResister";
+import {RegisterEmployee} from "@/pages/auth/EmployeeRegister";
 import {RegisterSuccess} from "@/pages/auth/Success";
 import {FindId} from "@/pages/auth/FindId";
 import {FindPw} from "@/pages/auth/FindPw";

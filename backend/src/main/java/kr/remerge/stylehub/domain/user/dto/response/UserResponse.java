@@ -6,7 +6,6 @@ import kr.remerge.stylehub.domain.user.enumtype.BusinessRole;
 import kr.remerge.stylehub.domain.user.enumtype.UserRole;
 import kr.remerge.stylehub.domain.user.enumtype.UserStatus;
 import lombok.Builder;
-import lombok.extern.jackson.Jacksonized;
 
 import java.time.LocalDateTime;
 
@@ -15,6 +14,7 @@ import java.time.LocalDateTime;
 @Builder
 public record UserResponse(
         Integer userId,
+        Integer companyId,
         String email,
         String name,
         String phone,
@@ -28,6 +28,7 @@ public record UserResponse(
     public static UserResponse from(User user) {
         return UserResponse.builder()
                 .userId(user.getUserId())
+                .companyId(user.getCompany() != null ? user.getCompany().getCompanyId() : null)
                 .email(user.getEmail())
                 .name(user.getName())
                 .phone(user.getPhone())

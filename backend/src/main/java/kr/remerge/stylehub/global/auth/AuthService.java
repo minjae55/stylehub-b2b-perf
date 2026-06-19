@@ -57,7 +57,16 @@ public class AuthService {
         if (user.getFailedLoginAttempts() >= 5) {
             throw new BusinessException(ErrorCode.LOGIN_ATTEMPTS_EXCEEDED);
         }
+        //───────────────────────────────────────────
+        System.out.println("=================================================");
+        System.out.println("👉 내 서버가 만든 '1'의 해시값: " + passwordEncoder.encode("1"));
+        System.out.println("[백엔드] 1. 유저가 입력한 날것의 암호: " + request.password());
+        System.out.println("[백엔드] 2. 현재 DB에 저장된 해시값: " + user.getPassword());
 
+        boolean isMatch = passwordEncoder.matches(request.password(), user.getPassword());
+        System.out.println("[백엔드] 3. BCrypt 매치 결과 (일치여부): " + isMatch);
+        System.out.println("=================================================");
+        // ───────────────────────────────────────────────────────────────
         // 4. 비밀번호 검증
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             user.onLoginFailed();

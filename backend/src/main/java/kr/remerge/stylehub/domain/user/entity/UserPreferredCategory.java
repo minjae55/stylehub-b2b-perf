@@ -1,7 +1,7 @@
 package kr.remerge.stylehub.domain.user.entity;
 
 import jakarta.persistence.*;
-import kr.remerge.stylehub.domain.product.entity.Category;
+import kr.remerge.stylehub.domain.category.entity.Category;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;

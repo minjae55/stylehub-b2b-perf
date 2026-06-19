@@ -76,7 +76,9 @@ public enum ErrorCode {
     // 공통
     // ───────────────────────────────────────────
     INVALID_INPUT(400, "잘못된 입력값입니다."),
-    INTERNAL_SERVER_ERROR(500, "서버 오류가 발생했습니다.");
+    EMPTY_FILE(400, "업로드한 파일이 비어있습니다."),
+    INTERNAL_SERVER_ERROR(500, "서버 오류가 발생했습니다."),
+    FILE_UPLOAD_ERROR(500, "파일 업로드 중 오류가 발생했습니다.");
 
     private final int httpStatus;  // HTTP 상태 코드
     private final String message;  // 에러 메시지

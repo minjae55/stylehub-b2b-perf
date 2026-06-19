@@ -1,31 +1,28 @@
-import { useState, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router";
-import {
-    ArrowLeft, ArrowRight,
-    Eye, EyeOff,
-    User, Building2, Tag,
-    AlertCircle, CheckCircle2,
-} from "lucide-react";
-import { CategoryStep } from "./Category";
+import {type ReactNode, useState} from "react";
+import {useNavigate, useSearchParams} from "react-router";
+import {AlertCircle, ArrowLeft, ArrowRight, Building2, CheckCircle2, Eye, EyeOff, Tag, User,} from "lucide-react";
+import {AgreementCheckbox, CategoryPicker, isValidCategoryCount} from "./Category";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Role = "buyer" | "seller";
+// URL 쿼리 ?role=buyer|seller → EmployeeSignUpRequest.businessRole("BUYER"|"SELLER")로 매핑
+type RoleParam = "buyer" | "seller";
+
+// ── FormData — EmployeeSignUpRequest 1:1 매핑 ─────────────────────────────────
 
 interface FormData {
     email: string;
     password: string;
     confirmPassword: string;
-    managerName: string;
-    managerPhone: string;
-    businessNo: string;
+    name: string;
+    phone: string;
+    businessNumber: string;
+    // 조회 결과 표시용 (서버 전송 대상 아님 — 회사 식별은 businessNumber로 이루어짐)
     companyName: string;
-    presidentName: string;
-    preferredCategories: string[];
+    representativeName: string;
+    preferredCategoryIds: string[];   // 선택 사항 — 입력 시 3~5개
     agreed: boolean;
 }
-
-// ── Step config ───────────────────────────────────────────────────────────────
 
 const STEPS = [
     { num: 1, label: "계정·담당자", icon: <User size={14} /> },
@@ -89,20 +86,15 @@ const inputCls =
 const readonlyCls =
     "w-full border border-border rounded px-3 py-2.5 text-sm bg-muted/40 text-muted-foreground cursor-not-allowed";
 
-// ── Step 1 : 계정·담당자 ──────────────────────────────────────────────────────
+// ── Step 1: 계정·담당자 ────────────────────────────────────────────────────────
 
-function Step1({
-                   form, set,
-               }: {
-    form: FormData; set: (f: Partial<FormData>) => void;
-}) {
+function Step1({form, set}: { form: FormData; set: (f: Partial<FormData>) => void }) {
     const [showPw, setShowPw] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const pwMismatch = form.confirmPassword && form.password !== form.confirmPassword;
 
     return (
         <div className="space-y-4">
-            {/* 안내 배너 */}
             <div className="bg-amber-50 border border-amber-200 rounded p-3 flex items-start gap-2">
                 <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
                 <p className="text-xs text-amber-700 leading-relaxed">
@@ -110,7 +102,6 @@ function Step1({
                 </p>
             </div>
 
-            {/* 계정 정보 */}
             <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                 <User size={14} className="text-primary" /> 계정 정보
             </div>
@@ -123,7 +114,7 @@ function Step1({
                     className={inputCls}
                 />
             </Field>
-            <Field label="비밀번호" required>
+            <Field label="비밀번호" required hint="8자 이상">
                 <div className="relative">
                     <input
                         type={showPw ? "text" : "password"}
@@ -165,15 +156,14 @@ function Step1({
 
             <hr className="border-border" />
 
-            {/* 담당자 정보 */}
             <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                 <User size={14} className="text-primary" /> 담당자 정보
             </div>
             <Field label="이름" required>
                 <input
                     type="text"
-                    value={form.managerName}
-                    onChange={(e) => set({ managerName: e.target.value })}
+                    value={form.name}
+                    onChange={(e) => set({name: e.target.value})}
                     placeholder="홍길동"
                     className={inputCls}
                 />
@@ -181,8 +171,8 @@ function Step1({
             <Field label="연락처" required hint="주문·배송 관련 긴급 연락에 사용됩니다.">
                 <input
                     type="tel"
-                    value={form.managerPhone}
-                    onChange={(e) => set({ managerPhone: e.target.value })}
+                    value={form.phone}
+                    onChange={(e) => set({phone: e.target.value})}
                     placeholder="010-0000-0000"
                     className={inputCls}
                 />
@@ -191,28 +181,25 @@ function Step1({
     );
 }
 
-// ── Step 2 : 사업자 확인 ──────────────────────────────────────────────────────
+// ── Step 2: 사업자 확인 ────────────────────────────────────────────────────────
 
-function Step2({
-                   form, set,
-               }: {
-    form: FormData; set: (f: Partial<FormData>) => void;
-}) {
+function Step2({form, set}: { form: FormData; set: (f: Partial<FormData>) => void }) {
     const [loading, setLoading]   = useState(false);
     const [verified, setVerified] = useState(false);
     const [notFound, setNotFound] = useState(false);
 
     const handleLookup = () => {
-        if (!form.businessNo) return;
+        if (!form.businessNumber) return;
         setLoading(true);
         setNotFound(false);
-        // TODO: 실제 API 연동
+        // TODO: GET /api/companies?businessNumber=... 로 실제 존재 여부 확인
+        // (서버 측 EmployeeSignUpRequest 처리 시 findByBusinessNumber 실패하면 COMPANY_NOT_FOUND)
         setTimeout(() => {
-            if (form.businessNo === "000-00-00000") {
+            if (form.businessNumber === "000-00-00000") {
                 setNotFound(true);
-                set({ companyName: "", presidentName: "" });
+                set({companyName: "", representativeName: ""});
             } else {
-                set({ companyName: "(주)패션코리아", presidentName: "홍길동" });
+                set({companyName: "(주)패션코리아", representativeName: "홍길동"});
                 setVerified(true);
             }
             setLoading(false);
@@ -229,14 +216,13 @@ function Step2({
                 조회 후 대표자가 직접 승인해야 계정이 활성화됩니다.
             </p>
 
-            {/* 사업자등록번호 조회 */}
             <Field label="사업자등록번호" required>
                 <div className="flex gap-2">
                     <input
                         type="text"
-                        value={form.businessNo}
+                        value={form.businessNumber}
                         onChange={(e) => {
-                            set({ businessNo: e.target.value });
+                            set({businessNumber: e.target.value});
                             setVerified(false);
                             setNotFound(false);
                         }}
@@ -247,14 +233,13 @@ function Step2({
                     <button
                         type="button"
                         onClick={handleLookup}
-                        disabled={loading || !form.businessNo || verified}
+                        disabled={loading || !form.businessNumber || verified}
                         className="shrink-0 px-4 py-2.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white text-sm font-semibold rounded transition-colors whitespace-nowrap"
                     >
                         {loading ? "조회 중..." : verified ? "확인됨" : "조회"}
                     </button>
                 </div>
 
-                {/* 상태 피드백 */}
                 {verified && (
                     <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                         <CheckCircle2 size={12} /> 사업자 정보가 확인되었습니다.
@@ -267,35 +252,23 @@ function Step2({
                 )}
             </Field>
 
-            {/* 조회 결과 — 읽기 전용 */}
             {verified && (
                 <>
                     <Field label="상호명">
-                        <input
-                            type="text"
-                            value={form.companyName}
-                            readOnly
-                            className={readonlyCls}
-                        />
+                        <input type="text" value={form.companyName} readOnly className={readonlyCls}/>
                     </Field>
                     <Field label="대표자명">
-                        <input
-                            type="text"
-                            value={form.presidentName}
-                            readOnly
-                            className={readonlyCls}
-                        />
+                        <input type="text" value={form.representativeName} readOnly className={readonlyCls}/>
                     </Field>
 
-                    {/* 입력 현황 요약 */}
                     <div className="bg-muted/40 border border-border rounded p-4 space-y-1.5">
                         <p className="text-xs font-semibold text-foreground mb-2">지금까지 입력한 정보</p>
                         {[
-                            ["이메일",     form.email       || "–"],
-                            ["이름",       form.managerName || "–"],
-                            ["연락처",     form.managerPhone|| "–"],
-                            ["사업자번호", form.businessNo  || "–"],
-                            ["소속 회사",  form.companyName || "–"],
+                            ["이메일", form.email || "–"],
+                            ["이름", form.name || "–"],
+                            ["연락처", form.phone || "–"],
+                            ["사업자번호", form.businessNumber || "–"],
+                            ["소속 회사", form.companyName || "–"],
                         ].map(([k, v]) => (
                             <div key={k} className="flex justify-between text-xs">
                                 <span className="text-muted-foreground">{k}</span>
@@ -314,51 +287,55 @@ function Step2({
 export function RegisterEmployee() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const role = (searchParams.get("role") ?? "buyer") as Role;
+    const roleParam = (searchParams.get("role") ?? "buyer") as RoleParam;
 
     const [step, setStep] = useState(1);
     const [form, setForm] = useState<FormData>({
         email: "",
         password: "",
         confirmPassword: "",
-        managerName: "",
-        managerPhone: "",
-        businessNo: "",
+        name: "",
+        phone: "",
+        businessNumber: "",
         companyName: "",
-        presidentName: "",
-        preferredCategories: [],
+        representativeName: "",
+        preferredCategoryIds: [],
         agreed: false,
     });
     const set = (partial: Partial<FormData>) =>
         setForm((f) => ({ ...f, ...partial }));
 
-    // 스텝별 다음 버튼 활성화 조건
     const canProceed = (): boolean => {
-        if (step === 1)
+        if (step === 1) {
             return !!(
-                form.email &&
-                form.password &&
+                form.email && form.password.length >= 8 &&
                 form.password === form.confirmPassword &&
-                form.managerName &&
-                form.managerPhone
+                form.name && form.phone
             );
-        if (step === 2)
-            return !!(form.businessNo && form.companyName && form.presidentName);
-        if (step === 3)
-            return form.agreed;
+        }
+        if (step === 2) {
+            return !!(form.businessNumber && form.companyName && form.representativeName);
+        }
+        if (step === 3) {
+            // 카테고리는 선택사항 — 0개 또는 3~5개만 허용
+            return isValidCategoryCount(form.preferredCategoryIds.length, false) && form.agreed;
+        }
         return false;
     };
 
-    const handleNext = () => {
-        if (step < 3) setStep((s) => s + 1);
-        else navigate("/auth/register/success");
+    const handleSubmit = () => {
+        // TODO: POST /api/users/signup/employee
+        // EmployeeSignUpRequest 매핑:
+        // { email, password, name, phone, businessNumber,
+        //   businessRole: roleParam.toUpperCase() as "BUYER" | "SELLER",
+        //   preferredCategoryIds: form.preferredCategoryIds.length > 0 ? form.preferredCategoryIds : undefined }
+        navigate("/auth/register/success");
     };
 
-    const roleLabel = role === "buyer" ? "바이어" : "셀러";
+    const roleLabel = roleParam === "buyer" ? "바이어" : "셀러";
 
     return (
         <div>
-            {/* 헤더 */}
             <div className="flex items-center gap-3 mb-1">
                 <button
                     type="button"
@@ -389,18 +366,28 @@ export function RegisterEmployee() {
             {step === 1 && <Step1 form={form} set={set} />}
             {step === 2 && <Step2 form={form} set={set} />}
             {step === 3 && (
-                <CategoryStep
-                    selected={form.preferredCategories}
-                    onChange={(ids) => set({ preferredCategories: ids })}
-                    agreed={form.agreed}
-                    onAgreedChange={(v) => set({ agreed: v })}
-                    role={role}
-                />
+                <div className="space-y-4">
+                    <CategoryPicker
+                        selected={form.preferredCategoryIds}
+                        onChange={(ids) => set({preferredCategoryIds: ids})}
+                        title="선호 카테고리"
+                        description={
+                            roleParam === "buyer"
+                                ? "주로 구매하는 카테고리를 선택하면 맞춤 상품을 우선 노출해 드립니다."
+                                : "주로 취급하는 카테고리를 선택하면 맞춤 바이어를 우선 매칭해 드립니다."
+                        }
+                        required={false}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        * 선택하지 않아도 가입 가능합니다. 선택할 경우 3~5개를 골라주세요.
+                    </p>
+                    <AgreementCheckbox agreed={form.agreed} onAgreedChange={(v) => set({agreed: v})}/>
+                </div>
             )}
 
             <button
                 type="button"
-                onClick={handleNext}
+                onClick={() => step < 3 ? setStep((s) => s + 1) : handleSubmit()}
                 disabled={!canProceed()}
                 className="w-full mt-6 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 rounded font-semibold text-sm transition-colors flex items-center justify-center gap-2"
             >
