@@ -61,6 +61,12 @@ public class ProductOption extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "sample_price")
+    private Long samplePrice;
+
+    @Column(name = "sample_max_quantity")
+    private Integer sampleMaxQuantity;
+
     @OneToMany(mappedBy = "productOption")
     private List<ProductOptionValue> optionValues = new ArrayList<>();
 }

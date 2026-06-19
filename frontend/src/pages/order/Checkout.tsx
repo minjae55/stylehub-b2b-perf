@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
+import api from "@/api/axios";
 import {
   AlertCircle,
   ArrowLeft,
@@ -24,6 +25,26 @@ type OrderItem = {
   price: number;
   quantity: number;
   image: string;
+};
+
+type CheckoutLocationState = {
+  cartItemIds: number[];
+  cartType: "NORMAL" | "SAMPLE";
+};
+
+type CheckoutPreviewResponse = {
+  cartType: "NORMAL" | "SAMPLE";
+  items: Array<{
+    cartItemId: number;
+    productName: string;
+    optionLabel: string;
+    unitPrice: number;
+    quantity: number;
+    totalPrice: number;
+  }>;
+  productAmount: number;
+  shippingFee: number;
+  totalAmount: number;
 };
 
 type DeliveryAddress = {
@@ -116,16 +137,71 @@ function formatPrice(value: number) {
 
 export function Checkout() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  const orderType = searchParams.get("type") ?? "ready";
+  const checkoutState = location.state as CheckoutLocationState | null;
+
+  const orderType = checkoutState?.cartType === "SAMPLE"
+    ? "sample"
+    : searchParams.get("type") ?? "ready";
   const orderId = searchParams.get("orderId") ?? "";
 
   const isCustom = orderType === "custom";
   const isSample = orderType === "sample";
   const isSigned = isCustom ? (isSignedMap[orderId] ?? false) : true;
 
-  const orderItems = isCustom ? CUSTOM_ITEMS[orderId] ?? READY_ITEMS : READY_ITEMS;
+  const [checkoutPreview, setCheckoutPreview] = useState<CheckoutPreviewResponse | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(!isCustom);
+  const [previewError, setPreviewError] = useState("");
+
+  useEffect(() => {
+    if (isCustom) {
+      setIsPreviewLoading(false);
+      return;
+    }
+
+    if (!checkoutState?.cartItemIds.length) {
+      setPreviewError("선택한 장바구니 상품이 없습니다.");
+      setIsPreviewLoading(false);
+      return;
+    }
+
+    const loadCheckoutPreview = async () => {
+      try {
+        const response = await api.post<CheckoutPreviewResponse>("/checkout/preview", {
+          cartItemIds: checkoutState.cartItemIds,
+          cartType: checkoutState.cartType,
+        });
+        setCheckoutPreview(response.data);
+      } catch (error) {
+        const apiError = error as { response?: { status?: number; data?: unknown } };
+        console.error(
+          "Checkout 조회 실패",
+          apiError.response?.status,
+          JSON.stringify(apiError.response?.data),
+        );
+        setPreviewError("주문 정보를 불러오지 못했습니다. 장바구니에서 다시 시도해주세요.");
+      } finally {
+        setIsPreviewLoading(false);
+      }
+    };
+
+    void loadCheckoutPreview();
+  }, [checkoutState, isCustom]);
+
+  const orderItems: OrderItem[] = checkoutPreview
+    ? checkoutPreview.items.map((item) => ({
+        id: item.cartItemId,
+        name: item.productName,
+        supplier: item.optionLabel,
+        price: item.unitPrice,
+        quantity: item.quantity,
+        image: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=120&h=120&fit=crop&auto=format",
+      }))
+    : isCustom
+      ? CUSTOM_ITEMS[orderId] ?? READY_ITEMS
+      : [];
   const [paymentMethod, setPaymentMethod] = useState<"wire" | "card">("wire");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -133,10 +209,36 @@ export function Checkout() {
   const [selectedAddress, setSelectedAddress] = useState(COMPANY_ADDRESSES[0]);
   const [orderNumber, setOrderNumber] = useState("");
 
-  const subtotal = orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const shipping = subtotal >= 1000000 ? 0 : 3000;
-  const platformFee = Math.floor(subtotal * 0.05);
-  const total = subtotal + shipping + platformFee;
+  const subtotal = checkoutPreview?.productAmount
+    ?? orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const shipping = checkoutPreview?.shippingFee
+    ?? (isCustom ? (subtotal >= 1000000 ? 0 : 3000) : 0);
+  const total = checkoutPreview?.totalAmount ?? subtotal + shipping;
+
+  if (isPreviewLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-semibold text-slate-500">
+        주문 정보를 확인하고 있습니다.
+      </div>
+    );
+  }
+
+  if (previewError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <AlertCircle size={36} className="mx-auto mb-4 text-rose-500" />
+          <p className="mb-5 text-sm font-semibold text-slate-700">{previewError}</p>
+          <Link
+            to="/cart"
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-white"
+          >
+            장바구니로 돌아가기
+          </Link>
+        </div>
+      </div>
+    );
+  }
   const orderTypeLabel = isCustom ? "소싱 주문" : isSample ? "샘플 주문" : "일반 주문";
 
   const handlePayment = async () => {
@@ -361,11 +463,6 @@ export function Checkout() {
               <div className="space-y-3 border-t border-slate-100 pt-4 text-sm">
                 <SummaryRow label="상품 금액" value={formatPrice(subtotal)} />
                 <SummaryRow label="국내 배송비" value={shipping === 0 ? "무료" : formatPrice(shipping)} />
-                <SummaryRow label="플랫폼 이용 수수료" value={formatPrice(platformFee)} />
-              </div>
-
-              <div className="my-4 rounded-lg border border-primary/15 bg-secondary/60 px-3 py-2.5 text-xs leading-5 text-slate-700">
-                플랫폼 이용 수수료는 안전결제, 주문 관리, 판매자 정산 처리에 사용됩니다.
               </div>
 
               <div className="flex items-end justify-between border-t border-slate-100 pt-4">

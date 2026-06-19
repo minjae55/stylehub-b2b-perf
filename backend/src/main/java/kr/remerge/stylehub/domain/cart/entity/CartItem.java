@@ -1,14 +1,13 @@
 package kr.remerge.stylehub.domain.cart.entity;
 
 import jakarta.persistence.*;
-import kr.remerge.stylehub.domain.product.entity.ProductOption;
 import kr.remerge.stylehub.domain.cart.enumtype.CartType;
+import kr.remerge.stylehub.domain.product.entity.ProductOption;
 import kr.remerge.stylehub.domain.user.entity.User;
+import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -22,7 +21,7 @@ import java.time.LocalDateTime;
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CartItem {
+public class CartItem extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,12 +46,6 @@ public class CartItem {
     @Column(name = "is_checked", nullable = false)
     private Boolean isChecked;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     public CartItem(
             User user,
             ProductOption productOption,
@@ -66,13 +59,12 @@ public class CartItem {
         this.isChecked = true;
     }
 
-    @PrePersist
-    void setUpdatedAt() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
     public void addQuantity(Integer quantity) {
         this.quantity += quantity;
     }
+
+    public void updateQuantity(Integer quantity) {
+        this.quantity = quantity;
+    }
+
 }
