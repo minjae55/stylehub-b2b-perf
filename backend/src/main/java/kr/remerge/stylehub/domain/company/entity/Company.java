@@ -57,6 +57,13 @@ public class Company extends BaseEntity {
     @Column(name = "business_license_url", length = 2000)
     private String businessLicenseUrl;
 
+    @Builder.Default
+    @Column(name = "base_shipping_fee", nullable = false)
+    private Long baseShippingFee = 0L;
+
+    @Column(name = "free_shipping_threshold")
+    private Long freeShippingThreshold;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "store_type", length = 10)
     private CompanyStoreType storeType;
