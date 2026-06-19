@@ -1,13 +1,12 @@
 package kr.remerge.stylehub.domain.product.entity;
 
 import jakarta.persistence.*;
+import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.company.entity.Brand;
 import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.*;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "products")

@@ -1,22 +1,21 @@
-import {Outlet, Link, useLocation} from "react-router";
+import {Link, Outlet, useLocation} from "react-router";
 import {
-    Search,
-    User,
-    ShoppingCart,
     Bell,
-    MapPin,
+    CheckCircle,
     ChevronDown,
     ClipboardList,
+    Info,
+    MapPin,
     Package,
-    Truck,
-    CheckCircle,
-    X,
+    Search,
     ShieldAlert,
+    ShoppingCart,
     Star,
-    Info
+    Truck,
+    User,
+    X
 } from "lucide-react";
-import {useState, useRef, useEffect} from "react";
-import {BuyerDashboard} from "@/pages/buyer/BuyerDashboard";
+import {useEffect, useRef, useState} from "react";
 
 const hotKeywords = ["여성 린넨 블라우스", "와이드 슬랙스", "플로럴 원피스", "오버핏 자켓", "스포츠 레깅스"];
 

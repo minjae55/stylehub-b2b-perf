@@ -1,4 +1,6 @@
-package kr.remerge.stylehub.global.auth.security;
+package kr.remerge.stylehub.global.auth.dto;
+
+import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
 
 public record AuthUser(
         Integer userId,

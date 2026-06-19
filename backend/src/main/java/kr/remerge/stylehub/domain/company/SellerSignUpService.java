@@ -1,29 +1,30 @@
 package kr.remerge.stylehub.domain.company;
 
+import kr.remerge.stylehub.domain.category.entity.Category;
+import kr.remerge.stylehub.domain.category.repository.CategoryRepository;
+import kr.remerge.stylehub.domain.company.dto.request.SellerSignUpRequest;
+import kr.remerge.stylehub.domain.company.entity.Brand;
+import kr.remerge.stylehub.domain.company.entity.Company;
+import kr.remerge.stylehub.domain.company.entity.CompanyBankAccount;
+import kr.remerge.stylehub.domain.company.enumtype.CompanyStatus;
+import kr.remerge.stylehub.domain.company.enumtype.CompanyStoreType;
+import kr.remerge.stylehub.domain.company.enumtype.SellerStatus;
+import kr.remerge.stylehub.domain.company.repository.BrandRepository;
 import kr.remerge.stylehub.domain.company.repository.CompanyBankAccountRepository;
 import kr.remerge.stylehub.domain.company.repository.CompanyRepository;
-import kr.remerge.stylehub.domain.product.entity.Category;
+import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.entity.UserPreferredCategory;
-import kr.remerge.stylehub.domain.company.repository.BrandRepository;
+import kr.remerge.stylehub.domain.user.enumtype.BusinessRole;
+import kr.remerge.stylehub.domain.user.enumtype.UserRole;
+import kr.remerge.stylehub.domain.user.enumtype.UserStatus;
 import kr.remerge.stylehub.domain.user.repository.UserPreferredCategoryRepository;
+import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.global.exception.BusinessException;
+import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import kr.remerge.stylehub.domain.company.entity.*;
-import kr.remerge.stylehub.domain.company.enumtype.CompanyStatus;
-import kr.remerge.stylehub.domain.company.enumtype.CompanyStoreType;
-import kr.remerge.stylehub.domain.company.enumtype.SellerStatus;
-import kr.remerge.stylehub.domain.company.dto.request.SellerSignUpRequest;
-import kr.remerge.stylehub.domain.user.entity.User;
-import kr.remerge.stylehub.domain.user.enumtype.BusinessRole;
-import kr.remerge.stylehub.domain.user.enumtype.UserRole;
-import kr.remerge.stylehub.domain.user.enumtype.UserStatus;
-import kr.remerge.stylehub.domain.user.repository.UserRepository;
-import kr.remerge.stylehub.domain.product.repository.CategoryRepository;
-import kr.remerge.stylehub.global.exception.BusinessException;
-import kr.remerge.stylehub.global.exception.ErrorCode;
 
 import java.util.List;
 

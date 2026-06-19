@@ -1,5 +1,6 @@
 import api from "./axios";
 import type {ApiResponse} from "./types";
+import {BuyerSignUpRequest, LoginRequest, UserResponse} from "@/api/auth.types";
 /*
 ## API 통신 규칙
 
@@ -16,40 +17,6 @@ import type {ApiResponse} from "./types";
     const { data } = await api.get<ApiResponse<UserResponse>>("/users/me");
 return data.data;
 */
-// ───────────────────────────────────────────
-// 요청 타입
-// ───────────────────────────────────────────
-
-export interface LoginRequest {
-    email: string;
-    password: string;
-}
-
-export interface SignUpRequest {
-    email: string;
-    password: string;
-    name: string;
-    phone?: string;
-    role: "ADMIN" | "PRESIDENT" | "EMPLOYEE";
-    businessRole: "BUYER" | "SELLER" | "BOTH";
-}
-
-// ───────────────────────────────────────────
-// 응답 타입
-// ───────────────────────────────────────────
-
-export interface UserResponse {
-    userId: number
-    companyId: number
-    email: string;
-    name: string;
-    phone: string | null;
-    role: "ADMIN" | "PRESIDENT" | "EMPLOYEE";
-    businessRole: "BUYER" | "SELLER" | "BOTH";
-    profileImageUrl: string | null;
-    status: "PENDING" | "APPROVED" | "SUSPENDED" | "DELETED";
-    createdAt: string;
-}
 
 // ───────────────────────────────────────────
 // 로그인
@@ -66,9 +33,16 @@ export const login = async (request: LoginRequest): Promise<string> => {
 // 회원가입
 // ───────────────────────────────────────────
 
-export const signUp = async (request: SignUpRequest): Promise<UserResponse> => {
-    const { data } = await api.post<ApiResponse<UserResponse>>("/users/signup", request);
-    return data.data;
+// ───────────────────────────────────────────
+// [추가] 바이어 회원가입
+// ───────────────────────────────────────────
+/**
+ * 백엔드 @PostMapping("/signup/buyer")와 매핑되는 바이어 회원가입 요청입니다.
+ */
+export const signUpBuyer = async (request: BuyerSignUpRequest): Promise<string> => {
+    // 백엔드가 ResponseEntity<ApiResponse<Void>>를 리턴하므로 데이터는 null(혹은 void) 처리
+    const {data} = await api.post<ApiResponse<null>>("users/signup/buyer", request);
+    return data.message ?? "바이어 가입 신청이 완료되었습니다.";
 };
 
 // ───────────────────────────────────────────
@@ -86,4 +60,25 @@ export const logout = async (): Promise<void> => {
 export const getMe = async (): Promise<UserResponse> => {
     const { data } = await api.get<ApiResponse<UserResponse>>("/users/me");
     return data.data;
+};
+
+// ───────────────────────────────────────────
+// 공통 파일 업로드
+// ───────────────────────────────────────────
+/**
+ * 파일을 multipart/form-data 형태로 백엔드에 업로드하고 저장된 S3 URL을 반환받습니다.
+ */
+export const uploadFile = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // API 규칙 4번 준수: ApiResponse<T> 형태로 받기
+    // 백엔드가 업로드 성공 시 URL 문자열을 주거나 객체에 담아준다면 그에 맞춰 <string> 혹은 <{fileUrl: string}> 등으로 타입을 지정하세요.
+    const {data} = await api.post<ApiResponse<string>>("/common/upload", formData, {
+        headers: {
+            "Content-Type": "multipart/form-data", // 파일 업로드를 위한 헤더 지정
+        },
+    });
+
+    return data.data; // 업로드된 S3 URL 경로 반환
 };

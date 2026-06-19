@@ -64,6 +64,12 @@ public class Company extends BaseEntity {
     @Column(name = "free_shipping_threshold")
     private Long freeShippingThreshold;
 
+    @Column(name = "avg_lead_time_days")
+    private Integer avgLeadTimeDays;
+
+    @Column(name = "answer_average")
+    private Double answerAverage;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "store_type", length = 10)
     private CompanyStoreType storeType;
