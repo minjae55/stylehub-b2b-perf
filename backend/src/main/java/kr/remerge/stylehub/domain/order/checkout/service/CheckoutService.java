@@ -1,6 +1,6 @@
 package kr.remerge.stylehub.domain.order.checkout.service;
 
-import jakarta.validation.Valid;
+import kr.remerge.stylehub.domain.cart.dto.CartResponse;
 import kr.remerge.stylehub.domain.cart.entity.CartItem;
 import kr.remerge.stylehub.domain.cart.enumtype.CartType;
 import kr.remerge.stylehub.domain.cart.repository.CartRepository;
@@ -15,6 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+
+import static java.util.stream.Collectors.groupingBy;
 
 @Service
 @Transactional(readOnly = true)
@@ -43,24 +46,43 @@ public class CheckoutService {
             validateCartItem(cartItem);
         }
 
-        return null;
+        List<CartResponse> items = cartItems.stream()
+                .map(CartResponse::from)
+                .toList();
+
+        long productAmount = items.stream()
+                .mapToLong(CartResponse::totalPrice)
+                .sum();
+
+        long shippingFee = calculateShippingFee(items);
+
+        return new CheckoutResponse(
+                checkoutRequest.cartType(),
+                items,
+                productAmount,
+                shippingFee,
+                productAmount + shippingFee
+        );
 
     }
 
     private void validateCartItem(CartItem cartItem) {
-        ProductOption productOption = cartItem.getProductOption();
-        Product product = productOption.getProduct();
+
+        ProductOption option = cartItem.getProductOption();
+        Product product = option.getProduct();
+
         int quantity = cartItem.getQuantity();
 
-        if (!productOption.getIsActive()) {
+        if (!option.getIsActive()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
-        if (quantity > productOption.getStockQuantity()) {
+        if (quantity > option.getStockQuantity()) {
             throw new BusinessException(ErrorCode.OUT_OF_STOCK);
         }
 
-        if (cartItem.getCartType() == CartType.NORMAL && quantity < product.getMoq()) {
+        if (cartItem.getCartType() == CartType.NORMAL
+                && quantity < product.getMoq()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
@@ -69,13 +91,43 @@ public class CheckoutService {
                 throw new BusinessException(ErrorCode.INVALID_INPUT);
             }
 
-            if (productOption.getSamplePrice() == null || productOption.getSampleMaxQuantity() == null) {
+            if (option.getSamplePrice() == null
+                    || option.getSampleMaxQuantity() == null) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT);
             }
 
-            if (quantity > productOption.getSampleMaxQuantity()) {
+            // ERroCode에 다음 내용으로 추가해달라고 해
+            // SAMPLE_OPTION_NOT_CONFIGURED(400, "선택한 옵션은 현재 샘플 주문을 이용할 수 없습니다."),
+
+            if (quantity > option.getSampleMaxQuantity()) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT);
             }
         }
+    }
+
+    private long calculateShippingFee(List<CartResponse> items) {
+
+        Map<Integer, List<CartResponse>> itemsByCompany = items.stream()
+                .collect(groupingBy(CartResponse::companyId));
+
+        long totalShippingFee = 0L;
+
+        for (List<CartResponse> companyItems : itemsByCompany.values()) {
+            CartResponse firstItem = companyItems.get(0);
+            long companyProductAmount = companyItems.stream()
+                    .mapToLong(CartResponse::totalPrice)
+                    .sum();
+
+            Long freeShippingThreshold = firstItem.freeShippingThreshold();
+
+            boolean isFreeShipping = freeShippingThreshold != null
+                    && companyProductAmount >= freeShippingThreshold;
+
+            if (!isFreeShipping) {
+                totalShippingFee += firstItem.baseShippingFee();
+            }
+        }
+
+        return totalShippingFee;
     }
 }
