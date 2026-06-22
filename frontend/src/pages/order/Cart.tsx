@@ -1,164 +1,384 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import api from "@/api/axios";
 import {
   AlertCircle,
   ArrowRight,
   Check,
   FlaskConical,
+  Loader2,
   Minus,
   Package,
   Plus,
   ShoppingCart,
+  Truck,
   Trash2,
 } from "lucide-react";
 
 
 type CartItem = {
-  id: number;
-  name: string;
-  supplier: string;
-  price: number;
-  samplePrice: number;
+  cartItemId: number;
+  productId: number;
+  productOptionId: number;
+  productName: string;
+  optionLabel: string;
+  options: Array<{
+    optionName: string;
+    optionValue: string;
+  }>;
+  unitPrice: number;
   moq: number;
   quantity: number;
-  sampleQty: number;
-  image: string;
-  approved: boolean;
-  hasSample: boolean;
-  sampleOrdered: boolean;
+  totalPrice: number;
+  isChecked: boolean;
+  sampleAvailable: boolean;
+  samplePrice?: number | null;
+  sampleMaxQuantity?: number;
+  sellerId?: number;
+  sellerName?: string;
+  shippingFee?: number;
+  freeShippingThreshold?: number;
+  cartType: "NORMAL" | "SAMPLE";
+};
+
+type CartApiItem = Omit<CartItem, "sellerId" | "shippingFee"> & {
+  companyId: number;
+  baseShippingFee: number;
 };
 
 type CartTab = "BULK" | "SAMPLE";
-
-const initialItems: CartItem[] = [
-  {
-    id: 1,
-    name: "여성 베이지 오버핏 셔츠",
-    supplier: "라온패션",
-    price: 18900,
-    samplePrice: 28000,
-    moq: 50,
-    quantity: 50,
-    sampleQty: 1,
-    image:
-      "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=160&h=160&fit=crop&auto=format",
-    approved: true,
-    hasSample: true,
-    sampleOrdered: false,
-  },
-  {
-    id: 2,
-    name: "여성 와이드 슬랙스",
-    supplier: "모던클로젯",
-    price: 24500,
-    samplePrice: 35000,
-    moq: 30,
-    quantity: 30,
-    sampleQty: 1,
-    image:
-      "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=160&h=160&fit=crop&auto=format",
-    approved: true,
-    hasSample: true,
-    sampleOrdered: false,
-  },
-  {
-    id: 3,
-    name: "여성 봄 니트 가디건",
-    supplier: "데일리앤코",
-    price: 16200,
-    samplePrice: 24000,
-    moq: 40,
-    quantity: 20,
-    sampleQty: 1,
-    image:
-      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=160&h=160&fit=crop&auto=format",
-    approved: false,
-    hasSample: true,
-    sampleOrdered: false,
-  },
-  {
-    id: 4,
-    name: "플로럴 미디 원피스",
-    supplier: "모아어패럴",
-    price: 25000,
-    samplePrice: 0,
-    moq: 20,
-    quantity: 20,
-    sampleQty: 0,
-    image:
-      "https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=160&h=160&fit=crop&auto=format",
-    approved: true,
-    hasSample: false,
-    sampleOrdered: false,
-  },
-];
 
 function formatPrice(value: number) {
   return `${value.toLocaleString()}원`;
 }
 
-export function Cart() {
-  const [items, setItems] = useState<CartItem[]>(initialItems);
-  const [tab, setTab] = useState<CartTab>("BULK");
-  const [selected, setSelected] = useState<number[]>(
-    initialItems.filter((item) => item.approved).map((item) => item.id)
-  );
-  const [selectedSample, setSelectedSample] = useState<number[]>([]);
+function getSampleMaxQuantity(item: CartItem) {
+  return Math.max(1, item.sampleMaxQuantity ?? 5);
+}
 
-  const sampleItems = items.filter((item) => item.hasSample && item.sampleOrdered);
-  const bulkSelected = items.filter((item) => selected.includes(item.id));
-  const sampleSelected = sampleItems.filter((item) => selectedSample.includes(item.id));
-  const bulkSubtotal = bulkSelected.reduce((sum, item) => sum + item.price * item.quantity, 0);
+const demoCartItems: CartItem[] = [
+  {
+    cartItemId: -1,
+    productId: 101,
+    productOptionId: 1001,
+    productName: "베이직 크롭 반팔 티셔츠",
+    optionLabel: "블랙 / M",
+    options: [{ optionName: "색상", optionValue: "블랙" }, { optionName: "사이즈", optionValue: "M" }],
+    unitPrice: 5500,
+    moq: 100,
+    quantity: 100,
+    totalPrice: 550000,
+    isChecked: true,
+    sampleAvailable: true,
+    sampleMaxQuantity: 3,
+    sellerId: 11,
+    sellerName: "스타일컴퍼니",
+    shippingFee: 5000,
+    freeShippingThreshold: 800000,
+    cartType: "NORMAL",
+  },
+  {
+    cartItemId: -2,
+    productId: 102,
+    productOptionId: 1002,
+    productName: "핀턱 와이드 슬랙스",
+    optionLabel: "차콜 / L",
+    options: [{ optionName: "색상", optionValue: "차콜" }, { optionName: "사이즈", optionValue: "L" }],
+    unitPrice: 12800,
+    moq: 20,
+    quantity: 20,
+    totalPrice: 256000,
+    isChecked: true,
+    sampleAvailable: true,
+    sampleMaxQuantity: 2,
+    sellerId: 11,
+    sellerName: "스타일컴퍼니",
+    shippingFee: 5000,
+    freeShippingThreshold: 800000,
+    cartType: "NORMAL",
+  },
+  {
+    cartItemId: -3,
+    productId: 201,
+    productOptionId: 2001,
+    productName: "썸머 린넨 셔츠",
+    optionLabel: "아이보리 / FREE",
+    options: [{ optionName: "색상", optionValue: "아이보리" }, { optionName: "사이즈", optionValue: "FREE" }],
+    unitPrice: 9200,
+    moq: 50,
+    quantity: 50,
+    totalPrice: 460000,
+    isChecked: true,
+    sampleAvailable: false,
+    sellerId: 22,
+    sellerName: "동대문 어패럴",
+    shippingFee: 3500,
+    freeShippingThreshold: 600000,
+    cartType: "NORMAL",
+  },
+  {
+    cartItemId: -4,
+    productId: 202,
+    productOptionId: 2002,
+    productName: "셔링 밴딩 롱스커트",
+    optionLabel: "베이지 / FREE",
+    options: [{ optionName: "색상", optionValue: "베이지" }, { optionName: "사이즈", optionValue: "FREE" }],
+    unitPrice: 10500,
+    moq: 10,
+    quantity: 10,
+    totalPrice: 105000,
+    isChecked: true,
+    sampleAvailable: true,
+    sampleMaxQuantity: 2,
+    sellerId: 22,
+    sellerName: "동대문 어패럴",
+    shippingFee: 3500,
+    freeShippingThreshold: 600000,
+    cartType: "NORMAL",
+  },
+  {
+    cartItemId: -5,
+    productId: 301,
+    productOptionId: 3001,
+    productName: "프리미엄 트위드 재킷",
+    optionLabel: "핑크 / S",
+    options: [{ optionName: "색상", optionValue: "핑크" }, { optionName: "사이즈", optionValue: "S" }],
+    unitPrice: 24800,
+    moq: 10,
+    quantity: 10,
+    totalPrice: 248000,
+    isChecked: true,
+    sampleAvailable: true,
+    sampleMaxQuantity: 1,
+    sellerId: 33,
+    sellerName: "서울 부티크 도매",
+    shippingFee: 3000,
+    freeShippingThreshold: 0,
+    cartType: "NORMAL",
+  },
+];
+
+export function Cart() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isSellerDemo = searchParams.get("demo") === "sellers";
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [tab, setTab] = useState<CartTab>("BULK");
+  const [selected, setSelected] = useState<number[]>([]);
+  const [selectedSample, setSelectedSample] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [addingSampleOptionId, setAddingSampleOptionId] = useState<number | null>(null);
+  const [updatingQuantityIds, setUpdatingQuantityIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const loadCart = async () => {
+      try {
+        if (isSellerDemo) {
+          setItems(demoCartItems);
+          setSelected(demoCartItems.map((item) => item.cartItemId));
+          setSelectedSample([]);
+          return;
+        }
+
+        const response = await api.get<CartApiItem[]>("/cart");
+        const cartItems = response.data.map(({ companyId, baseShippingFee, ...item }) => ({
+          ...item,
+          sellerId: companyId,
+          shippingFee: baseShippingFee,
+          freeShippingThreshold: item.freeShippingThreshold ?? 0,
+        }));
+        setItems(cartItems);
+        setSelected(
+          cartItems
+            .filter((item) => item.cartType === "NORMAL" && item.isChecked)
+            .map((item) => item.cartItemId)
+        );
+        setSelectedSample(
+          cartItems
+            .filter((item) => item.cartType === "SAMPLE" && item.isChecked)
+            .map((item) => item.cartItemId)
+        );
+      } catch (error) {
+        const apiError = error as { response?: { status?: number; data?: unknown } };
+        console.error(
+          "장바구니 조회 실패",
+          apiError.response?.status,
+          JSON.stringify(apiError.response?.data),
+        );
+        setErrorMessage("장바구니를 불러오지 못했습니다. 다시 시도해주세요.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadCart();
+  }, [isSellerDemo]);
+
+  const bulkItems = items.filter((item) => item.cartType === "NORMAL");
+  const sampleItems = items.filter((item) => item.cartType === "SAMPLE");
+  const sampleOptionIds = new Set(sampleItems.map((item) => item.productOptionId));
+  const bulkSelected = bulkItems.filter((item) => selected.includes(item.cartItemId));
+  const sampleSelected = sampleItems.filter((item) => selectedSample.includes(item.cartItemId));
+  const bulkSubtotal = bulkSelected.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const sampleSubtotal = sampleSelected.reduce(
-    (sum, item) => sum + item.samplePrice * item.sampleQty,
+    (sum, item) => sum + item.unitPrice * item.quantity,
     0
   );
-  const bulkValidIds = items.filter((item) => item.approved).map((item) => item.id);
-  const sampleValidIds = sampleItems.filter((item) => item.approved).map((item) => item.id);
+  const bulkValidIds = bulkItems
+    .filter((item) => item.quantity >= item.moq)
+    .map((item) => item.cartItemId);
+  const sampleValidIds = sampleItems.map((item) => item.cartItemId);
   const allBulkSelected = bulkValidIds.length > 0 && selected.length === bulkValidIds.length;
   const allSampleSelected =
     sampleValidIds.length > 0 && selectedSample.length === sampleValidIds.length;
-  const sortedBulkItems = [...items].sort((a, b) => {
-    const aBlocked = !a.approved || a.quantity < a.moq;
-    const bBlocked = !b.approved || b.quantity < b.moq;
+  const sortedBulkItems = [...bulkItems].sort((a, b) => {
+    const aBlocked = a.quantity < a.moq;
+    const bBlocked = b.quantity < b.moq;
     return Number(aBlocked) - Number(bBlocked);
   });
+  const sellerGroups = Object.values(
+    sortedBulkItems.reduce<Record<string, { sellerId: number; sellerName: string; items: CartItem[] }>>(
+      (groups, item) => {
+        const sellerId = item.sellerId ?? 0;
+        const sellerName = item.sellerName ?? "판매자 정보 확인 중";
+        const key = `${sellerId}-${sellerName}`;
+        groups[key] ??= { sellerId, sellerName, items: [] };
+        groups[key].items.push(item);
+        return groups;
+      },
+      {}
+    )
+  );
 
-  const updateQty = (id: number, delta: number, type: "bulk" | "sample") => {
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
+  const updateQty = async (id: number, delta: number, type: "bulk" | "sample") => {
+    const item = items.find((cartItem) => cartItem.cartItemId === id);
+    if (!item || updatingQuantityIds.has(id)) return;
 
-        if (type === "bulk") {
-          const next = item.quantity + delta;
-          return next < item.moq ? item : { ...item, quantity: next };
-        }
+    const nextQuantity = item.quantity + delta;
+    const minimum = type === "bulk" ? item.moq : 1;
+    const maximum = type === "sample" ? getSampleMaxQuantity(item) : Number.MAX_SAFE_INTEGER;
+    if (nextQuantity < minimum || nextQuantity > maximum) return;
 
-        const next = item.sampleQty + delta;
-        return next < 1 || next > 5 ? item : { ...item, sampleQty: next };
-      })
-    );
+    if (isSellerDemo) {
+      setItems((prev) =>
+        prev.map((cartItem) =>
+          cartItem.cartItemId === id
+            ? { ...cartItem, quantity: nextQuantity, totalPrice: cartItem.unitPrice * nextQuantity }
+            : cartItem
+        )
+      );
+      return;
+    }
+
+    try {
+      setUpdatingQuantityIds((prev) => new Set(prev).add(id));
+      setItems((prev) =>
+        prev.map((cartItem) =>
+          cartItem.cartItemId === id
+            ? {
+                ...cartItem,
+                quantity: nextQuantity,
+                totalPrice: cartItem.unitPrice * nextQuantity,
+              }
+            : cartItem
+        )
+      );
+
+      const response = await api.patch<CartItem>(`/cart/${id}/quantity`, {
+        quantity: nextQuantity,
+      });
+      if (response.data?.cartItemId === id) {
+        setItems((prev) =>
+          prev.map((cartItem) =>
+            cartItem.cartItemId === id ? response.data : cartItem
+          )
+        );
+      }
+    } catch {
+      setItems((prev) =>
+        prev.map((cartItem) =>
+          cartItem.cartItemId === id ? item : cartItem
+        )
+      );
+      window.alert("수량을 변경하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setUpdatingQuantityIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   };
 
-  const removeItem = (id: number) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const removeItemFromState = (id: number) => {
+    setItems((prev) => prev.filter((item) => item.cartItemId !== id));
     setSelected((prev) => prev.filter((selectedId) => selectedId !== id));
     setSelectedSample((prev) => prev.filter((selectedId) => selectedId !== id));
   };
 
-  const toggleSampleOrdered = (id: number) => {
-    const item = items.find((current) => current.id === id);
-    if (!item) return;
+  const removeItem = async (id: number) => {
+    if (isSellerDemo) {
+      removeItemFromState(id);
+      return;
+    }
 
-    const next = !item.sampleOrdered;
-    setItems((prev) =>
-      prev.map((current) => (current.id === id ? { ...current, sampleOrdered: next } : current))
-    );
+    try {
+      await api.delete(`/cart/${id}`);
+      removeItemFromState(id);
+    } catch (error) {
+      const apiError = error as { response?: { status?: number; data?: unknown } };
+      console.error(
+        "장바구니 삭제 실패",
+        apiError.response?.status,
+        JSON.stringify(apiError.response?.data),
+      );
+      window.alert("장바구니 상품을 삭제하지 못했습니다. 다시 시도해주세요.");
+    }
+  };
 
-    if (next && item.approved) {
-      setSelectedSample((prev) => [...new Set([...prev, id])]);
-    } else {
-      setSelectedSample((prev) => prev.filter((selectedId) => selectedId !== id));
+  const handleAddSample = async (item: CartItem) => {
+    if (!item.sampleAvailable || addingSampleOptionId !== null) return;
+
+    if (isSellerDemo) {
+      const sampleItem: CartItem = {
+        ...item,
+        cartItemId: item.cartItemId - 1000,
+        quantity: 1,
+        totalPrice: item.unitPrice,
+        cartType: "SAMPLE",
+      };
+      setItems((prev) =>
+        prev.some((cartItem) => cartItem.cartType === "SAMPLE" && cartItem.productOptionId === item.productOptionId)
+          ? prev
+          : [...prev, sampleItem]
+      );
+      setSelectedSample([sampleItem.cartItemId]);
+      setTab("SAMPLE");
+      return;
+    }
+
+    try {
+      setAddingSampleOptionId(item.productOptionId);
+
+      await api.post("/cart", {
+        productOptionId: item.productOptionId,
+        quantity: 1,
+        cartType: "SAMPLE",
+      });
+
+      const response = await api.get<CartItem[]>("/cart");
+      setItems(response.data);
+      setSelectedSample(
+        response.data
+          .filter((cartItem) => cartItem.cartType === "SAMPLE" && cartItem.isChecked)
+          .map((cartItem) => cartItem.cartItemId)
+      );
+      setTab("SAMPLE");
+    } catch {
+      window.alert("샘플 상품을 장바구니에 담지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setAddingSampleOptionId(null);
     }
   };
 
@@ -184,11 +404,33 @@ export function Cart() {
     setSelectedSample(allSampleSelected ? [] : sampleValidIds);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-slate-50">
+        <div className="flex items-center gap-3 text-sm font-semibold text-slate-500">
+          <Loader2 size={20} className="animate-spin text-primary" />
+          장바구니를 불러오는 중입니다
+        </div>
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="min-h-screen bg-slate-50 px-4 py-10">
+        <div className="mx-auto max-w-[1180px] rounded-xl border border-red-200 bg-white px-6 py-16 text-center shadow-sm">
+          <AlertCircle size={42} className="mx-auto mb-4 text-red-400" />
+          <h1 className="text-lg font-bold text-slate-950">{errorMessage}</h1>
+        </div>
+      </div>
+    );
+  }
+
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-10">
         <div className="mx-auto max-w-[1180px]">
-          <PageTitle itemCount={0} sampleCount={0} />
+          <PageTitle />
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-20 text-center shadow-sm">
             <Package size={48} className="mx-auto mb-4 text-slate-300" />
             <h2 className="mb-2 text-xl font-bold text-slate-950">장바구니가 비어 있습니다</h2>
@@ -208,10 +450,22 @@ export function Cart() {
   const currentSubtotal = tab === "SAMPLE" ? sampleSubtotal : bulkSubtotal;
   const currentCount = tab === "SAMPLE" ? sampleSelected.length : bulkSelected.length;
 
+  const handleCheckout = () => {
+    const cartItemIds = tab === "SAMPLE" ? selectedSample : selected;
+    if (cartItemIds.length === 0) return;
+
+    navigate("/checkout", {
+      state: {
+        cartItemIds,
+        cartType: tab === "SAMPLE" ? "SAMPLE" : "NORMAL",
+      },
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8">
       <div className="mx-auto max-w-[1180px]">
-        <PageTitle itemCount={items.length} sampleCount={sampleItems.length} />
+        <PageTitle />
 
         <div className="mb-5 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
           <div className="grid grid-cols-2 gap-2">
@@ -219,7 +473,7 @@ export function Cart() {
               active={tab === "BULK"}
               icon={<ShoppingCart size={16} />}
               label="일반 주문"
-              count={items.length}
+              count={bulkItems.length}
               onClick={() => setTab("BULK")}
             />
             <TabButton
@@ -253,18 +507,85 @@ export function Cart() {
                   onClick={() => toggleSelectAll("BULK")}
                   label={`전체 선택 (${selected.length}/${bulkValidIds.length})`}
                 />
-                {sortedBulkItems.map((item) => (
-                  <CartProductCard
-                    key={item.id}
-                    item={item}
-                    selected={selected.includes(item.id)}
-                    mode="bulk"
-                    onToggle={() => item.approved && toggleSelect(item.id, "BULK")}
-                    onRemove={() => removeItem(item.id)}
-                    onQtyChange={(delta) => updateQty(item.id, delta, "bulk")}
-                    onSampleToggle={() => toggleSampleOrdered(item.id)}
-                  />
-                ))}
+                {sellerGroups.map((group, groupIndex) => {
+                  const groupLabel = String.fromCharCode(65 + groupIndex);
+                  const selectedGroupItems = group.items.filter((item) => selected.includes(item.cartItemId));
+                  const sellerSubtotal = selectedGroupItems.reduce(
+                    (sum, item) => sum + item.unitPrice * item.quantity,
+                    0
+                  );
+                  const shippingFee = group.items[0]?.shippingFee ?? 0;
+                  const freeShippingThreshold = group.items[0]?.freeShippingThreshold ?? 0;
+                  const qualifiesForFreeShipping =
+                    freeShippingThreshold > 0 && sellerSubtotal >= freeShippingThreshold;
+                  const amountUntilFreeShipping = Math.max(0, freeShippingThreshold - sellerSubtotal);
+                  const showSellerGroup = isSellerDemo || group.items.some((item) => item.sellerName);
+
+                  return (
+                    <section
+                      key={`${group.sellerId}-${group.sellerName}`}
+                      className={showSellerGroup
+                        ? "overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                        : "space-y-3"}
+                    >
+                      {showSellerGroup && (
+                        <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <Package size={17} />
+                              </div>
+                              <h2 className="truncate text-base font-black text-slate-950">
+                                배송비 묶음 {groupLabel}
+                              </h2>
+                              <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                                {group.items.length}개 상품
+                              </span>
+                            </div>
+                            <p className="mt-1 pl-11 text-xs text-slate-500">
+                              같은 출고처 상품 · 배송비 함께 계산 · 선택 합계 <strong className="font-bold text-slate-800">{formatPrice(sellerSubtotal)}</strong>
+                            </p>
+                          </div>
+                          <div
+                            className={`inline-flex items-center gap-2 self-start rounded-full px-3 py-1.5 text-xs font-bold sm:self-auto ${
+                              qualifiesForFreeShipping
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-amber-50 text-amber-700"
+                            }`}
+                          >
+                            <Truck size={14} />
+                            {qualifiesForFreeShipping
+                              ? "무료배송 적용"
+                              : freeShippingThreshold > 0
+                                ? `${formatPrice(amountUntilFreeShipping)} 추가 시 무료배송`
+                                : `배송비 ${formatPrice(shippingFee)}`}
+                          </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className={showSellerGroup ? "divide-y divide-slate-100" : "space-y-3"}>
+                        {group.items.map((item) => (
+                          <CartProductCard
+                            key={item.cartItemId}
+                            item={item}
+                            selected={selected.includes(item.cartItemId)}
+                            mode="bulk"
+                            onToggle={() => toggleSelect(item.cartItemId, "BULK")}
+                            onRemove={() => removeItem(item.cartItemId)}
+                            onQtyChange={(delta) => updateQty(item.cartItemId, delta, "bulk")}
+                            onAddSample={() => handleAddSample(item)}
+                            sampleAdded={sampleOptionIds.has(item.productOptionId)}
+                            isAddingSample={addingSampleOptionId === item.productOptionId}
+                            isUpdatingQuantity={updatingQuantityIds.has(item.cartItemId)}
+                            grouped={showSellerGroup}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
               </>
             ) : (
               <SampleCart
@@ -274,8 +595,9 @@ export function Cart() {
                 onSelectAll={() => toggleSelectAll("SAMPLE")}
                 onGoBulk={() => setTab("BULK")}
                 onToggle={(id) => toggleSelect(id, "SAMPLE")}
-                onRemove={(id) => toggleSampleOrdered(id)}
+                onRemove={(id) => removeItem(id)}
                 onQtyChange={(id, delta) => updateQty(id, delta, "sample")}
+                updatingQuantityIds={updatingQuantityIds}
               />
             )}
           </main>
@@ -284,7 +606,7 @@ export function Cart() {
             tab={tab}
             count={currentCount}
             subtotal={currentSubtotal}
-            onContinuePath={tab === "SAMPLE" ? "/buyer/checkout?type=sample" : "/buyer/checkout"}
+            onCheckout={handleCheckout}
           />
         </div>
       </div>
@@ -292,7 +614,7 @@ export function Cart() {
   );
 }
 
-function PageTitle({ itemCount, sampleCount }: { itemCount: number; sampleCount: number }) {
+function PageTitle() {
   return (
     <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div>
@@ -304,15 +626,6 @@ function PageTitle({ itemCount, sampleCount }: { itemCount: number; sampleCount:
         </p>
       </div>
     </header>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs font-semibold text-slate-500">{label}</p>
-      <p className="mt-1 text-base font-black text-slate-950">{value}</p>
-    </div>
   );
 }
 
@@ -397,7 +710,11 @@ function CartProductCard({
   onToggle,
   onRemove,
   onQtyChange,
-  onSampleToggle,
+  onAddSample,
+  sampleAdded = false,
+  isAddingSample = false,
+  isUpdatingQuantity = false,
+  grouped = false,
 }: {
   item: CartItem;
   selected: boolean;
@@ -405,48 +722,80 @@ function CartProductCard({
   onToggle: () => void;
   onRemove: () => void;
   onQtyChange: (delta: number) => void;
-  onSampleToggle?: () => void;
+  onAddSample?: () => void;
+  sampleAdded?: boolean;
+  isAddingSample?: boolean;
+  isUpdatingQuantity?: boolean;
+  grouped?: boolean;
 }) {
   const isSample = mode === "sample";
-  const unitPrice = isSample ? item.samplePrice : item.price;
-  const quantity = isSample ? item.sampleQty : item.quantity;
+  const unitPrice = item.unitPrice;
+  const quantity = item.quantity;
   const amount = unitPrice * quantity;
   const moqShortfall = !isSample && item.quantity < item.moq;
+  const sampleMaxQuantity = getSampleMaxQuantity(item);
 
   return (
     <article
-      className={`overflow-hidden rounded-xl border bg-white shadow-sm ${
-        moqShortfall ? "border-amber-300" : selected ? "border-primary/30" : "border-slate-200"
-      }`}
+      className={grouped
+        ? `overflow-hidden bg-white ${selected ? "bg-primary/[0.015]" : ""}`
+        : `overflow-hidden rounded-xl border bg-white shadow-sm ${
+            moqShortfall ? "border-amber-300" : selected ? "border-primary/30" : "border-slate-200"
+          }`}
     >
       {isSample && (
         <div className="flex items-center gap-2 border-b border-primary/10 bg-secondary px-5 py-2 text-xs font-bold text-primary">
           <FlaskConical size={13} />
           샘플 주문
-          <span className="ml-auto text-[11px] text-primary/70">최대 5개까지 선택 가능</span>
+          <span className="ml-auto text-[11px] text-primary/70">
+            최대 {sampleMaxQuantity.toLocaleString()}개까지 선택 가능
+          </span>
         </div>
       )}
 
       <div className="flex gap-4 p-5">
         <div className="pt-8">
-          <Checkbox checked={selected} onClick={onToggle} disabled={!item.approved} />
+          <Checkbox checked={selected} onClick={onToggle} disabled={moqShortfall} />
         </div>
-        <img
-          src={item.image}
-          alt={item.name}
-          className="h-24 w-24 shrink-0 rounded-lg border border-slate-100 object-cover"
-        />
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-300">
+          <Package size={32} />
+        </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="text-sm font-bold text-slate-950">{item.name}</h3>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">{item.supplier}</p>
-              {!item.approved && (
-                <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">
-                  <AlertCircle size={11} />
-                  판매 승인 대기
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-950">{item.productName}</h3>
+                {!isSample && item.sampleAvailable && (
+                  <button
+                    type="button"
+                    onClick={onAddSample}
+                    disabled={sampleAdded || isAddingSample}
+                    className="inline-flex h-6 shrink-0 items-center justify-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 text-[11px] font-bold text-amber-700 transition hover:border-amber-400 hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    {isAddingSample ? (
+                      <Loader2 size={11} className="animate-spin" />
+                    ) : sampleAdded ? (
+                      <Check size={11} />
+                    ) : (
+                      <FlaskConical size={11} />
+                    )}
+                    {isAddingSample ? "추가 중" : sampleAdded ? "샘플 담김" : "샘플 주문"}
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-xs font-medium text-slate-500">{item.optionLabel}</p>
+              {item.options.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {item.options.map((option) => (
+                    <span
+                      key={`${option.optionName}-${option.optionValue}`}
+                      className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600"
+                    >
+                      {option.optionName}: {option.optionValue}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
             <button
@@ -464,16 +813,15 @@ function CartProductCard({
                 <span className="text-sm font-black text-primary">{formatPrice(unitPrice)}</span>
                 <span className="text-xs text-slate-400">/ 벌</span>
                 {!isSample && <span className="text-xs text-slate-500">최소 {item.moq.toLocaleString()}벌</span>}
-                {isSample && (
-                  <span className="text-xs text-slate-400 line-through">{formatPrice(item.price)} 도매가</span>
-                )}
               </div>
               <QuantityControl
                 value={quantity}
                 unit={isSample ? "개" : "벌"}
-                stepLabel={isSample ? "최대 5개" : "10벌 단위"}
+                stepLabel={isSample ? `최대 ${sampleMaxQuantity.toLocaleString()}개` : "10벌 단위"}
                 onMinus={() => onQtyChange(isSample ? -1 : -10)}
                 onPlus={() => onQtyChange(isSample ? 1 : 10)}
+                minusDisabled={isUpdatingQuantity || (isSample ? quantity <= 1 : quantity <= item.moq)}
+                plusDisabled={isUpdatingQuantity || (isSample && quantity >= sampleMaxQuantity)}
               />
             </div>
             <div className="text-right">
@@ -489,28 +837,9 @@ function CartProductCard({
             </div>
           )}
 
-          {!isSample && item.hasSample && onSampleToggle && (
-            <div className="mt-4 border-t border-slate-100 pt-4">
-              <button
-                type="button"
-                onClick={onSampleToggle}
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
-                  item.sampleOrdered
-                    ? "border-primary/25 bg-secondary text-primary"
-                    : "border-slate-200 text-slate-500 hover:border-primary/40 hover:text-primary"
-                }`}
-              >
-                <FlaskConical size={13} />
-                {item.sampleOrdered
-                  ? `샘플 주문 추가됨 · ${formatPrice(item.samplePrice)}`
-                  : `샘플 먼저 받아보기 · ${formatPrice(item.samplePrice)}`}
-              </button>
-            </div>
-          )}
-
           {isSample && (
             <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              본 주문 예정: {item.quantity.toLocaleString()}벌 · {formatPrice(item.price * item.quantity)}
+              샘플 옵션: {item.optionLabel}
             </div>
           )}
         </div>
@@ -525,19 +854,24 @@ function QuantityControl({
   stepLabel,
   onMinus,
   onPlus,
+  minusDisabled = false,
+  plusDisabled = false,
 }: {
   value: number;
   unit: string;
   stepLabel: string;
   onMinus: () => void;
   onPlus: () => void;
+  minusDisabled?: boolean;
+  plusDisabled?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={onMinus}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-primary hover:text-primary"
+        disabled={minusDisabled}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
       >
         <Minus size={13} />
       </button>
@@ -547,7 +881,8 @@ function QuantityControl({
       <button
         type="button"
         onClick={onPlus}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-primary hover:text-primary"
+        disabled={plusDisabled}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
       >
         <Plus size={13} />
       </button>
@@ -567,6 +902,7 @@ function SampleCart({
   onToggle,
   onRemove,
   onQtyChange,
+  updatingQuantityIds,
 }: {
   sampleItems: CartItem[];
   selectedSample: number[];
@@ -576,6 +912,7 @@ function SampleCart({
   onToggle: (id: number) => void;
   onRemove: (id: number) => void;
   onQtyChange: (id: number, delta: number) => void;
+  updatingQuantityIds: Set<number>;
 }) {
   if (sampleItems.length === 0) {
     return (
@@ -610,13 +947,14 @@ function SampleCart({
       />
       {sampleItems.map((item) => (
         <CartProductCard
-          key={item.id}
+          key={item.cartItemId}
           item={item}
-          selected={selectedSample.includes(item.id)}
+          selected={selectedSample.includes(item.cartItemId)}
           mode="sample"
-          onToggle={() => item.approved && onToggle(item.id)}
-          onRemove={() => onRemove(item.id)}
-          onQtyChange={(delta) => onQtyChange(item.id, delta)}
+          onToggle={() => onToggle(item.cartItemId)}
+          onRemove={() => onRemove(item.cartItemId)}
+          onQtyChange={(delta) => onQtyChange(item.cartItemId, delta)}
+          isUpdatingQuantity={updatingQuantityIds.has(item.cartItemId)}
         />
       ))}
     </>
@@ -627,12 +965,12 @@ function OrderSummary({
   tab,
   count,
   subtotal,
-  onContinuePath,
+  onCheckout,
 }: {
   tab: CartTab;
   count: number;
   subtotal: number;
-  onContinuePath: string;
+  onCheckout: () => void;
 }) {
   const isSample = tab === "SAMPLE";
 
@@ -657,7 +995,7 @@ function OrderSummary({
           <div>
                 <h2 className="text-sm font-bold text-slate-950">
                     결제 예정 금액
-                </ h2>
+                </h2>
           </div>
           <p className="whitespace-nowrap text-right text-xl font-black leading-none text-primary md:text-2xl">
             {formatPrice(subtotal)}
@@ -678,13 +1016,14 @@ function OrderSummary({
             <ArrowRight size={16} />
           </button>
         ) : (
-          <Link
-            to={onContinuePath}
+          <button
+            type="button"
+            onClick={onCheckout}
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary/90"
           >
             {isSample ? "샘플 주문하기" : "주문하기"}
             <ArrowRight size={16} />
-          </Link>
+          </button>
         )}
 
         <Link

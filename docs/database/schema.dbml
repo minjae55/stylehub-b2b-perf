@@ -1,0 +1,973 @@
+    Table users {
+    user_id int [pk, increment, note: '회원 PK']
+    company_id int [ref: > companies.company_id, note: '소속 회사 PK']
+    default_shipping_address_id int [ref: - addresses.address_id, note: '사용자의 기본 출고지']
+    default_receiving_address_id int [ref: - addresses.address_id, note: '사용자의 기본 수령지']
+
+    email varchar(100) [unique, not null, note: '로그인 이메일']
+    password varchar(255) [note: '암호화된 비밀번호']
+    name varchar(20) [note: '이름']
+    phone varchar(20) [note: '휴대폰 번호']
+    role varchar(20) [not null, note: 'ADMIN / PRESIDENT / EMPLOYEE']
+    business_role enum('BUYER', 'SELLER', 'BOTH', 'ADMIN') [not null, note: '비즈니스 역할']
+    profile_image_url varchar(2000) [note: '프로필 이미지 URL']
+
+    status enum('PENDING', 'SUSPENDED', 'DELETED', 'APPROVED') [default: 'PENDING', note: '계정 상태']
+
+    updated_at datetime [note: '회원 정보 수정일']
+    last_login_at datetime [note: '마지막 로그인 일시']
+    last_login_ip varchar(45) [note: '마지막 로그인 IP']
+
+    created_at datetime [default: `CURRENT_TIMESTAMP`, note: '계정 생성일']
+    deleted_at datetime [note: '계정 삭제일']
+    failed_login_attempts tinyint [default: 0, note: '로그인 실패 횟수']
+  }
+
+  Table social_accounts {
+    social_account_id int [pk, increment, note: '소셜 계정 PK']
+    user_id int [ref: > users.user_id, note: '회원 PK']
+    provider varchar(20) [not null, note: 'NAVER, KAKAO, GOOGLE']
+    provider_uid varchar(255) [not null, note: '소셜 제공자의 고유 식별자']
+    created_at datetime [default: `CURRENT_TIMESTAMP`, note: '소셜 계정 연동일']
+    deleted_at datetime [note: '소셜 계정 삭제일']
+
+    indexes {
+      (provider, provider_uid) [unique, name: 'idx_provider_uid']
+      user_id
+    }
+  }
+
+  Table companies {
+    company_id int [pk, increment, note: '회사 PK']
+    default_return_address_id int [ref: - addresses.address_id, note: '회사 기본 반품지']
+
+    name varchar(100) [not null, note: '회사명']
+    business_number varchar(20) [not null, unique, note: '사업자등록번호']
+    representative_name varchar(50) [note: '대표자명']
+    representative_phone varchar(20) [note: '대표 연락처']
+    website_url varchar(255) [note: '회사 웹사이트 URL']
+    description varchar(2000) [note: '회사 소개']
+    address varchar(255) [note: '회사 주소']
+    address_detail varchar(255) [note: '회사 상세 주소']
+    logo_url varchar(2000) [note: '회사 로고 URL']
+    business_license_url varchar(2000) [note: '사업자등록증 URL']
+    status enum('PENDING', 'APPROVED', 'REJECTED', 'DELETED', 'SUSPENDED') [default: 'PENDING', note: '회사 상태']
+    seller_status enum('NONE', 'PENDING', 'APPROVED', 'REJECTED') [default: 'NONE', note: '셀러 신청 상태']
+
+    company_store_type enum('OFFLINE', 'ONLINE', 'BOTH')
+    oem_available boolean [not null, default: false, note: 'OEM 가능 여부']
+
+    avg_lead_time_days int [note: '평균 출고일']
+    answer_average double [note: '소싱 요청에 대한응답률']
+
+    base_shipping_fee bigint [not null, default: 0, note: '회사의 기본 배송비']
+    free_shipping_threshold bigint [note: '무료 배송이 적용되는 주문 금액 기준. null이면 무료 배송 기준 없음']
+
+    created_at datetime [default: `CURRENT_TIMESTAMP`, note: '회사 등록일']
+    updated_at datetime [note: '회사 정보 수정일']
+    deleted_at datetime [note: '회사 삭제일']
+  }
+
+  Table company_handled_categories {
+    company_handled_category_id int [pk, increment, note: '회사 취급 카테고리 ID']
+
+    company_id int [not null, ref: > companies.company_id, note: '회사 ID']
+    category_id int [not null, ref: > categories.category_id, note: '취급 카테고리 ID']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '등록일']
+
+    indexes {
+      (company_id, category_id) [unique]
+      company_id
+      category_id
+    }
+
+    Note: '셀러 회사가 취급하는 카테고리. 소싱 요청 자동 발송 대상 선정 기준으로 사용'
+  }
+
+
+  Table products {
+    product_id int [pk, increment, note: '상품 ID']
+
+    seller_id int [not null, ref: > users.user_id, note: '판매 셀러']
+    company_id int [not null, ref: > companies.company_id, note: '소속 회사']
+    category_id int [not null, ref: > categories.category_id, note: '카테고리 ID']
+    brand_id int [not null, ref: > brands.brand_id, note: '브랜드 ID']
+
+    product_name varchar(150) [not null, note: '상품명']
+    product_eng_name varchar(150) [note: '상품 영문명']
+    return_policy text [note: '상품별 반품/교환/환불 정책']
+    view_count int [note: '조회수']
+
+    season varchar(30) [note: 'SS/FW/상시']
+
+    moq int [not null, note: '최소 발주 수량']
+    unit_price bigint [not null, note: '상품 단가']
+
+    lead_time_days int [note: '예상 출고 소요일']
+
+    main_material varchar(255) [note: '주요 소재']
+    material_cert varchar(255) [note: '소재 인증']
+
+    description text [note: '상품 설명']
+    care_instruction text [note: '세탁/관리 방법']
+
+    product_url varchar(2000) [note: '상품 상세 PDF 또는 파일 URL']
+
+    oem_available boolean [not null, default: false, note: 'OEM 가능 여부']
+    sample_available boolean [not null, default: false, note: '샘플 제공 가능 여부']
+    white_label boolean [not null, default: false, note: '화이트라벨 가능 여부']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '상품 등록일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '상품 수정일']
+  }
+
+  Table product_options {
+    product_option_id int [pk, increment, note: '상품 옵션 ID']
+    product_id int [not null, ref: > products.product_id, note: '상품 ID']
+    option_label varchar(100) [not null, note: '화면 표시용 옵션 조합명']
+
+    sku varchar(100) [note: '옵션 조합별 관리 코드']
+    stock_quantity int [not null, default: 0, note: '옵션 조합 재고 수량']
+    additional_price bigint [not null, default: 0, note: '옵션 추가 금액']
+    restock_alert_quantity int [note: '재입고 알림 기준 수량']
+
+    is_active boolean [not null, default: true, note: '옵션 판매 활성화 여부']
+
+    sample_price bigint [default: 0, note: '해당 옵션의 샘플 1개 가격']
+    sample_max_quantity int [default: 1, note: '해당 옵션의 샘플 최대 주문 수량']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '상품 옵션 등록일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '상품 옵션 수정일']
+
+    indexes {
+      product_id
+      (product_id, option_label) [unique]
+      (product_id, sku) [unique]
+    }
+  }
+
+  Table product_images {
+    product_image_id int [pk, increment, note: '상품 이미지 ID']
+    product_option_id int [not null, ref: > product_options.product_option_id, note: '상품 옵션 ID']
+
+    image_url varchar(2000) [not null, note: '상품 이미지 URL']
+
+    sort_order int [not null, default: 0, note: '이미지 표시 순서']
+    is_main boolean [not null, default: false, note: '대표 이미지 여부']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '상품 이미지 등록일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '상품 이미지 수정일']
+
+  }
+
+  Table product_option_values {
+    product_option_value_id int [pk, increment, note: '상품 옵션 세부값 ID']
+    product_option_id int [not null, ref: > product_options.product_option_id, note: '상품 옵션 조합 ID']
+
+    option_name varchar(50) [not null, note: '옵션명']
+    option_value varchar(50) [not null, note: '옵션값']
+    sort_order int [not null, default: 0, note: '옵션 표시 순서']
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '상품 옵션 세부값 등록일']
+
+    indexes {
+      product_option_id
+      (product_option_id, option_name, option_value) [unique]
+    }
+  }
+
+  Table cart_items {
+    cart_item_id int [pk, increment, note: '장바구니 항목 ID']
+    user_id int [not null, ref: > users.user_id, note: '장바구니 소유 사용자 ID']
+    product_option_id int [not null, ref: > product_options.product_option_id, note: '상품 옵션 조합 ID']
+
+    quantity int [not null, note: '수량']
+    cart_type cart_type [not null, default: 'NORMAL', note: '일반/샘플 장바구니 구분']
+    is_checked boolean [not null, default: true, note: '주문 선택 여부']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '장바구니 등록일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '장바구니 수정일']
+
+    indexes {
+      (user_id, product_option_id, cart_type) [unique]
+      user_id
+    }
+  }
+
+  Enum cart_type {
+    NORMAL
+    SAMPLE
+  }
+
+  Table addresses {
+    address_id int [pk, increment, note: '주소 PK']
+    company_id int [not null, ref: > companies.company_id, note: '소속 회사']
+
+    address_name varchar(50) [not null, note: '주소 이름']
+    zipcode varchar(20) [note: '우편번호']
+    address varchar(255) [not null, note: '기본 주소']
+    address_detail varchar(255) [note: '상세 주소']
+
+    created_at datetime [default: `CURRENT_TIMESTAMP`, note: '주소 등록일']
+    updated_at datetime [note: '주소 수정일']
+    deleted_at datetime [note: '주소 삭제일']
+  }
+
+  Table inquiries {
+    inquiry_id int [pk, increment, note: '문의 PK']
+    last_sender_id int [ref: > users.user_id, note: '마지막 메시지 작성자']
+
+    company_id int [not null, ref: > companies.company_id, note: '문의 회사']
+    created_by_user_id int [not null, ref: > users.user_id, note: '문의 생성자']
+    category varchar(30) [not null, note: 'ACCOUNT, ORDER, PRODUCT, PAYMENT, ETC']
+    title varchar(100) [not null, note: '문의 제목']
+    status enum('OPEN', 'WAITING', 'ANSWERED', 'CLOSED') [default: 'OPEN', note: '문의 상태']
+    assigned_admin_id int [ref: > users.user_id, note: '담당 관리자']
+    last_message_at datetime [note: '마지막 메시지 시간']
+
+    created_at datetime [default: `CURRENT_TIMESTAMP`, note: '문의 생성일']
+    closed_at datetime [note: '문의 종료일']
+  }
+
+  Table inquiry_messages {
+    message_id int [pk, increment, note: '메시지 PK']
+    inquiry_id int [not null, ref: > inquiries.inquiry_id, note: '문의 PK']
+
+    sender_id int [not null, ref: > users.user_id, note: '보낸 사람']
+    message text [note: '메시지 내용']
+
+    created_at datetime [default: `CURRENT_TIMESTAMP`, note: '메시지 작성일']
+  }
+
+  Table inquiry_message_reads {
+    message_read_id int [pk, increment, note: '메시지 읽음 PK']
+    message_id int [not null, ref: > inquiry_messages.message_id, note: '메시지 PK']
+    user_id int [not null, ref: > users.user_id, note: '읽은 사용자']
+    read_at datetime [default: `CURRENT_TIMESTAMP`, note: '메시지 읽은 시각']
+  }
+
+  Table orders {
+    order_id int [pk, increment, note: '주문 ID']
+    order_no varchar(30) [not null, unique, note: '사용자에게 보여줄 주문 번호']
+
+    buyer_id int [not null, ref: > users.user_id, note: '주문 바이어 ID']
+    seller_id int [not null, ref: > users.user_id, note: '주문 셀러 ID']
+
+    contract_id int [ref: > contracts.contract_id, note: '계약 기반 주문인 경우 계약 ID']
+    quote_id int [ref: > quotes.quote_id, note: '견적 기반 주문인 경우 견적 ID']
+    parent_order_id int [ref: > orders.order_id, note: '샘플 주문에서 파생된 본주문 연결 ID']
+
+    order_type order_type [not null, default: 'NORMAL', note: '주문 유형']
+    status order_status [not null, default: 'PENDING', note: '주문 상태']
+    is_sample boolean [not null, default: 'false', note: '샘플 주문을 했나?']
+
+    subtotal_amount bigint [not null, default: 0, note: '상품 금액 합계']
+    platform_fee bigint [not null, default: 0, note: '플랫폼 수수료']
+    shipping_fee bigint [not null, default: 0, note: '배송비']
+    total_amount bigint [not null, default: 0, note: '최종 결제 금액']
+    payment_method payment_method [note: '결제 수단']
+
+    receiver_name varchar(50) [not null, note: '수령인 이름']
+    receiver_phone varchar(30) [not null, note: '수령인 연락처']
+    receiver_zipcode varchar(20) [note: '수령지 우편번호']
+    receiver_address varchar(255) [not null, note: '수령지 주소']
+    receiver_address_detail varchar(255) [note: '수령지 상세 주소']
+    receiver_memo varchar(255) [note: '배송 요청사항']
+
+    sender_name varchar(50) [note: '발송인명']
+    sender_phone varchar(30) [note: '발송지 연락처']
+    sender_zipcode varchar(20) [note: '발송지 우편번호']
+    sender_address varchar(255) [note: '발송지 주소']
+    sender_address_detail varchar(255) [note: '발송지 상세 주소']
+
+    carrier varchar(50) [note: '택배사 또는 운송사명. 예: CJ대한통운, 한진택배']
+    tracking_number varchar(100) [note: '운송장 번호']
+    shipped_at datetime [note: '출고 일시. 셀러가 상품을 발송한 시각']
+    delivered_at datetime [note: '배송 완료 일시. 상품이 바이어에게 도착한 시각']
+
+    canceled_reason text [note: '주문 취소 사유']
+    canceled_at datetime [note: '주문 취소 일시']
+    canceled_by_user_id int [ref: > users.user_id, note: '주문 취소 사용자 ID']
+
+    agreed_at datetime [note: '주문 및 결제 약관 동의 일시']
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '주문 생성일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '주문 수정일']
+
+    indexes {
+      order_no
+      buyer_id
+      seller_id
+      (buyer_id, created_at)
+      (seller_id, status, created_at)
+    }
+  }
+
+  Table order_items {
+    order_item_id int [pk, increment, note: '주문 상품 항목 ID']
+    order_id int [not null, ref: > orders.order_id, note: '주문 ID']
+    product_id int [ref: > products.product_id, note: '상품 ID']
+    product_option_id int [ref: > product_options.product_option_id, note: '상품 옵션 조합 ID']
+
+    product_name varchar(150) [not null, note: '주문 당시 상품명 스냅샷']
+    option_summary varchar(255) [note: '주문 당시 옵션 정보 스냅샷']
+    quantity int [not null, note: '주문 수량']
+    unit_price bigint [not null, note: '주문 당시 상품 단가']
+    additional_price bigint [not null, default: 0, note: '주문 당시 옵션 추가 금액']
+    total_price bigint [not null, note: '주문 상품 총 금액']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '주문 상품 항목 생성일']
+
+    indexes {
+      order_id
+      product_id
+    }
+  }
+
+  Enum order_type {
+    NORMAL
+    READY
+    CUSTOM
+  }
+
+
+
+  Enum payment_method {
+    TRANSFER
+    CORP_CARD
+  }
+
+  Table order_logs {
+    order_log_id int [pk, increment]
+    order_id int [not null, ref: > orders.order_id]
+
+    log_type varchar(30) [not null, note: 'STATUS / PROCESS']
+    previous_status order_status [note: '상태 변경 전 값']
+    new_status order_status [note: '상태 변경 후 값']
+    process_step order_process_step [note: '세부 진행 단계']
+
+    actor_user_id int [ref: > users.user_id]
+    memo text
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`]
+
+    indexes {
+      order_id
+      (order_id, created_at)
+      (log_type, created_at)
+    }
+  }
+
+  Enum order_status {
+    PENDING [note: '주문 생성 또는 결제 대기 상태']
+    CONFIRMED [note: '결제 완료로 주문이 확정된 상태']
+    PREPARING [note: '셀러가 상품 준비 또는 출고 준비 중인 상태']
+    SHIPPED [note: '상품이 발송되어 운송장이 등록된 상태']
+    DELIVERED [note: '상품이 배송 완료된 상태']
+    COMPLETED [note: '바이어가 거래 확정을 완료한 상태']
+    DISPUTE [note: '이의제기가 접수되어 처리 중인 상태']
+    CANCELED [note: '주문이 취소된 상태']
+    REFUNDED [note: '환불이 완료된 상태']
+  }
+
+  Enum order_process_step {
+    SAMPLE_PREPARING [note: '샘플 준비 또는 제작이 시작된 상태']
+    SAMPLE_SHIPPED [note: '샘플이 발송된 상태']
+    SAMPLE_DELIVERED [note: '샘플이 바이어에게 배송 완료된 상태']
+    SAMPLE_NEGOTIATING [note: '샘플 확인 후 수정 요청 또는 재협의가 진행 중인 상태']
+
+    CONTRACT_CREATING [note: '셀러가 계약서를 작성 및 서명 중인 상태']
+    CONTRACT_PAYMENT_PENDING [note: '셀러는 계약서 제공 완료, 바이어 결제/서명 대기 중']
+    CONTRACT_COMPLETED [note: '바이어 결제 + 서명 완료, 양측 계약 확정']
+
+    PRODUCTION_STARTED [note: '본생산이 시작된 상태']
+    PRODUCTION_COMPLETED [note: '본생산이 완료된 상태']
+  }
+
+
+
+  Table quotes {
+    quote_id int [pk, increment, note: '견적서 ID']
+    quote_no varchar(30) [not null, unique, note: '견적서 번호']
+    sourcing_id int [not null, ref: > sourcing_requests.sourcing_request_id, note: '소싱 요청 ID']
+    company_id int [not null, ref: > companies.company_id, note: '회사 ID']
+    buyer_id int [not null, ref: > users.user_id, note: '바이어 ID']
+    seller_id int [not null, ref: > users.user_id, note: '셀러 ID']
+
+    company_name varchar(50) [note: '견적 당시 회사명']
+    buyer_name varchar(50) [note: '견적 당시 바이어명']
+    seller_name varchar(50) [note: '견적 당시 셀러명']
+
+    parent_quote_id int [ref: > quotes.quote_id, note: '이전 버전 견적서 ID']
+    version int [not null, default: 1, note: '견적서 버전']
+
+    brand_name varchar(100) [note: '견적 당시 브랜드명']
+    product_name varchar(150) [not null, note: '견적 상품명']
+    category_name varchar(100) [note: '견적 당시 카테고리명']
+
+    material varchar(255) [note: '소재 정보']
+
+    lead_time_days int [not null, note: '예상 출고 소요일']
+    delivery_company varchar(50) [note: '예상 배송사']
+    shipping_fee bigint [not null, default: 0, note: '견적 기준 배송비']
+    valid_until datetime [not null, default: `CURRENT_TIMESTAMP`, note: '견적 유효 일시']
+    sample_available varchar(30) [not null, default: 'AVAILABLE',
+    note: '''
+      샘플 제공 가능 여부.
+      AVAILABLE=가능,
+      UNAVAILABLE=불가,
+      NEGOTIABLE=협의 필요']
+      '''
+        ]
+    seller_memo text [note: '셀러 메모']
+
+    subtotal_amount bigint [not null, default: 0, note: '견적 상품 금액 합계']
+    total_amount bigint [not null, default: 0, note: '최종 견적 금액']
+    status varchar(30) [not null, default: 'SUBMITTED', note: '견적 상태']
+
+    submitted_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '견적 제출 시각']
+    negotiated_at datetime [note: '견적 협의 시각']
+    accepted_at datetime [note: '견적 수락 시각']
+    expired_at datetime [note: '견적 만료 시각']
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '견적서 생성일']
+
+    indexes {
+      quote_no [unique]
+      sourcing_id
+      seller_id
+      (seller_id, status, created_at)
+    }
+  }
+
+  Table quote_items {
+    quote_item_id int [pk, increment, note: '견적 상품 옵션 항목 ID']
+    quote_id int [not null, ref: > quotes.quote_id, note: '견적서 ID']
+
+    option_summary varchar(255) [note: '견적 당시 옵션 정보']
+    quantity int [not null, default: 0, note: '견적 수량']
+    unit_price bigint [not null, default: 0, note: '견적 당시 단가']
+    total_price bigint [not null, default: 0, note: '견적 항목 총 금액']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '견적 상품 항목 생성일']
+
+    indexes {
+      quote_id
+    }
+  }
+
+
+
+  Enum sourcing_status {
+    "PENDING" [note: '대기중']
+    "TRADING" [note: '거래중']
+    "NEGOTIATING" [note: '협의중']
+    "COMPLETED" [note: '완료']
+  }
+
+  Table sourcing_requests {
+    sourcing_request_id int [pk, increment, note: '소싱 요청 ID']
+    sourcing_no varchar(50) [not null, unique, note: '소싱 요청 번호']
+    buyer_id int [not null, ref: > users.user_id, note: '바이어 ID']
+    type varchar(10) [not null, note: 'READY 또는 CUSTOM']
+    status sourcing_status [not null, default: 'PENDING', note: '진행 상태']
+
+    product_name varchar(100) [not null, note: '상품명']
+    brand_name varchar(50) [null, note: '브랜드명']
+    need_sample char(1) [not null, default: 'N', note: '샘플 필요 여부']
+    main_material varchar(255) [note: '주요 소재']
+
+    unit_price bigint [null, note: '희망 단가']
+    ref_url text [null, note: '참고 URL']
+
+    delivery_date date [null, note: '희망 납기일']
+    expiry_date date [null, note: '요청 유효기간']
+    total_budget bigint [null, note: '전체 예산']
+    detail text [null, note: '상세 요구사항']
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '소싱 요청 생성일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '소싱 요청 수정일']
+  }
+
+  Table sourcing_request_items {
+    sourcing_request_item_id int [pk, increment, note: '소싱 요청 항목 ID']
+    sourcing_id int [not null, ref: > sourcing_requests.sourcing_request_id, note: '소싱 요청 ID']
+    option_summary varchar(255) [not null, note: '옵션 요약']
+    quantity int [not null, note: '요청 수량']
+    sample_quantity int [note: '샘플 수량']
+  }
+
+  Table sourcing_request_files {
+    sourcing_request_file_id int [pk, increment, note: '파일 ID']
+    sourcing_request_id int [not null, ref: > sourcing_requests.sourcing_request_id, note: '소싱 요청 ID']
+    file_type varchar(20) [not null, note: '파일 구분']
+    file_name varchar(255) [not null, note: '원본 파일명']
+    file_url varchar(2000) [not null, note: '파일 경로 또는 URL']
+  }
+
+  Table sourcing_suppliers {
+    sourcing_supplier_id int [pk, increment]
+    sourcing_request_id int [not null, ref: > sourcing_requests.sourcing_request_id]
+
+    seller_company_id int [not null, ref: > companies.company_id]
+    assigned_by int [null, ref: > users.user_id, note: '승인한 관리자, 승인 전엔 NULL']
+    status varchar(20) [not null, default: 'SUGGESTED', note: 'SUGGESTED/RECOMMENDED/QUOTED/DECLINED/EXPIRED']
+    manager_note text [null, note: '관리자 추천 사유 또는 특이사항']
+
+    seller_feedback text [null, note: '셀러의 응답 내용 (수락/거절 사유 등)']
+    approved_at datetime [null, note: '관리자 승인 시점 (셀러 노출 시점)']
+
+    responded_at datetime [null, note: '셀러가 의사를 밝힌 시간']
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`]
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`]
+
+    indexes {
+      (sourcing_request_id, seller_company_id) [unique]
+    }
+  }
+
+
+  Table categories {
+    category_id int [pk, increment, note: '카테고리 ID']
+    parent_id int [ref: > categories.category_id, note: '상위 카테고리 ID']
+    category_name varchar(50) [not null, note: '카테고리명']
+    depth int [not null, note: '카테고리 깊이']
+    sort_order int [not null, default: 0, note: '카테고리 정렬 순서']
+    is_active boolean [not null, default: true, note: '카테고리 활성화 여부']
+  }
+
+  Ref: sourcing_request_files.sourcing_request_file_id > sourcing_requests.sourcing_request_id [delete: cascade]
+
+  Table brands {
+    brand_id int [pk, increment, note: '브랜드 ID']
+
+    company_id int [not null, ref: > companies.company_id, note: '브랜드 소유 회사 ID']
+    brand_name varchar(100) [not null, note: '브랜드명']
+    brand_logo_url varchar(2000) [note: '브랜드 로고 이미지 URL']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '브랜드 등록일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '브랜드 수정일']
+  }
+
+  Table contracts {
+    contract_id int [pk, increment, note: '계약서 ID']
+    quote_id int [not null, ref: > quotes.quote_id, note: '견적서 ID']
+    company_id int [not null, ref: > companies.company_id, note: 'companies 조회용']
+
+    parent_contract_id int [ref: > contracts.contract_id, note: '이전 버전 계약서 ID. 최초 계약서이면 null']
+    version int [not null, default: 1, note: '계약서 버전. 수정 계약서가 생성될 때 증가']
+
+    buyer_company_name varchar(100) [not null, note: '바이어 회사명']
+    seller_company_name varchar(100) [not null, note: '셀러 회사명']
+
+    contract_no varchar(30) [not null, unique, note: '계약서 번호']
+    status contract_status [not null, default: 'DRAFT', note: '계약서 상태']
+
+    contract_amount bigint [not null, note: '계약 총 금액']
+    contract_hash varchar(255) [note: '계약서 원본 PDF 해시. 서명 전 계약서 위변조 검증에 사용']
+
+    pdf_url varchar(2000) [note: '계약서 PDF URL']
+
+    completed_at datetime [note: '계약 확정 시각']
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '계약서 생성일']
+    canceled_at datetime [note: '계약 취소 시각']
+    submitted_at datetime [note: '셀러가 계약서를 제출한 시각']
+
+  }
+
+  Table contract_items {
+    contract_item_id int [pk, increment, note: '계약 항목 ID']
+    contract_id int [not null, ref: > contracts.contract_id, note: '계약서 ID']
+    product_id int [ref: > products.product_id, note: '상품 ID']
+    product_option_id int [ref: > product_options.product_option_id, note: '상품 옵션 ID']
+
+    product_name varchar(150) [not null, note: '계약 당시 상품명']
+    option_summary varchar(255) [note: '계약 당시 옵션 정보']
+    material varchar(255) [note: '계약 당시 소재 정보']
+
+    quantity int [not null, note: '계약 수량']
+    unit_price bigint [not null, note: '계약 단가']
+    total_price bigint [not null, note: '총 금액']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '계약 항목 생성일']
+  }
+
+  Table contract_signatures {
+    contract_signature_id int [pk, increment, note: '계약 서명 ID']
+    contract_id int [not null, ref: > contracts.contract_id, note: '계약서 ID']
+    signer_id int [not null, ref: > users.user_id, note: '서명 사용자 ID']
+
+    signer_role signer_role [not null, note: '서명자 역할']
+    signature_text varchar(100) [note: '텍스트 기반 전자서명']
+    signature_image_url varchar(2000) [note: '서명 이미지 URL']
+
+    signature_hash varchar(255) [note: '서명 무결성 검증 해시. contract_hash + signer_id + signer_role + signed_at 등을 조합해 생성']
+    signed_ip varchar(45) [note: '서명 요청 IP']
+    signed_user_agent varchar(500) [note: '서명 당시 브라우저/기기 정보']
+
+    signed_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '서명 완료 시각']
+  }
+
+  Enum signer_role {
+    BUYER
+    SELLER
+  }
+
+  Enum contract_status {
+    SELLER_SIGNED
+    BUYER_SIGNED
+    COMPLETED
+    CANCELED
+    EXPIRED
+  }
+
+  Table wishlist_folders {
+    wishlist_folder_id int [pk, increment, note: '찜 폴더 ID']
+
+    user_id int [not null, ref: > users.user_id, note: '폴더 소유 사용자 ID']
+    folder_name varchar(50) [not null, note: '찜 폴더명']
+    sort_order int [not null, default: 0, note: '폴더 표시 순서']
+    is_default boolean [not null, default: false, note: '기본 폴더 여부']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '폴더 생성일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '폴더 수정일']
+
+    indexes {
+      user_id
+      (user_id, folder_name) [unique, note: '사용자별 폴더명 중복 방지']
+    }
+  }
+
+  Table wishlists {
+    wishlist_id int [pk, increment, note: '찜 목록 PK']
+
+    wishlist_folder_id int [not null, ref: > wishlist_folders.wishlist_folder_id, note: '소속 찜 폴더 ID']
+    user_id int [not null, ref: > users.user_id, note: '찜한 사용자 ID']
+    product_id int [not null, ref: > products.product_id, note: '찜한 상품 ID']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '찜 등록 일시']
+
+    indexes {
+      wishlist_folder_id
+      user_id
+      product_id
+      (wishlist_folder_id, product_id) [unique, note: '같은 폴더 내 같은 상품 중복 찜 방지']
+    }
+
+    Note: '사용자가 폴더별로 관심 상품을 저장하는 찜 목록 테이블'
+  }
+
+
+  Table negotiations {
+    negotiation_id int [pk, increment, note: '협의 PK']
+
+    negotiation_type varchar(30) [not null, note: 'QUOTE 또는 CONTRACT']
+
+    quote_id int [ref: > quotes.quote_id, note: '견적 협의 대상 견적서 ID']
+    contract_id int [ref: > contracts.contract_id, note: '계약 협의 대상 계약서 ID']
+
+    buyer_id  int [not null, ref: > users.user_id, note: '협의 바이어 ID']
+    seller_id int [not null, ref: > users.user_id, note: '협의 셀러 ID']
+    admin_id int [ref: > users.user_id, note: '관리자 user_id']
+
+    status varchar(30) [not null, default: 'OPEN', note: '협의 상태']
+    title varchar(150) [not null, note: '협의 제목']
+
+    opened_at datetime [not null, note: '협의 시작 시각']
+    agreed_at datetime [note: '최종 합의 시각']
+    closed_at datetime [note: '협의 종료 시각']
+
+    created_at datetime [not null, note: '협의 생성일']
+    updated_at datetime [not null, note: '협의 수정일']
+  }
+
+  Table negotiation_requests {
+    negotiation_request_id int [pk, increment, note: '수정 요청 PK']
+
+    negotiation_id int [not null, ref: > negotiations.negotiation_id, note: '협의 ID']
+
+    requested_quote_id int [ref: > quotes.quote_id, note: '수정 요청 대상 견적서 ID']
+    revised_quote_id int [ref: > quotes.quote_id, note: '셀러가 새로 제출한 수정 견적서 ID']
+
+    requested_contract_id int [ref: > contracts.contract_id, note: '수정 요청 대상 계약서 ID']
+    revised_contract_id int [ref: > contracts.contract_id, note: '셀러가 새로 제출한 수정 계약서 ID']
+
+    status varchar(30) [not null, default: 'REQUESTED', note: '요청 상태']
+
+    buyer_request text [not null, note: '바이어 수정 요청 내용']
+    seller_memo text [note: '셀러 메모']
+
+    requested_at datetime [not null, note: '요청 시각']
+    responded_at datetime [note: '응답 시각']
+    accepted_at datetime [note: '수락 시각']
+    canceled_at datetime [note: '취소 시각']
+
+    created_at datetime [not null, note: '수정 요청 생성일']
+    updated_at datetime [not null, note: '수정 요청 수정일']
+  }
+
+  Table negotiation_files {
+    negotiation_file_id int [pk, increment, note: '협의 첨부파일 PK']
+
+    negotiation_request_id int [not null, ref: > negotiation_requests.negotiation_request_id, note: '수정 요청 ID']
+
+    uploaded_by_user_id int [not null, note: '파일 업로드 user_id']
+    file_name varchar(255) [not null, note: '원본 파일명']
+    file_url varchar(2000) [not null, note: '파일 URL 또는 S3 key']
+    file_type varchar(50) [note: '파일 MIME 타입']
+    file_size bigint [note: '파일 크기 byte']
+
+    created_at datetime [not null, note: '협의 첨부파일 등록일']
+  }
+
+  Table disputes {
+    dispute_id int [pk, increment, note: '이의제기 PK']
+
+    order_id int [not null, ref: > orders.order_id, note: '이의제기가 발생한 주문 ID']
+
+    buyer_id int [not null, ref: > users.user_id, note: '이의제기를 접수한 바이어 ID']
+    seller_id int [not null, ref: > users.user_id, note: '이의제기 대상 셀러 ID']
+    admin_id int [ref: > users.user_id, note: '중재 또는 검토 담당 관리자 ID']
+
+    dispute_type varchar(30) [not null, note: '이의제기 유형']
+    status varchar(30) [not null, default: 'RECEIVED', note: '이의제기 상태']
+
+    title varchar(150) [not null, note: '이의제기 제목']
+    buyer_claim text [not null, note: '바이어 주장 내용']
+    requested_action varchar(30) [not null, note: '요청 처리 방식']
+
+    resolution_type varchar(30) [note: '최종 처리 방식']
+    resolution_amount bigint [note: '환불 또는 보상 금액']
+    admin_memo text [note: '관리자 메모']
+
+    received_at datetime [not null, note: '접수 시각']
+    resolved_at datetime [note: '처리 완료 시각']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '생성일시']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '수정일시']
+
+    indexes {
+      order_id
+      (buyer_id, status)
+      (seller_id, status)
+      (admin_id, status)
+      (dispute_type, status)
+    }
+  }
+
+  Table dispute_items {
+    dispute_item_id int [pk, increment, note: '이의제기 대상 상품 ID']
+
+    dispute_id int [not null, ref: > disputes.dispute_id, note: '소속 이의제기 ID']
+    order_item_id int [not null, ref: > order_items.order_item_id, note: '이의제기 대상 주문 상품 ID']
+
+    claim_quantity int [note: '문제가 발생한 수량']
+    claim_reason text [note: '해당 상품에 대한 문제 사유']
+
+    requested_action varchar(30) [note: '해당 상품별 요청 처리 방식. REFUND, EXCHANGE, PARTIAL_REFUND 등']
+    resolution_type varchar(30) [note: '해당 상품별 최종 처리 방식']
+    resolution_amount bigint [note: '해당 상품별 환불 또는 보상 금액']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '생성일시']
+
+    indexes {
+      dispute_id
+      order_item_id
+    }
+
+    Note: '이의제기 1건 안에서 여러 주문 상품을 대상으로 문제 제기할 수 있도록 분리한 테이블'
+  }
+
+  Table dispute_responses {
+    dispute_response_id int [pk, increment, note: '이의제기 처리 이력 PK']
+
+    dispute_id int [not null, ref: > disputes.dispute_id, note: '이의제기 ID']
+
+    responder_id int [not null, ref: > users.user_id, note: '응답자 user_id']
+    responder_role varchar(30) [not null, note: '응답자 역할']
+
+    status varchar(30) [not null, note: '응답 이후 이의제기 상태']
+    content text [not null, note: '응답 내용']
+
+    created_at datetime [not null, note: '이의제기 응답 생성일']
+
+    indexes {
+      (dispute_id, created_at)
+      (responder_id)
+    }
+  }
+
+  Table dispute_files {
+    dispute_file_id int [pk, increment, note: '이의제기 첨부파일 PK']
+
+    dispute_id int [not null, ref: > disputes.dispute_id, note: '이의제기 ID']
+    dispute_response_id int [note: '응답 ID']
+
+    uploaded_by_user_id int [not null, note: '파일 업로드 user_id']
+    file_name varchar(255) [not null, note: '원본 파일명']
+    file_url varchar(2000) [not null, note: '파일 URL 또는 S3 key']
+    file_type varchar(50) [note: '파일 MIME 타입']
+    file_size bigint [note: '파일 크기 byte']
+
+    created_at datetime [not null, note: '이의제기 첨부파일 등록일']
+
+    indexes {
+      (dispute_id)
+      (dispute_response_id)
+    }
+  }
+
+  Table settlements {
+    settlement_id int [pk, increment, note: '정산 ID']
+
+    seller_id int [not null, ref: > users.user_id, note: '정산 대상 셀러 ID']
+    buyer_id int [not null, ref: > users.user_id, note: '정산 대상 바이어 ID']
+    admin_id int [not null, ref: > users.user_id, note: '정산 처리 관리자 ID']
+    order_id int [not null, ref: > orders.order_id, note: 'orders ID']
+
+    order_no varchar(30) [not null, ref: > orders.order_no, note: '정산 대상 주문 번호']
+
+    total_amount bigint [not null, note: '결제 금액']
+    platform_fee bigint [not null, default: 0, note: '플랫폼 수수료']
+    final_amount bigint [not null, default: 0, note: '정산 지급액']
+
+    status varchar(50) [not null, default: 'PENDING', note: '정산 상태']
+
+    settled_at datetime [not null, note: '최종 정산일']
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '정산 생성일']
+
+    indexes {
+      status
+    }
+  }
+
+  Table notices {
+    notice_id int [pk, increment, note: '공지사항 ID']
+
+    title varchar(200) [not null, note: '공지사항 제목']
+    content text [not null, note: '공지사항 내용']
+    is_pinned boolean [not null, default: false, note: '상단 고정 여부']
+    created_by_user_id int [not null, ref: > users.user_id, note: '작성 관리자']
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '공지사항 생성일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '공지사항 수정일']
+  }
+
+  Table faqs {
+    faq_id int [pk, increment, note: 'FAQ ID']
+    category varchar(50) [note: '결제, 배송, 계정 등']
+    question varchar(300) [not null, note: '질문 내용']
+    answer text [not null, note: '답변 내용']
+    sort_order int [not null, default: 0, note: 'FAQ 정렬 순서']
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: 'FAQ 생성일']
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: 'FAQ 수정일']
+  }
+
+  Table recent_products {
+
+    recent_product_id int [pk, increment, note: '최근 본 상품 ID']
+    user_id int [ref: > users.user_id, note: '조회한 사용자 ID']
+    product_id int [ref: > products.product_id, note: '조회한 상품 ID']
+
+    viewed_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '마지막 조회 시각']
+
+  indexes {
+    (user_id, product_id) [unique]
+    (user_id, viewed_at)
+  }
+
+  }
+
+  Table notifications {
+    notification_id int [pk, increment, note: '알림 ID']
+
+    receiver_id int [not null, ref: > users.user_id, note: '알림을 받는 사용자 ID']
+
+    notification_type varchar(50) [not null,
+    note: '''
+    알림 유형,
+    ORDER_CREATED
+    QUOTE_UPDATED
+    CONTRACT_SIGNED
+    DISPUTE_CREATED
+    RESTOCK_AVAILABLE
+    SYSTEM_NOTICE 등
+    ''']
+    title varchar(100) [not null, note: '알림 제목']
+    content varchar(500) [not null, note: '알림 내용']
+
+    target_type varchar(30) [note: '알림 클릭 시 이동할 대상 유형. ORDER, QUOTE, PRODUCT 등']
+    target_id int [note: '알림 클릭 시 이동할 대상 ID']
+
+    is_read boolean [not null, default: false, note: '읽음 여부']
+    read_at datetime [note: '읽은 시각']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: '알림 생성 시각']
+
+    indexes {
+      receiver_id
+      (receiver_id, is_read)
+      (receiver_id, created_at)
+    }
+  }
+
+  Table user_preferred_categories {
+    preferred_category_id int [pk, increment]
+    user_id int [not null, ref: > users.user_id]
+    category_id int [not null, ref: > categories.category_id]
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`]
+
+    indexes {
+      (user_id, category_id) [unique]
+      user_id
+    }
+  }
+
+  Table company_bank_accounts {
+    bank_account_id int [pk, increment]
+    company_id int [not null, ref: > companies.company_id]
+
+    bank_name varchar(50) [not null, note: '은행명']
+    account_number varchar(50) [not null, note: '계좌번호 (암호화 고려)']
+    account_holder varchar(50) [not null, note: '예금주']
+
+    is_default boolean [not null, default: false, note: '회사당 1개만 true 권장']
+    is_verified boolean [not null, default: false, note: '계좌 인증 여부 (1원 인증 등)']
+
+    created_at datetime [not null, default: `CURRENT_TIMESTAMP`]
+    updated_at datetime [not null, default: `CURRENT_TIMESTAMP`]
+    deleted_at datetime
+
+    indexes {
+      company_id
+      (company_id, is_default)
+    }
+  }
+
+  Table toss_payments {
+    toss_payment_id varchar(200) [pk, note: '토스 발급 paymentKey']
+    toss_order_id   varchar(64)  [unique, not null, note: '우리가 생성해서 토스에 보낸 주문 식별자. 재시도마다 새로 발급']
+
+    order_id int [not null, ref: > orders.order_id, note: '비즈니스 주문 ID']
+
+    method varchar(30) [note: 'CARD, VIRTUAL_ACCOUNT 등']
+    status varchar(20) [not null, default: 'READY', note: 'READY | DONE | CANCELED. 이 결제 시도 자체의 PG 상태']
+    amount bigint [not null, note: '이 결제 시도 금액']
+
+    requested_at datetime [not null, note: '결제 요청 생성 시각']
+    approved_at  datetime [note: '결제 승인 완료 시각']
+
+    indexes {
+      order_id
+      toss_order_id
+    }
+  }
+
+  Table toss_refunds {
+    toss_refund_id  int [pk, increment]
+    toss_payment_id varchar(200) [not null, ref: > toss_payments.toss_payment_id]
+
+    amount        bigint [not null, note: '환불 금액']
+    cancel_reason text [note: '환불 사유']
+    canceled_at   datetime [not null, note: '환불 처리 완료 시각']
+
+    indexes {
+      toss_payment_id
+    }
+  }

@@ -1,5 +1,6 @@
 package kr.remerge.stylehub.global.auth.security;
 
+import kr.remerge.stylehub.global.auth.dto.AuthUser;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -10,7 +11,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 // @LoginUser 어노테이션이 붙은 파라미터를 가로채서
-// SecurityContext에서 유저 정보를 꺼내 LoginUserInfo로 변환해주는 클래스
+// SecurityContext에서 유저 정보를 꺼내 AuthUser로 변환해주는 클래스
 @Component
 public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver {
 

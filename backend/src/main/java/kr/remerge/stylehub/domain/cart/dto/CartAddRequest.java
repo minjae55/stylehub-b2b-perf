@@ -7,9 +7,6 @@ import kr.remerge.stylehub.domain.cart.enumtype.CartType;
 public record CartAddRequest(
 
         @NotNull
-        Integer userId,
-
-        @NotNull
         Integer productOptionId,
 
         @NotNull

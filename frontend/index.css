@@ -9,19 +9,20 @@
 /* Import tailwind and have it only scan code files inside src directory.
  * Otherwise, the dev server might trigger unnecessary updates due to the tailwind plugin scanning unnecessary files
  */
+@import 'tw-animate-css';
 @import 'tailwindcss' source(none);
+@import './default_shadcn_theme.css';
+@import './src/styles/globals.css';
+
 @source './src/**/*.{js,ts,jsx,tsx}';
 
 /* Import Tailwind Animate plugin */
-@import 'tw-animate-css';
 
 /* Import the default Shadcn theme variables. These act as a fallback in case
  * the model removes a required variable from globals.css, so that the page
  * continues to render 
  */
-@import './default_shadcn_theme.css';
 
 /* Import user's custom styles from the Make.
  * Note that we hoist @imports using a PostCSS plugin, so this can contain @imports e.g. for fonts.
  */
-@import './src/styles/globals.css';

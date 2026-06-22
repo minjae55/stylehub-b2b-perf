@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.domain.product.entity;
+package kr.remerge.stylehub.domain.category.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

@@ -1,10 +1,11 @@
+import api from "@/api/axios";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { ArrowLeft, Bookmark, ShoppingCart, Truck, Shield, CheckCircle, Award, MapPin, Phone, Mail, Plus, Minus, Leaf, RefreshCw, Heart, Users, ShieldCheck } from "lucide-react";
 
 type CertKey = "KC" | "OEKO-TEX" | "GOTS" | "GRS" | "비건" | "Fair Trade" | "REACH" | "CPSIA" | "UKCA" | "어린이안전" | "환경마크" | "섬유품질";
 
-const certConfig: Record<CertKey, { label: string; bg: string; border: string; color: string; iconBg: string; icon: React.ReactNode; expiry?: string }> = 
+const certConfig: Record<CertKey, { label: string; bg: string; border: string; color: string; iconBg: string; icon: React.ReactNode; expiry?: string }> =
 {  "KC":        { label: "KC 인증",         bg: "#EEF2FF", border: "#C7D2FE", color: "#3730A3", iconBg: "#4338CA", icon: <span style={{ fontSize: 9, fontWeight: 700 }}>KC</span> },
   "OEKO-TEX": { label: "OEKO-TEX",        bg: "#ECFDF5", border: "#A7F3D0", color: "#065F46", iconBg: "#059669", icon: <CheckCircle size={11} /> },
   "GOTS":      { label: "GOTS",            bg: "#F0FDF4", border: "#BBF7D0", color: "#14532D", iconBg: "#16A34A", icon: <Leaf size={11} /> },
@@ -43,14 +44,17 @@ function CertBadge({ certKey }: { certKey: CertKey }) {
 }
 
 export function ProductDetail() {
+  const navigate = useNavigate();
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [quantity, setQuantity] = useState(100);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const product = {
     id: "F002",
+    productOptionId: 1, // TODO: 상품 상세 API 연동 후 선택한 옵션 ID로 교체
     name: "크롭 반팔 티셔츠 (10컬러)",
     brand: "스타일컴퍼니",
     category: "상의 · 티셔츠/탑",
@@ -58,6 +62,8 @@ export function ProductDetail() {
     unit: "/벌",
     moq: 100,
     verified: true,
+    sampleAvailable: true,
+    samplePrice: 10000,
 
     productType: "OEM/ODM" as "기성품" | "OEM/ODM", // 제품 유형 추가
 
@@ -104,6 +110,27 @@ export function ProductDetail() {
   };
 
   const total = product.price * quantity;
+
+
+  const handleAddToCart = async () => {
+    if (isAddingToCart) return;
+
+    try {
+      setIsAddingToCart(true);
+      await api.post("/cart", {
+        productOptionId: product.productOptionId,
+        quantity,
+        cartType: "NORMAL",
+      });
+      navigate("/cart");
+    } catch (error) {
+      const apiError = error as { response?: { status?: number; data?: unknown } };
+      console.error("장바구니 추가 실패", apiError.response?.status, apiError.response?.data);
+      window.alert("장바구니에 담지 못했습니다. 로그인 상태와 상품 옵션을 확인해주세요.");
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
 
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
@@ -250,10 +277,15 @@ export function ProductDetail() {
               </div>
 
               <div className="flex gap-3 pt-1">
-                <Link to="/cart" className="flex-1 bg-white border-2 border-primary text-primary hover:bg-secondary py-3.5 rounded font-semibold transition-colors flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={isAddingToCart}
+                  className="flex-1 bg-white border-2 border-primary text-primary hover:bg-secondary py-3.5 rounded font-semibold transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+                >
                   <ShoppingCart size={18} />
-                  장바구니 담기
-                </Link>
+                  {isAddingToCart ? "담는 중..." : "장바구니 담기"}
+                </button>
                 <Link to="/checkout" className="flex-1 bg-primary hover:bg-primary/90 text-white py-3.5 rounded font-semibold transition-colors flex items-center justify-center">
                   바로 구매하기
                 </Link>
