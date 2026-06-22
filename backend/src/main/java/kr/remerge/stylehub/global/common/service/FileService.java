@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.global.common;
+package kr.remerge.stylehub.global.common.service;
 
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;

@@ -124,4 +124,19 @@ public class JwtProvider {
             return true; // 만료 예외가 터지면 true 반환
         }
     }
+
+    // ───────────────────────────────────────────
+// 비밀번호 재설정 토큰 생성 (추가할 부분)
+// ───────────────────────────────────────────
+    public String createPasswordResetToken(String email) {
+        long passwordResetExpiration = 1800000L; // 30분 (30 * 60 * 1000)
+
+        return Jwts.builder()
+                .subject(email) // 비밀번호 재설정은 userId 대신 '이메일'을 주체로 담는 것이 추후 재설정 처리 시 편리합니다.
+                .claim("purpose", "PASSWORD_RESET") // 일반 로그인 토큰과 구분하기 위한 용도 (보안 강화)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + passwordResetExpiration))
+                .signWith(getSigningKey())
+                .compact();
+    }
 }

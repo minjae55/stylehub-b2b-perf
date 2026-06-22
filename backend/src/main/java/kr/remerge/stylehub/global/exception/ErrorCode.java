@@ -20,6 +20,8 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_003", "유효하지 않은 토큰입니다."),
     EXPIRED_ACCESS_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_004", "액세스 토큰이 만료되었습니다."),
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "AUTH_005", "리프레시 토큰이 만료되었습니다."),
+    OTP_EXPIRED(HttpStatus.BAD_REQUEST, "AUTH_006", "인증 시간이 만료되었습니다. 다시 시도해 주세요."),
+    INVALID_OTP_CODE(HttpStatus.BAD_REQUEST, "AUTH_007", "인증번호가 일치하지 않습니다."),
 
     // ───────────────────────────────────────────
     // 유저 (USER)

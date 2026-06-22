@@ -1,5 +1,6 @@
 package kr.remerge.stylehub.global.common; // 프로젝트 패키지 구조에 맞게 수정
 
+import kr.remerge.stylehub.global.common.service.FileService;
 import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
