@@ -237,7 +237,7 @@ export function RegisterBuyer() {
             );
         }
         if (step === 2) {
-            return !!(form.businessNumber && form.companyName && form.representativeName && form.address);
+            return !!(form.businessNumber && form.companyName && form.representativeName && form.address && form.businessLicenseFile);
         }
         if (step === 3) {
             return isValidCategoryCount(form.preferredCategoryIds.length, true) && form.agreed;
@@ -254,36 +254,37 @@ export function RegisterBuyer() {
         try {
             setIsSubmitting(true); // 로딩 시작 (연타 방지)
 
-            // ❶ 따로 빼놓은 파일 업로드 함수를 호출해서 S3 URL을 먼저 따옵니다.
+            // 따로 빼놓은 파일 업로드 함수를 호출해서 S3 URL을 먼저 따옵니다.
             const licenseUrl = await uploadFile(form.businessLicenseFile);
 
-            // ❷ 백엔드 DTO(record) 스펙에 맞게 가입용 객체를 가공합니다.
+            // 사업자 번호 전송 시 하이픈(-)을 완전히 제거하여 백엔드 데이터 포맷을 통일합니다.
+            const cleanBusinessNumber = form.businessNumber.replace(/-/g, "");
+            // 백엔드 DTO(record) 스펙에 맞게 가입용 객체를 가공합니다.
+
             const signUpRequestData = {
                 email: form.email,
                 password: form.password,
                 name: form.name,
                 phone: form.phone,
-                businessNumber: form.businessNumber,
+                businessNumber: cleanBusinessNumber,
                 companyName: form.companyName,
                 representativeName: form.representativeName,
                 address: form.address,
                 addressDetail: form.addressDetail,
-                businessLicenseUrl: licenseUrl,         // 👈 ❶번에서 받아온 URL을 여기에 쏙!
+                businessLicenseUrl: licenseUrl,
                 preferredCategoryIds: form.preferredCategoryIds, // [1, 10, 20...] 숫자 배열
             };
 
-            // ❸ 따로 빼놓은 바이어 회원가입 함수를 호출하면서 가공한 데이터를 넘겨줍니다.
-            const message = await signUpBuyer(signUpRequestData);
+            const responseMessage = await signUpBuyer(signUpRequestData);
 
-            alert(message); // "바이어 가입 신청이 완료되었습니다." (서버 메시지 알림)
+            alert("바이어 가입 신청이 완료되었습니다."); // "바이어 가입 신청이 완료되었습니다." (서버 메시지 알림)
 
             // ❹ 성공했으니 다음 페이지로 이동!
             navigate("/auth/register/success");
 
         } catch (error: any) {
-            console.error(error);
-            // 에러 발생 시 알림
-            alert(error.response?.data?.message || error.message || "회원가입 처리 중 오류가 발생했습니다.");
+            console.error("회원가입 처리 중 에러 발생: ", error);
+            alert(error.message);
         } finally {
             setIsSubmitting(false); // 로딩 끝
         }
@@ -326,7 +327,7 @@ export function RegisterBuyer() {
                 disabled={!canProceed() || isSubmitting}
                 className="w-full mt-6 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded font-semibold text-sm transition-colors flex items-center justify-center gap-2"
             >
-                {step < 3 ? "다음 단계" : "가입 신청하기"} <ArrowRight size={16}/>
+                {step < 3 ? "다음 단계" : isSubmitting ? "가입 신청 중..." : "가입 신청하기"} <ArrowRight size={16}/>
             </button>
         </div>
     );

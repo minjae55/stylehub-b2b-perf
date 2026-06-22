@@ -2,19 +2,17 @@ import {useEffect, useState} from "react";
 import {AlertCircle, CheckCircle2, Search, Tag} from "lucide-react";
 // ── 공통 API 인스턴스 및 타입 규칙 적용 ──────────────────────────────
 import api from "@/api/axios";
-import type {ApiResponse} from "@/api/types";
 
 export type Category = { id: number; name: string; group: string };
 
 const MIN_CATEGORIES = 3;
 const MAX_CATEGORIES = 5;
 
-// ── [수정] 실제 백엔드 대분류 카테고리 조회 API 연동 ───────────────────────────
+// ── 실제 백엔드 대분류 카테고리 조회 API 연동 ───────────────────────────
 async function fetchCategories(): Promise<Category[]> {
     // 프로젝트 규칙 4번 준수: api.get<ApiResponse<T>> 사용
     // TODO: 실제 백엔드의 카테고리 대분류 목록 조회 엔드포인트 경로로 맞춰주세요.
-    const {data} = await api.get<ApiResponse<Category[]>>("/categories/main");
-    return data.data; // 백엔드에서 받아온 대분류 리스트 [ {id: 1, name: "상의", group: "의류"}, ... ] 반환
+    return await api.get<Category[]>("/categories/main"); // 백엔드에서 받아온 대분류 리스트 [ {id: 1, name: "상의", group: "의류"}, ... ] 반환
 }
 
 // 카테고리 개수가 유효한 범위인지 (선택사항이면 0개도 허용)
