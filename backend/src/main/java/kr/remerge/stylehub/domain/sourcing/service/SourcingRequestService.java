@@ -31,6 +31,7 @@ public class SourcingRequestService {
     private final SourcingRequestItemRepository sourcingRequestItemRepository;
     private final SourcingRequestFileRepository sourcingRequestFileRepository;
     private final UserRepository userRepository;
+    private final SourcingAutoAssignService sourcingAutoAssignService;
 
     // ── 상세 조회 ────────────────────────────────────────────────────
     @Transactional(readOnly = true)
@@ -87,7 +88,7 @@ public class SourcingRequestService {
                     .build();
 
             SourcingRequest saved = sourcingRequestRepository.save(request);
-
+            sourcingAutoAssignService.assign(saved);
             // 옵션 items 저장
             if (itemDto.getOptions() != null) {
                 for (SourcingRequestDto.OptionRequest opt : itemDto.getOptions()) {
@@ -125,6 +126,7 @@ public class SourcingRequestService {
                     .build();
 
             sourcingRequestFileRepository.save(fileEntity);
+
         }
     }
 

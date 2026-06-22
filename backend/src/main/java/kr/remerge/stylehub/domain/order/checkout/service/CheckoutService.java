@@ -4,20 +4,27 @@ import kr.remerge.stylehub.domain.cart.dto.CartResponse;
 import kr.remerge.stylehub.domain.cart.entity.CartItem;
 import kr.remerge.stylehub.domain.cart.enumtype.CartType;
 import kr.remerge.stylehub.domain.cart.repository.CartRepository;
+import kr.remerge.stylehub.domain.company.entity.Address;
 import kr.remerge.stylehub.domain.company.entity.Company;
+import kr.remerge.stylehub.domain.company.repository.AddressRepository;
+import kr.remerge.stylehub.domain.order.checkout.dto.AddressCreateRequest;
+import kr.remerge.stylehub.domain.order.checkout.dto.AddressResponse;
 import kr.remerge.stylehub.domain.order.checkout.dto.CheckoutRequest;
 import kr.remerge.stylehub.domain.order.checkout.dto.CheckoutResponse;
 import kr.remerge.stylehub.domain.product.entity.Product;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
+import kr.remerge.stylehub.domain.user.entity.User;
+import kr.remerge.stylehub.domain.user.repository.UserRepository;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import static java.util.stream.Collectors.groupingBy;
 
 @Service
 @Transactional(readOnly = true)
@@ -25,22 +32,28 @@ import java.util.Map;
 public class CheckoutService {
 
     private final CartRepository cartRepository;
+    private final UserRepository userRepository;
+    private final AddressRepository addressRepository;
 
-    public CheckoutResponse getCheckout(Integer userId, CheckoutRequest request) {
-        List<Integer> cartItemIds = request.cartItemIds().stream().distinct().toList();
+    public CheckoutResponse getCheckout(Integer userId, CheckoutRequest checkoutRequest) {
 
-        List<CartItem> cartItems = cartRepository
-                .findByCartItemIdInAndUser_UserIdAndCartType(
-                        cartItemIds,
-                        userId,
-                        request.cartType()
-                );
+        List<Integer> cartItemIds = checkoutRequest.cartItemIds().stream()
+                .distinct()
+                .toList();
+
+        List<CartItem> cartItems = cartRepository.findByCartItemIdInAndUser_UserIdAndCartType(
+                cartItemIds,
+                userId,
+                checkoutRequest.cartType()
+        );
 
         if (cartItems.size() != cartItemIds.size()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
-        cartItems.forEach(this::validateCartItem);
+        for (CartItem cartItem : cartItems) {
+            validateCartItem(cartItem);
+        }
 
         List<CartResponse> items = cartItems.stream()
                 .map(CartResponse::from)
@@ -50,81 +63,132 @@ public class CheckoutService {
                 .mapToLong(CartResponse::totalPrice)
                 .sum();
 
-        long shippingFee = calculateShippingFee(cartItems);
+        long shippingFee = calculateShippingFee(items);
 
         return new CheckoutResponse(
-                request.cartType(),
+                checkoutRequest.cartType(),
                 items,
                 productAmount,
                 shippingFee,
                 productAmount + shippingFee
         );
+
     }
 
     private void validateCartItem(CartItem cartItem) {
-        ProductOption productOption = cartItem.getProductOption();
-        Product product = productOption.getProduct();
+
+        ProductOption option = cartItem.getProductOption();
+        Product product = option.getProduct();
+
         int quantity = cartItem.getQuantity();
 
-        if (!productOption.getIsActive() || quantity > productOption.getStockQuantity()) {
+        if (!option.getIsActive()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (quantity > option.getStockQuantity()) {
             throw new BusinessException(ErrorCode.OUT_OF_STOCK);
         }
 
-        if (cartItem.getCartType() == CartType.NORMAL && quantity < product.getMoq()) {
+        if (cartItem.getCartType() == CartType.NORMAL
+                && quantity < product.getMoq()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
         if (cartItem.getCartType() == CartType.SAMPLE) {
-            if (!product.getSampleAvailable()
-                    || productOption.getSamplePrice() == null
-                    || productOption.getSampleMaxQuantity() == null
-                    || quantity > productOption.getSampleMaxQuantity()) {
+            if (!product.getSampleAvailable()) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT);
+            }
+
+            if (option.getSamplePrice() == null
+                    || option.getSampleMaxQuantity() == null) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT);
+            }
+
+            // ERroCode에 다음 내용으로 추가해달라고 해
+            // 민재 : SAMPLE_OPTION_NOT_CONFIGURED(400, "선택한 옵션은 현재 샘플 주문을 이용할 수 없습니다."),
+
+            if (quantity > option.getSampleMaxQuantity()) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT);
             }
         }
     }
 
-    private long calculateShippingFee(List<CartItem> cartItems) {
-        Map<Integer, CompanyCartTotal> totalsByCompany = new LinkedHashMap<>();
+    private long calculateShippingFee(List<CartResponse> items) {
 
-        for (CartItem cartItem : cartItems) {
-            Company company = cartItem.getProductOption().getProduct().getCompany();
-            if (company == null) {
-                throw new BusinessException(ErrorCode.COMPANY_NOT_FOUND);
+        Map<Integer, List<CartResponse>> itemsByCompany = items.stream()
+                .collect(groupingBy(CartResponse::companyId));
+
+        long totalShippingFee = 0L;
+
+        for (List<CartResponse> companyItems : itemsByCompany.values()) {
+            CartResponse firstItem = companyItems.get(0);
+            long companyProductAmount = companyItems.stream()
+                    .mapToLong(CartResponse::totalPrice)
+                    .sum();
+
+            Long freeShippingThreshold = firstItem.freeShippingThreshold();
+
+            boolean isFreeShipping = freeShippingThreshold != null
+                    && companyProductAmount >= freeShippingThreshold;
+
+            if (!isFreeShipping) {
+                totalShippingFee += firstItem.baseShippingFee();
             }
-
-            long itemTotal = CartResponse.from(cartItem).totalPrice();
-            totalsByCompany
-                    .computeIfAbsent(
-                            company.getCompanyId(),
-                            ignored -> new CompanyCartTotal(company)
-                    )
-                    .add(itemTotal);
         }
 
-        return totalsByCompany.values().stream()
-                .mapToLong(CompanyCartTotal::shippingFee)
-                .sum();
+        return totalShippingFee;
     }
 
-    private static class CompanyCartTotal {
-        private final Company company;
-        private long productAmount;
+    public List<AddressResponse> getAddress(Integer userId) {
 
-        private CompanyCartTotal(Company company) {
-            this.company = company;
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Integer companyId = user.getCompany().getCompanyId();
+
+        Integer defaultAddressId = user.getDefaultReceivingAddress() == null
+                ? null
+                : user.getDefaultReceivingAddress().getAddressId();
+
+        return addressRepository
+                .findByCompany_CompanyIdAndDeletedAtIsNull(companyId)
+                .stream()
+                .map(address -> AddressResponse.from(
+                        address,
+                        address.getAddressId().equals(defaultAddressId)
+                ))
+                .toList();
+    }
+
+    @Transactional
+    public AddressResponse createAddress(Integer userId, AddressCreateRequest request) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Company company = user.getCompany();
+
+        if (company == null) {
+            throw new BusinessException(ErrorCode.COMPANY_NOT_FOUND);
         }
 
-        private void add(long amount) {
-            productAmount += amount;
+        Address address = Address.builder()
+                .company(company)
+                .addressName(request.addressName())
+                .zipcode(request.zipcode())
+                .address(request.address())
+                .addressDetail(request.addressDetail())
+                .build();
+
+        Address savedAddress = addressRepository.save(address);
+
+        boolean isDefault = user.getDefaultReceivingAddress() == null;
+
+        if (isDefault) {
+            user.updateDefaultReceivingAddress(savedAddress);
         }
 
-        private long shippingFee() {
-            Long threshold = company.getFreeShippingThreshold();
-            if (threshold != null && productAmount >= threshold) {
-                return 0L;
-            }
-            return company.getBaseShippingFee();
-        }
+        return AddressResponse.from(savedAddress, isDefault);
     }
 }

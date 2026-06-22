@@ -109,4 +109,8 @@ public class User extends BaseEntity {
         this.status = UserStatus.DELETED;
         this.deletedAt = LocalDateTime.now();
     }
+
+    public void updateDefaultReceivingAddress(Address address) {
+        this.defaultReceivingAddress = address;
+    }
 }

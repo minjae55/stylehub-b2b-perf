@@ -3,11 +3,14 @@ package kr.remerge.stylehub.domain.cart.service;
 import kr.remerge.stylehub.domain.cart.dto.CartAddRequest;
 import kr.remerge.stylehub.domain.cart.dto.CartResponse;
 import kr.remerge.stylehub.domain.cart.entity.CartItem;
+import kr.remerge.stylehub.domain.cart.enumtype.CartType;
 import kr.remerge.stylehub.domain.cart.repository.CartRepository;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
 import kr.remerge.stylehub.domain.product.repository.ProductOptionRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.global.exception.BusinessException;
+import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +31,8 @@ public class CartService {
         User user = findUser(userId);
         ProductOption productOption = findProductOption(request);
 
+        validateSampleOption(productOption, request);
+
         cartRepository.findByUserAndProductOptionAndCartType(
                 user,
                 productOption,
@@ -43,6 +48,28 @@ public class CartService {
                         )
                 )
         );
+    }
+
+    private void validateSampleOption(ProductOption option, CartAddRequest request) {
+
+        if (request.cartType() != CartType.SAMPLE) {
+            return;
+        }
+
+        if (!option.getProduct().getSampleAvailable()
+                || option.getSamplePrice() == null
+                || option.getSampleMaxQuantity() == null
+        ) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT
+//                    민재 : ErrorCode.SAMPLE_OPTION_NOT_CONFIGURED 이거로 바꿔
+            );
+        }
+
+        if (request.quantity() > option.getSampleMaxQuantity()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+
     }
 
     public List<CartResponse> getCartByUserId(Integer userId) {
