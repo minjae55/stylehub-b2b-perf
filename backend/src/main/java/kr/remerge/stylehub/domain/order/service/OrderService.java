@@ -6,7 +6,8 @@ import kr.remerge.stylehub.domain.cart.repository.CartRepository;
 import kr.remerge.stylehub.domain.company.entity.Address;
 import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.company.repository.AddressRepository;
-import kr.remerge.stylehub.domain.order.OrderRepository;
+import kr.remerge.stylehub.domain.order.dto.BuyerOrderListResponse;
+import kr.remerge.stylehub.domain.order.repository.OrderRepository;
 import kr.remerge.stylehub.domain.order.dto.OrderCreateRequest;
 import kr.remerge.stylehub.domain.order.dto.OrderCreateResponse;
 import kr.remerge.stylehub.domain.order.entity.Order;
@@ -218,11 +219,16 @@ public class OrderService {
         return "ORD-" + date + "-" + random;
     }
 
-    public List<Order> getOrderList(Integer userId) {
+    public List<BuyerOrderListResponse> getOrderList(Integer userId) {
 
-        Optional<Order> orderList = orderRepository.findById(userId);
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
 
-
-        return null;
+        return orderRepository.findByBuyer_UserId(userId)
+                .stream()
+                .map(BuyerOrderListResponse::from)
+                .toList();
     }
+
 }
