@@ -1,7 +1,12 @@
 package kr.remerge.stylehub.global.auth;
 
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import kr.remerge.stylehub.domain.user.UserService;
+import kr.remerge.stylehub.domain.user.dto.request.FindIdSendOtpRequest;
+import kr.remerge.stylehub.domain.user.dto.request.FindIdVerifyOtpRequest;
+import kr.remerge.stylehub.domain.user.dto.request.FindPwRequest;
+import kr.remerge.stylehub.domain.user.dto.response.FindIdResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -23,6 +28,7 @@ import jakarta.validation.Valid;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserService userService;
 
     // 액세스 토큰 쿠키 만료 시간 (30분, JwtProperties와 맞추기)
     private static final int ACCESS_TOKEN_MAX_AGE = 60 * 30;
@@ -54,7 +60,7 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-                .body(ApiResponse.success("로그인 되었습니다."));
+                .body(ApiResponse.successWithMessage("로그인 되었습니다."));
     }
 
     // ───────────────────────────────────────────
@@ -79,15 +85,17 @@ public class AuthController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
-                .body(ApiResponse.success("토큰이 재발급되었습니다."));
+                .body(ApiResponse.successWithMessage("토큰이 재발급되었습니다."));
     }
 
     // ───────────────────────────────────────────
     // 로그아웃
     // ───────────────────────────────────────────
 
-    // POST /api/auth/logout
-    // 쿠키 maxAge=0으로 즉시 만료시켜서 삭제
+    /**
+     * 로그아웃 API
+     * POST /api/auth/logout
+     */
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout() {
 
@@ -97,7 +105,7 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, deleteAccessToken.toString())
                 .header(HttpHeaders.SET_COOKIE, deleteRefreshToken.toString())
-                .body(ApiResponse.success("로그아웃 되었습니다."));
+                .body(ApiResponse.successWithMessage("로그아웃 되었습니다."));
     }
 
     // ───────────────────────────────────────────
@@ -106,11 +114,11 @@ public class AuthController {
 
     private ResponseCookie createCookie(String name, String value, int maxAgeSeconds) {
         return ResponseCookie.from(name, value)
-                .httpOnly(true)        // JS에서 접근 불가 (XSS 방어)
-                .secure(false)         // 로컬 개발 단계라 false, 배포 시 true로 변경 필요
-                .sameSite("Lax")       // 로컬 개발 단계, 배포 시 도메인 구조에 따라 조정
-                .path("/")             // 모든 경로에서 쿠키 전송
-                .maxAge(maxAgeSeconds) // 만료 시간
+                .httpOnly(true)         // JS에서 접근 불가 (XSS 방어)
+                .secure(true)           // 로컬 개발 단계라 false, 배포 시 true로 변경 필요
+                .sameSite("None")       // 로컬 개발 단계, 배포 시 도메인 구조에 따라 조정
+                .path("/")              // 모든 경로에서 쿠키 전송
+                .maxAge(maxAgeSeconds)  // 만료 시간
                 .build();
     }
 
@@ -130,5 +138,42 @@ public class AuthController {
             ip = ip.split(",")[0].trim();
         }
         return ip;
+    }
+
+    // ───────────────────────────────────────────
+    // 아이디 / 비밀번호 찾기 API (추가할 부분)
+    // ───────────────────────────────────────────
+
+    /**
+     * 1. 아이디 찾기 - OTP 인증번호 발송
+     * POST /api/auth/find-id/otp
+     */
+    @PostMapping("/find-id/otp")
+    public ResponseEntity<ApiResponse<Void>> sendFindIdOtp(@Valid @RequestBody FindIdSendOtpRequest request) {
+        userService.sendFindIdOtp(request);
+        return ResponseEntity.ok()
+                .body(ApiResponse.successWithMessage("인증번호가 발송되었습니다."));
+    }
+
+    /**
+     * 2. 아이디 찾기 - OTP 인증번호 검증 및 결과 반환
+     * POST /api/auth/find-id/otp/verify
+     */
+    @PostMapping("/find-id/otp/verify")
+    public ResponseEntity<ApiResponse<FindIdResponse>> verifyFindIdOtp(@Valid @RequestBody FindIdVerifyOtpRequest request) {
+        FindIdResponse response = userService.verifyFindIdOtp(request);
+        return ResponseEntity.ok()
+                .body(ApiResponse.success(response));
+    }
+
+    /**
+     * 3. 비밀번호 찾기 - 재설정 이메일 발송
+     * POST /api/auth/find-pw
+     */
+    @PostMapping("/find-pw")
+    public ResponseEntity<ApiResponse<Void>> requestFindPassword(@Valid @RequestBody FindPwRequest request) {
+        userService.requestFindPassword(request);
+        return ResponseEntity.ok()
+                .body(ApiResponse.successWithMessage("비밀번호 재설정 링크가 메일로 발송되었습니다."));
     }
 }

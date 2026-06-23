@@ -2,6 +2,7 @@ import {type ReactNode, useState} from "react";
 import {useNavigate, useSearchParams} from "react-router";
 import {AlertCircle, ArrowLeft, ArrowRight, Building2, CheckCircle2, Eye, EyeOff, Tag, User,} from "lucide-react";
 import {AgreementCheckbox, CategoryPicker, isValidCategoryCount} from "./Category";
+import {signUpEmployee} from "@/api/auth";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ interface FormData {
     // 조회 결과 표시용 (서버 전송 대상 아님 — 회사 식별은 businessNumber로 이루어짐)
     companyName: string;
     representativeName: string;
-    preferredCategoryIds: string[];   // 선택 사항 — 입력 시 3~5개
+    preferredCategoryIds: number[];   // 선택 사항 — 입력 시 3~5개
     agreed: boolean;
 }
 
@@ -193,7 +194,6 @@ function Step2({form, set}: { form: FormData; set: (f: Partial<FormData>) => voi
         setLoading(true);
         setNotFound(false);
         // TODO: GET /api/companies?businessNumber=... 로 실제 존재 여부 확인
-        // (서버 측 EmployeeSignUpRequest 처리 시 findByBusinessNumber 실패하면 COMPANY_NOT_FOUND)
         setTimeout(() => {
             if (form.businessNumber === "000-00-00000") {
                 setNotFound(true);
@@ -288,6 +288,7 @@ export function RegisterEmployee() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const roleParam = (searchParams.get("role") ?? "buyer") as RoleParam;
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [step, setStep] = useState(1);
     const [form, setForm] = useState<FormData>({
@@ -323,13 +324,32 @@ export function RegisterEmployee() {
         return false;
     };
 
-    const handleSubmit = () => {
-        // TODO: POST /api/users/signup/employee
-        // EmployeeSignUpRequest 매핑:
-        // { email, password, name, phone, businessNumber,
-        //   businessRole: roleParam.toUpperCase() as "BUYER" | "SELLER",
-        //   preferredCategoryIds: form.preferredCategoryIds.length > 0 ? form.preferredCategoryIds : undefined }
-        navigate("/auth/register/success");
+    const handleSubmit = async () => {
+        try {
+            setIsSubmitting(true); // 락 걸기
+
+            const cleanBusinessNumber = form.businessNumber.replace(/-/g, "");
+
+            const signUpRequestData = {
+                email: form.email,
+                password: form.password,
+                name: form.name,
+                phone: form.phone,
+                businessNumber: cleanBusinessNumber,
+                businessRole: roleParam.toUpperCase() as "BUYER" | "SELLER",
+                preferredCategoryIds: form.preferredCategoryIds.length > 0 ? form.preferredCategoryIds : undefined
+            };
+
+            await signUpEmployee(signUpRequestData);
+            alert(`${roleLabel} 직원 가입 신청이 완료되었습니다! 대표자 승인 후 로그인 가능합니다.`);
+
+            navigate("/auth/register/success");
+        } catch (error: any) {
+            console.error("직원 회원가입 에러:", error);
+            alert(error.message);
+        } finally {
+            setIsSubmitting(false); // 락 해제
+        }
     };
 
     const roleLabel = roleParam === "buyer" ? "바이어" : "셀러";
@@ -388,10 +408,10 @@ export function RegisterEmployee() {
             <button
                 type="button"
                 onClick={() => step < 3 ? setStep((s) => s + 1) : handleSubmit()}
-                disabled={!canProceed()}
+                disabled={!canProceed() || isSubmitting}
                 className="w-full mt-6 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 rounded font-semibold text-sm transition-colors flex items-center justify-center gap-2"
             >
-                {step < 3 ? "다음 단계" : "가입 신청하기"} <ArrowRight size={16} />
+                {step < 3 ? "다음 단계" : isSubmitting ? "가입 신청 중..." : "가입 신청하기"} <ArrowRight size={16} />
             </button>
         </div>
     );

@@ -9,20 +9,26 @@ import kr.remerge.stylehub.domain.company.repository.CompanyBankAccountRepositor
 import kr.remerge.stylehub.domain.company.repository.CompanyHandledCategoryRepository;
 import kr.remerge.stylehub.domain.company.repository.CompanyRepository;
 import kr.remerge.stylehub.domain.user.dto.request.*;
+import kr.remerge.stylehub.domain.user.dto.response.FindIdResponse;
 import kr.remerge.stylehub.domain.user.dto.response.UserResponse;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.entity.UserPreferredCategory;
-import kr.remerge.stylehub.domain.user.enumtype.UserStatus;
 import kr.remerge.stylehub.domain.user.repository.UserPreferredCategoryRepository;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.global.auth.jwt.JwtProvider;
+import kr.remerge.stylehub.global.common.service.EmailService;
+import kr.remerge.stylehub.global.common.service.SmsService;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
+import kr.remerge.stylehub.global.common.RedisRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
@@ -37,47 +43,24 @@ public class UserService {
     private final BrandRepository brandRepository;
     private final CategoryRepository categoryRepository;
 
+    private final RedisRepository redisRepository; // Redis 캐시 레포지토리 (만료 시간 설정용)
+    private final SmsService smsService;             // 알림톡 또는 SMS 발송 서비스
+    private final EmailService emailService;         // 이메일 발송 서비스
+    private final JwtProvider jwtProvider; // 임시 비밀번호 재설정용 토큰 공급자
     // ───────────────────────────────────────────
     // 회원가입
     // ───────────────────────────────────────────
-
-    @Transactional
-    public UserResponse signUp(SignUpRequest request) {
-
-        // 1. 이메일 중복 체크
-        if (userRepository.existsByEmail(request.email())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
-        }
-
-        // 2. 비밀번호 암호화
-        // BCrypt로 단방향 암호화 → DB에 평문 저장 절대 금지
-        String encodedPassword = passwordEncoder.encode(request.password());
-
-        // 3. User 엔티티 생성
-        // 가입 직후엔 PENDING 상태 (관리자 승인 후 APPROVED)
-        User user = User.builder()
-                .email(request.email())
-                .password(encodedPassword)
-                .name(request.name())
-                .phone(request.phone())
-                .role(request.role())
-                .businessRole(request.businessRole())
-                .status(UserStatus.PENDING)
-                .build();
-
-        // 4. DB 저장
-        User savedUser = userRepository.save(user);
-
-        // 5. 저장된 유저 정보 반환
-        return UserResponse.from(savedUser);
-    }
-
     // ───────────────────────────────────────────
     // 바이어 대표자 가입
     // ───────────────────────────────────────────
     @Transactional
     public void signUpBuyer(BuyerSignUpRequest request) {
         validateEmail(request.email());
+
+        // 사업자 번호 중복 검사
+        if (companyRepository.existsByBusinessNumber(request.businessNumber())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_BUSINESS_NUMBER);
+        }
 
         // 1. 회사 생성 및 저장
         Company company = companyRepository.save(request.toCompanyEntity());
@@ -88,7 +71,6 @@ public class UserService {
 
         // 3. 선호 카테고리 저장
         saveUserPreferredCategories(user, request.preferredCategoryIds());
-
     }
 
     // ───────────────────────────────────────────
@@ -97,6 +79,11 @@ public class UserService {
     @Transactional
     public void signUpSeller(SellerSignUpRequest request) {
         validateEmail(request.email());
+
+        // 사업자 번호 중복 검사
+        if (companyRepository.existsByBusinessNumber(request.businessNumber())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_BUSINESS_NUMBER);
+        }
 
         // 1. 회사 생성 및 저장
         Company company = companyRepository.save(request.toCompanyEntity());
@@ -142,8 +129,6 @@ public class UserService {
     // ───────────────────────────────────────────
     // 공통 내부 메서드
     // ───────────────────────────────────────────
-
-
     private void validateEmail(String email) {
         if (userRepository.existsByEmail(email)) {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
@@ -234,5 +219,92 @@ public class UserService {
         user.delete();
     }
 
+    // ───────────────────────────────────────────
+    // 아이디 찾기 - OTP 인증번호 발송
+    // ───────────────────────────────────────────
+    @Transactional
+    public void sendFindIdOtp(FindIdSendOtpRequest request) {
+        // 1. 이름과 휴대폰 번호가 일치하는 유저가 존재하는지 검증
+        boolean isExist = userRepository.existsByNameAndPhone(request.name(), request.phone());
+        if (!isExist) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND); // 혹은 "입력 정보가 일치하지 않습니다" 전용 에러코드
+        }
 
+        // 2. 6자리 보안 난수 생성
+        String otpCode = String.format("%06d", new Random().nextInt(1000000));
+
+        // 3. Redis 캐시에 휴대폰 번호를 Key로 삼아 3분(180초) 동안 저장
+        redisRepository.save(request.phone(), otpCode, Duration.ofMinutes(3));
+
+        // 4. 외부 SMS 유틸을 이용해 발송
+        smsService.sendSms(request.phone(), "[StyleHub] 본인확인 인증번호 [" + otpCode + "]를 입력해주세요. (3분 내 제한)");
+    }
+
+    // ───────────────────────────────────────────
+    // 아이디 찾기 - OTP 인증번호 검증 및 결과 반환
+    // ───────────────────────────────────────────
+    @Transactional
+    public FindIdResponse verifyFindIdOtp(FindIdVerifyOtpRequest request) {
+        // 1. 캐시 저장소에서 해당 번호의 OTP 코드 조회
+        String savedCode = redisRepository.get(request.phone());
+
+        if (savedCode == null) {
+            throw new BusinessException(ErrorCode.OTP_EXPIRED); // 인증 시간 만료 예외 처리
+        }
+
+        if (!savedCode.equals(request.code())) {
+            throw new BusinessException(ErrorCode.INVALID_OTP_CODE); // 인증번호 불일치 예외 처리
+        }
+
+        // 2. 일치할 경우 유저 정보 획득
+        User user = userRepository.findByNameAndPhone(request.name(), request.phone())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 3. 검증 완료 후 OTP 코드는 보관함에서 즉시 파기 (보안)
+        redisRepository.delete(request.phone());
+
+        // 4. 이메일(아이디) 마스킹 처리
+        String maskedEmail = maskEmail(user.getEmail());
+
+        // 프론트엔드가 요구하는 { maskedEmail, createdAt } 스펙 반환
+        return new FindIdResponse(maskedEmail, user.getCreatedAt().toString());
+    }
+
+    // ───────────────────────────────────────────
+    // 비밀번호 찾기 - 재설정 이메일 발송
+    // ───────────────────────────────────────────
+    @Transactional
+    public void requestFindPassword(FindPwRequest request) {
+        // 1. 가입 이메일과 이름이 정확히 일치하는 유저 검증
+        User user = userRepository.findByEmailAndName(request.email(), request.name())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 2. 30분 동안만 유효한 임시 비밀번호 재설정 토큰 생성
+        String resetToken = jwtProvider.createPasswordResetToken(user.getEmail());
+
+        // 3. 사용자가 접근할 프론트엔드 도메인 링크 세팅
+        String resetLink = "https://stylehub.kr/auth/reset-password?token=" + resetToken;
+
+        // 4. HTML 포맷 빌드 및 메일 발송
+        String emailContent = "<h3>안녕하세요, StyleHub입니다.</h3>" +
+                "<p>아래 링크를 클릭하여 30분 이내에 비밀번호를 재설정해 주세요.</p>" +
+                "<p><a href='" + resetLink + "' style='color: #2563eb; font-weight: bold;'>비밀번호 재설정하러 가기</a></p>";
+
+        emailService.sendHtmlEmail(user.getEmail(), "[StyleHub] 비밀번호 재설정 링크 안내", emailContent);
+    }
+
+    // ───────────────────────────────────────────
+    // 이메일 마스킹 헬퍼 메서드
+    // ───────────────────────────────────────────
+    private String maskEmail(String email) {
+        String[] parts = email.split("@");
+        String id = parts[0];
+        String domain = parts[1];
+
+        if (id.length() <= 3) {
+            return id.replaceAll("\\.", "*") + "@" + domain;
+        }
+        // 앞 2자리 유지, 중간 별표, 뒤 2자리 유지 패턴
+        return id.substring(0, 2) + "***" + id.substring(id.length() - 2) + "@" + domain;
+    }
 }

@@ -1,12 +1,14 @@
 package kr.remerge.stylehub.domain.order.entity;
 
 import jakarta.persistence.*;
+import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.contract.entity.Contract;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.order.enumtype.OrderStatus;
 import kr.remerge.stylehub.domain.order.enumtype.OrderType;
 import kr.remerge.stylehub.domain.order.enumtype.PaymentMethod;
+import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -15,18 +17,21 @@ import java.time.LocalDateTime;
 @Table(
         name = "orders",
         indexes = {
-                @Index(name = "idx_orders_order_no", columnList = "order_no"),
-                @Index(name = "idx_orders_buyer_id", columnList = "buyer_id"),
-                @Index(name = "idx_orders_seller_id", columnList = "seller_id"),
-                @Index(name = "idx_orders_buyer_created", columnList = "buyer_id,created_at"),
-                @Index(name = "idx_orders_seller_status_created", columnList = "seller_id,status,created_at")
+                @Index(
+                        name = "idx_orders_buyer_created",
+                        columnList = "buyer_id, created_at"
+                ),
+                @Index(
+                        name = "idx_orders_seller_company_status_created",
+                        columnList = "seller_company_id, status, created_at"
+                )
         }
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class Order {
+public class Order extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,8 +46,8 @@ public class Order {
     private User buyer;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "seller_id", nullable = false)
-    private User seller;
+    @JoinColumn(name = "seller_company_id", nullable = false)
+    private Company sellerCompany;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id")
@@ -63,6 +68,9 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status;
+
+    @Column(name = "seller_company_name", nullable = false, length = 100)
+    private String sellerCompanyName;
 
     @Builder.Default
     @Column(name = "is_sample", nullable = false)
@@ -147,9 +155,4 @@ public class Order {
     @Column(name = "agreed_at")
     private LocalDateTime agreedAt;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 }

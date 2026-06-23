@@ -1,6 +1,6 @@
 import {create} from "zustand";
 import {createJSONStorage, persist} from "zustand/middleware";
-import type {UserResponse} from "@/api/auth";
+import type {UserResponse} from "@/api/auth.types";
 
 /*
 사용법

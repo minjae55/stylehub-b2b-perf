@@ -35,7 +35,7 @@ public class UserController {
             @Valid @RequestBody BuyerSignUpRequest request) {
         userService.signUpBuyer(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("바이어 가입 신청이 완료되었습니다."));
+                .body(ApiResponse.successWithMessage("바이어 가입 신청이 완료되었습니다."));
     }
 
     // ───────────────────────────────────────────
@@ -47,7 +47,7 @@ public class UserController {
             @Valid @RequestBody SellerSignUpRequest request) {
         userService.signUpSeller(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("셀러 가입 신청이 완료되었습니다."));
+                .body(ApiResponse.successWithMessage("셀러 가입 신청이 완료되었습니다."));
     }
 
     // ───────────────────────────────────────────
@@ -59,7 +59,7 @@ public class UserController {
             @Valid @RequestBody EmployeeSignUpRequest request) {
         userService.signUpEmployee(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("직원 가입 신청이 완료되었습니다."));
+                .body(ApiResponse.successWithMessage("직원 가입 신청이 완료되었습니다."));
     }
 
     // ───────────────────────────────────────────
@@ -110,6 +110,6 @@ public class UserController {
 
         userService.deleteMe(user.userId());
 
-        return ResponseEntity.ok(ApiResponse.success("회원 탈퇴가 완료되었습니다."));
+        return ResponseEntity.ok(ApiResponse.successWithMessage("회원 탈퇴가 완료되었습니다."));
     }
 }

@@ -46,10 +46,6 @@ public record CartResponse(
                 ? productOption.getSamplePrice()
                 : product.getUnitPrice() + productOption.getAdditionalPrice();
 
-        if (unitPrice == null) {
-            throw new IllegalStateException("샘플 가격이 설정되지 않았습니다.");
-        }
-
         Long totalPrice = unitPrice * cartItem.getQuantity();
 
         return new CartResponse(

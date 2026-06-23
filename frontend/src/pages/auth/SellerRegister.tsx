@@ -15,6 +15,7 @@ import {
     User,
 } from "lucide-react";
 import {AgreementCheckbox, CategoryPicker, isValidCategoryCount} from "./Category";
+import {signUpSeller, uploadFile} from "@/api/auth";
 
 // ── FormData — SellerSignUpRequest 1:1 매핑 ───────────────────────────────────
 
@@ -43,8 +44,8 @@ interface FormData {
     accountNumber: string;
     accountHolder: string;
     // 카테고리 (2종)
-    preferredCategoryIds: string[];   // 개인 선호
-    handledCategoryIds: string[];     // 회사 취급
+    preferredCategoryIds: number[];   // 개인 선호
+    handledCategoryIds: number[];     // 회사 취급
     agreed: boolean;
 }
 
@@ -358,6 +359,7 @@ function Step5({form, set}: { form: FormData; set: (f: Partial<FormData>) => voi
 export function RegisterSeller() {
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [form, setForm] = useState<FormData>({
         email: "", password: "", confirmPassword: "",
         name: "", phone: "",
@@ -379,7 +381,8 @@ export function RegisterSeller() {
             );
         }
         if (step === 2) {
-            return !!(form.businessNumber && form.companyName && form.representativeName && form.address);
+            return !!(form.businessNumber && form.companyName && form.representativeName && form.address && form.businessLicenseFile
+            );
         }
         if (step === 3) {
             return !!(form.storeType && (form.storeType === "offline" || form.websiteUrl));
@@ -397,13 +400,62 @@ export function RegisterSeller() {
         return false;
     };
 
-    const handleSubmit = () => {
-        // TODO: POST /api/users/signup/seller
-        // SellerSignUpRequest 매핑:
-        // { email, password, name, phone, businessNumber, companyName, representativeName,
-        //   address, addressDetail, businessLicenseUrl, websiteUrl, storeType, brandName,
-        //   bankName, accountNumber, accountHolder, preferredCategoryIds, handledCategoryIds }
-        navigate("/auth/register/success");
+    const handleSubmit = async () => {
+        // 이중 안전 장치
+        if (!form.businessLicenseFile) {
+            alert("사업자등록증 파일을 올려주세요.");
+            return;
+        }
+
+        try {
+            setIsSubmitting(true); // 락 걸기
+
+            // 1. 파일 업로드 API 호출 및 S3 URL 확보
+            const licenseUrl = await uploadFile(form.businessLicenseFile);
+
+            // 2. 사업자 등록번호 하이픈 제거 (숫자 10자리 정제)
+            const cleanBusinessNumber = form.businessNumber.replace(/-/g, "");
+
+            // 3. 카테고리 ID 배열들을 백엔드 DTO 규격(Integer 타입)에 맞게 숫자 배열로 변환
+
+            // 4. 백엔드 DTO 스펙에 맞게 데이터 조립
+            const signUpRequestData = {
+                email: form.email,
+                password: form.password,
+                name: form.name,
+                phone: form.phone,
+                businessNumber: cleanBusinessNumber,
+                companyName: form.companyName,
+                representativeName: form.representativeName,
+                address: form.address,
+                addressDetail: form.addressDetail,
+                businessLicenseUrl: licenseUrl,
+                websiteUrl: form.websiteUrl,
+                storeType: form.storeType.toUpperCase() as "OFFLINE" | "ONLINE" | "BOTH", // 백엔드 Enum 규격이 대문자일 경우를 대비해 안전하게 변환
+                brandName: form.brandName,
+                bankName: form.bankName,
+                accountNumber: form.accountNumber,
+                accountHolder: form.accountHolder,
+                preferredCategoryIds: form.preferredCategoryIds, // number[]
+                handledCategoryIds: form.handledCategoryIds,     // number[]
+            };
+
+            // 5. 셀러 회원가입 API 요청
+            // 전역 인터셉터가 response.data.data를 까서 주기 때문에 완료 메시지가 리턴됩니다.
+            await signUpSeller(signUpRequestData);
+            alert("셀러 가입 신청이 완료되었습니다!");
+
+            navigate("/auth/register/success");
+
+        } catch (error: any) {
+            console.error("셀러 회원가입 에러:", error);
+
+            // 인터셉터가 이미 에러 메시지(ex: "이미 등록된 사업자등록번호입니다.")를
+            // error.message에 넣어두었으므로 딱 이 한 줄이면 처리 끝!
+            alert(error.message);
+        } finally {
+            setIsSubmitting(false); // 락 해제
+        }
     };
 
     return (
@@ -433,10 +485,10 @@ export function RegisterSeller() {
             <button
                 type="button"
                 onClick={() => step < 5 ? setStep((s) => s + 1) : handleSubmit()}
-                disabled={!canProceed()}
+                disabled={!canProceed() || isSubmitting}
                 className="w-full mt-6 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded font-semibold text-sm transition-colors flex items-center justify-center gap-2"
             >
-                {step < 5 ? "다음 단계" : "가입 신청하기"} <ArrowRight size={16}/>
+                {step < 5 ? "다음 단계" : isSubmitting ? "가입 신청 중..." : "가입 신청하기"} <ArrowRight size={16}/>
             </button>
         </div>
     );

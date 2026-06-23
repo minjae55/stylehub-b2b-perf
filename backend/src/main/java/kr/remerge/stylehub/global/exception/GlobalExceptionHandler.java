@@ -1,7 +1,6 @@
 package kr.remerge.stylehub.global.exception;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -9,10 +8,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import kr.remerge.stylehub.global.response.ApiResponse;
-import kr.remerge.stylehub.global.response.ErrorResponse;
 
 import java.util.HashMap;
 import java.util.Map;
+
 /*
 ───────────────────────────────────────────
 흐름 정리
@@ -20,8 +19,8 @@ import java.util.Map;
 Service
     → throw new BusinessException(ErrorCode.USER_NOT_FOUND)
         → GlobalExceptionHandler.handleBusinessException()
-            → ErrorResponse.of(errorCode)
-                → 404 { code: "USER_NOT_FOUND", message: "유저를 찾을 수 없습니다." }
+            → ApiResponse.fail(errorCode)
+                → 404 { success: false, code: "USER_NOT_FOUND", message: "유저를 찾을 수 없습니다." }
 */
 
 // 전역 예외 처리 클래스
@@ -37,7 +36,7 @@ public class GlobalExceptionHandler {
 
     // Service에서 throw new BusinessException(ErrorCode.XXX) 하면 여기서 처리
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e) {
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
         ErrorCode errorCode = e.getErrorCode();
 
         // WARN 레벨로 로그 출력 (비즈니스 예외는 서버 오류가 아님)
@@ -45,7 +44,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
-                .body(ErrorResponse.of(errorCode));
+                .body(ApiResponse.fail(errorCode));
     }
 
     // ───────────────────────────────────────────
@@ -55,7 +54,7 @@ public class GlobalExceptionHandler {
     // RequestDTO에 @Valid 붙였을 때 검증 실패하면 여기서 처리
     // ex) @NotBlank, @Size, @Email 등
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(
             MethodArgumentNotValidException e) {
 
         // 어떤 필드가 왜 실패했는지 모아서 반환
@@ -67,8 +66,8 @@ public class GlobalExceptionHandler {
         log.warn("[ValidationException] {}", fieldErrors);
 
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse.ofValidation(fieldErrors));
+                .status(ErrorCode.INVALID_INPUT.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.INVALID_INPUT, fieldErrors));
     }
 
     // ───────────────────────────────────────────
@@ -78,11 +77,11 @@ public class GlobalExceptionHandler {
     // 위에서 잡지 못한 모든 예외는 여기서 처리
     // 500 에러로 반환, ERROR 레벨로 로그 출력
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(Exception e) {
+    public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
         log.error("[Exception] 예상치 못한 오류 발생", e);
 
         return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR));
+                .status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.INTERNAL_SERVER_ERROR));
     }
 }
