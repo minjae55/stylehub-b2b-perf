@@ -166,7 +166,7 @@ export function Checkout() {
           cartItemIds: checkoutState.cartItemIds,
           cartType: checkoutState.cartType,
         });
-        setCheckoutPreview(response.data);
+        setCheckoutPreview(response);
       } catch (error) {
         const apiError = error as { response?: { status?: number; data?: unknown } };
         console.error(
@@ -187,8 +187,8 @@ export function Checkout() {
     const loadAddresses = async () => {
       try {
         const response = await api.get<DeliveryAddress[]>("/checkout/address");
-        setAddresses(response.data);
-        setSelectedAddress(response.data.find((address) => address.isDefault) ?? null);
+        setAddresses(response);
+        setSelectedAddress(response.find((address) => address.isDefault) ?? null);
       } catch (error) {
         console.error("배송지 조회 실패", error);
         setAddressError("배송지 목록을 불러오지 못했습니다.");
@@ -227,6 +227,10 @@ export function Checkout() {
   const shipping = checkoutPreview?.shippingFee
     ?? (isCustom ? (subtotal >= 1000000 ? 0 : 3000) : 0);
   const total = checkoutPreview?.totalAmount ?? subtotal + shipping;
+  const shippingText = shipping === 0 ? "무료" : formatPrice(shipping);
+  const shippingDescription = shipping === 0
+    ? "무료 배송 조건이 적용되었습니다."
+    : "판매사별 배송비가 합산되어 결제 예정 금액에 포함됩니다.";
 
   if (isPreviewLoading) {
     return (
@@ -271,8 +275,8 @@ export function Checkout() {
       setAddressSaveError("");
 
       const response = await api.post<DeliveryAddress>("/checkout/address", addressForm);
-      setAddresses((previous) => [...previous, response.data]);
-      setSelectedAddress(response.data);
+      setAddresses((previous) => [...previous, response]);
+      setSelectedAddress(response);
       setAddressForm(EMPTY_ADDRESS_FORM);
       setShowAddressForm(false);
       setShowAddressModal(false);
@@ -338,8 +342,8 @@ export function Checkout() {
         cartType: checkoutState.cartType,
       });
 
-      setCreatedOrderNumbers(response.data.orderNos);
-      setCreatedOrderTotal(response.data.totalAmount);
+      setCreatedOrderNumbers(response.orderNos);
+      setCreatedOrderTotal(response.totalAmount);
       setShowSuccessModal(true);
     } catch (error) {
       console.error("임시 주문 생성 실패", error);
@@ -548,7 +552,17 @@ export function Checkout() {
 
               <div className="space-y-3 border-t border-slate-100 pt-4 text-sm">
                 <SummaryRow label="상품 금액" value={formatPrice(subtotal)} />
-                <SummaryRow label="국내 배송비" value={shipping === 0 ? "무료" : formatPrice(shipping)} />
+                <SummaryRow label="국내 배송비" value={shippingText} />
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-800">
+                      <Truck size={14} />
+                      배송비
+                    </div>
+                    <span className="text-sm font-black text-amber-900">{shippingText}</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-amber-700">{shippingDescription}</p>
+                </div>
               </div>
 
               <div className="flex items-end justify-between border-t border-slate-100 pt-4">

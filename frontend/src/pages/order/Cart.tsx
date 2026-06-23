@@ -56,6 +56,15 @@ function getSampleMaxQuantity(item: CartItem) {
   return Math.max(1, item.sampleMaxQuantity ?? 5);
 }
 
+function mapCartApiItems(apiItems: CartApiItem[]): CartItem[] {
+  return apiItems.map(({ companyId, baseShippingFee, ...item }) => ({
+    ...item,
+    sellerId: companyId,
+    shippingFee: baseShippingFee,
+    freeShippingThreshold: item.freeShippingThreshold ?? 0,
+  }));
+}
+
 const demoCartItems: CartItem[] = [
   {
     cartItemId: -1,
@@ -182,12 +191,7 @@ export function Cart() {
         }
 
         const response = await api.get<CartApiItem[]>("/cart");
-        const cartItems = response.data.map(({ companyId, baseShippingFee, ...item }) => ({
-          ...item,
-          sellerId: companyId,
-          shippingFee: baseShippingFee,
-          freeShippingThreshold: item.freeShippingThreshold ?? 0,
-        }));
+        const cartItems = mapCartApiItems(response);
         setItems(cartItems);
         setSelected(
           cartItems
@@ -288,10 +292,10 @@ export function Cart() {
       const response = await api.patch<CartItem>(`/cart/${id}/quantity`, {
         quantity: nextQuantity,
       });
-      if (response.data?.cartItemId === id) {
+      if (response?.cartItemId === id) {
         setItems((prev) =>
           prev.map((cartItem) =>
-            cartItem.cartItemId === id ? response.data : cartItem
+            cartItem.cartItemId === id ? response : cartItem
           )
         );
       }
@@ -367,10 +371,11 @@ export function Cart() {
         cartType: "SAMPLE",
       });
 
-      const response = await api.get<CartItem[]>("/cart");
-      setItems(response.data);
+      const response = await api.get<CartApiItem[]>("/cart");
+      const cartItems = mapCartApiItems(response);
+      setItems(cartItems);
       setSelectedSample(
-        response.data
+        cartItems
           .filter((cartItem) => cartItem.cartType === "SAMPLE" && cartItem.isChecked)
           .map((cartItem) => cartItem.cartItemId)
       );

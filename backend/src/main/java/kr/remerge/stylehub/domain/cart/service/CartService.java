@@ -61,8 +61,7 @@ public class CartService {
                 || option.getSampleMaxQuantity() == null
         ) {
             throw new BusinessException(
-                    ErrorCode.INVALID_INPUT
-//                    민재 : ErrorCode.SAMPLE_OPTION_NOT_CONFIGURED 이거로 바꿔
+                    ErrorCode.SAMPLE_OPTION_NOT_CONFIGURED
             );
         }
 

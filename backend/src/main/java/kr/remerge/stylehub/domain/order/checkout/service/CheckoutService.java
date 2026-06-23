@@ -65,6 +65,7 @@ public class CheckoutService {
 
         long shippingFee = calculateShippingFee(items);
 
+
         return new CheckoutResponse(
                 checkoutRequest.cartType(),
                 items,
@@ -97,19 +98,16 @@ public class CheckoutService {
 
         if (cartItem.getCartType() == CartType.SAMPLE) {
             if (!product.getSampleAvailable()) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT);
+                throw new BusinessException(ErrorCode.SAMPLE_OPTION_NOT_CONFIGURED);
             }
 
             if (option.getSamplePrice() == null
                     || option.getSampleMaxQuantity() == null) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT);
+                throw new BusinessException(ErrorCode.SAMPLE_OPTION_NOT_CONFIGURED);
             }
 
-            // ERroCode에 다음 내용으로 추가해달라고 해
-            // 민재 : SAMPLE_OPTION_NOT_CONFIGURED(400, "선택한 옵션은 현재 샘플 주문을 이용할 수 없습니다."),
-
             if (quantity > option.getSampleMaxQuantity()) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT);
+                throw new BusinessException(ErrorCode.SAMPLE_OPTION_NOT_CONFIGURED);
             }
         }
     }

@@ -55,7 +55,7 @@ public class OrderService {
         Map<Integer, List<CartItem>> itemsByCompany = getItemsByCompany(cartItems);
 
         Address address = addressRepository.findById(request.addressId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.ADDRESS_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SAMPLE_OPTION_NOT_CONFIGURED));
 
         ArrayList<String> orderNos = new ArrayList<>();
         long checkoutTotalAmount = 0L;
@@ -175,6 +175,18 @@ public class OrderService {
     }
 
     private List<CartItem> getCartItems(Integer userId, OrderCreateRequest request) {
+
+        if (request.cartItemIds() == null || request.cartItemIds().isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+//            throw new BusinessException(ErrorCode.CART_ITEM_EMPTY);
+            //민재 추가해달라고 해
+        }
+
+        if (request.cartType() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+//            throw new BusinessException(ErrorCode.INVALID_CART_TYPE);
+            //민재 추가해달라고 해
+        }
 
         return cartRepository.findByCartItemIdInAndUser_UserIdAndCartType(
                 request.cartItemIds(),
