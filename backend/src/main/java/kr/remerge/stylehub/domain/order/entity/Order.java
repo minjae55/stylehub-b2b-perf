@@ -59,7 +59,7 @@ public class Order extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_order_id")
-    private Order parentOrder;
+    private kr.remerge.stylehub.domain.order.entity.Order parentOrder;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false)

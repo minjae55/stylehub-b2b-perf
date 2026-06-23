@@ -1,4 +1,5 @@
 import {createBrowserRouter} from "react-router";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import {Root} from "./Root";
 import {ProtectedLayout} from "./ProtectedLayout";
@@ -70,6 +71,9 @@ import AdminSupport from "@/pages/admin/AdminSupport";
 
 import {SupplierRegister} from "@/pages/company/SupplierRegister";
 
+//토스페이먼츠
+import PaymentSuccessPage from "@/pages/tosspayment/PaymentSuccessPage";
+
 export const router = createBrowserRouter([
     // ─────────────────────────────────────────
     // auth 그룹 - 인증 불필요
@@ -116,6 +120,9 @@ export const router = createBrowserRouter([
                     {path: "orders", Component: Orders},
                     {path: "orders/:id", Component: OrderDetail},
                     {path: "checkout", Component: Checkout},
+
+                    // ✨ Toss Payments
+                    {path: "payment/success", Component: PaymentSuccessPage},
 
                     // Trade Flow
                     {path: "orders/:orderId/negotiations", Component: Negotiations},

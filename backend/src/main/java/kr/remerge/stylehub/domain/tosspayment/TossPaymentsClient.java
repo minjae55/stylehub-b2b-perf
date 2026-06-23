@@ -16,18 +16,26 @@ public class TossPaymentsClient {
                 .uri("/v1/payments/confirm")
                 .bodyValue(dto)
                 .retrieve()
-                .onStatus(HttpStatusCode::is4xxClientError, response -> {
-                    // 에러 발생 시 처리 (예: 결제 정보 불일치 등)
-                    return Mono.error(new RuntimeException("결제 승인 실패: 입력값이 올바르지 않습니다."));
-                })
+                .onStatus(HttpStatusCode::is4xxClientError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(errorBody -> Mono.error(new RuntimeException("결제 승인 실패(4xx): " + errorBody)))
+                )
+                .onStatus(HttpStatusCode::is5xxServerError, response ->
+                        Mono.error(new RuntimeException("토스페이먼츠 서버 에러(5xx)가 발생했습니다."))
+                )
                 .bodyToMono(PaymentResult.class)
-                .block(); // 비동기 호출 결과를 동기적으로 반환
+                .block();
     }
+
     public PaymentResult cancel(String paymentKey, PaymentCancelRequest request) {
         return tossWebClient.post()
                 .uri("/v1/payments/{paymentKey}/cancel", paymentKey)
                 .bodyValue(request)
                 .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(errorBody -> Mono.error(new RuntimeException("결제 취소 실패: " + errorBody)))
+                )
                 .bodyToMono(PaymentResult.class)
                 .block();
     }

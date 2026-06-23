@@ -1,4 +1,23 @@
 package kr.remerge.stylehub.domain.tosspayment.dto;
 
 public class TossPaymentDto {
+
+    // 결제 승인 요청
+    public record ConfirmRequest(
+            String paymentKey,
+            Long orderId,
+            Long amount
+    ) {}
+
+    // 결제 취소 요청
+    public record CancelRequest(
+            String cancelReason
+    ) {}
+
+    // 결제 응답 공통
+    public record Response(
+            String paymentKey,
+            Long orderId,
+            String status
+    ) {}
 }
