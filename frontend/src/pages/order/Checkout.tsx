@@ -559,7 +559,9 @@ export function Checkout() {
                       <Truck size={14} />
                       배송비
                     </div>
-                    <span className="text-sm font-black text-amber-900">{shippingText}</span>
+                    {shipping > 0 && (
+                      <span className="text-sm font-black text-amber-900">{shippingText}</span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs leading-5 text-amber-700">{shippingDescription}</p>
                 </div>

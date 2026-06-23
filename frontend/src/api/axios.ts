@@ -81,6 +81,7 @@ type CustomizedAxios = {
     get<T = any, R = T, D = any>(url: string, config?: any): Promise<R>;
     post<T = any, R = T, D = any>(url: string, data?: any, config?: any): Promise<R>;
     put<T = any, R = T, D = any>(url: string, data?: any, config?: any): Promise<R>;
+    patch<T = any, R = T, D = any>(url: string, data?: any, config?: any): Promise<R>;
     delete<T = any, R = T, D = any>(url: string, config?: any): Promise<R>;
 };
 

@@ -26,10 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import static java.util.stream.Collectors.groupingBy;
 
@@ -219,5 +216,13 @@ public class OrderService {
                 .toUpperCase();
 
         return "ORD-" + date + "-" + random;
+    }
+
+    public List<Order> getOrderList(Integer userId) {
+
+        Optional<Order> orderList = orderRepository.findById(userId);
+
+
+        return null;
     }
 }
