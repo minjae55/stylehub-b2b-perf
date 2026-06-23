@@ -15,6 +15,7 @@ public enum ErrorCode {
     // ───────────────────────────────────────────
     // 인증 / 인가 (AUTH)
     // ───────────────────────────────────────────
+    ADDRESS_NOT_FOUND(HttpStatus.BAD_REQUEST, "1", "오류"),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AUTH_001", "로그인이 필요합니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "AUTH_002", "접근 권한이 없습니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_003", "유효하지 않은 토큰입니다."),

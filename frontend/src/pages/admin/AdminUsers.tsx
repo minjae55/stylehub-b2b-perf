@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, UserPlus, UserX } from 'lucide-react';
 
 interface User {
@@ -11,15 +11,45 @@ interface User {
   createdAt: string;
 }
 
-export const INITIAL_USERS: User[] = [
-  { id: 'USR-001', name: '김바이어', email: 'buyer1@global.com', companyName: '(주)글로벌유통', role: 'BUYER/대표', status: 'ACTIVE', createdAt: '2026-01-15' },
-  { id: 'USR-002', name: '이셀러', email: 'seller1@ecopack.com', companyName: '(주)에코팩', role: 'SELLER/대표', status: 'ACTIVE', createdAt: '2026-02-20' },
-  { id: 'USR-003', name: '박그린', email: 'seller2@greenpack.com', companyName: '그린패키지', role: 'SELLER/직원', status: 'SUSPENDED', createdAt: '2026-03-11' },
-  { id: 'USR-004', name: '최수입', email: 'buyer2@trade.com', companyName: '트레이드인포', role: 'BUYER/직원', status: 'PENDING', createdAt: '2026-06-01' },
-];
+interface ApiUser {
+  userId: number;
+  name: string;
+  email: string;
+  companyName: string;
+  role: 'ADMIN' | 'PRESIDENT' | 'EMPLOYEE';
+  businessRole: 'BUYER' | 'SELLER' | 'BOTH';
+  status: 'PENDING' | 'APPROVED' | 'SUSPENDED' | 'DELETED';
+  createdAt: string;
+}
+
+function mapApiUser(u: ApiUser): User {
+  const roleMap: Record<string, User['role']> = {
+    'BUYER_PRESIDENT': 'BUYER/대표',
+    'BUYER_EMPOLYEE': 'BUYER/직원',
+    'SELLER_PRESIDENT': 'SELLER/대표',
+    'SELLER_EMPLOYEE': 'SELLER/직원',
+  };
+  const statusMap: Record<string, User['status']> = {
+    'APPROVED': 'ACTIVE',
+    'PENDING': 'PENDING',
+    'SUSPENDED': 'SUSPENDED',
+  };
+
+  return {
+    id: String(u.userId),
+    name: u.name,
+    email: u.email,
+    companyName: u.companyName,
+    role: roleMap[`${u.businessRole}_${u.role}`] ?? 'ADMIN',
+    status: statusMap[u.status] ?? 'PENDING',
+    createdAt: u.createdAt?.slice(0,10) ?? '',
+  };
+}
 
 export const AdminUsers: React.FC = () => {
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchFilter, setSearchFilter] = useState<"all" | "name" | "company" | "email">("all");
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
@@ -28,6 +58,27 @@ export const AdminUsers: React.FC = () => {
 
   // 💡 왼쪽 사이드바용 상태 카테고리 추가 ('ALL': 전체, 'REQUEST': 등록요청)
   const [activeSubCategory, setActiveSubCategory] = useState<'ALL' | 'REQUEST' | 'SUSPENDED'>('ALL');
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/admin/users', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          },
+        });
+        if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
+        const data = await res.json();
+        setUsers((data.data as ApiUser[]).map(mapApiUser));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '불러오기 실패');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   // 계정 상태 변경 및 가입 승인 토글 액션
   const handleToggleStatus = (userId: string) => {
@@ -118,6 +169,9 @@ export const AdminUsers: React.FC = () => {
   // 대기 승인 카운트 집계
   const pendingCount = users.filter(u => u.status === 'PENDING').length;
   const suspendedCount = users.filter(u => u.status === 'SUSPENDED').length;
+
+  if (loading) return <div className="p-8 text-slate-500 text-sm">불러오는 중...</div>;
+  if (error)   return <div className="p-8 text-rose-500 text-sm">{error}</div>;
 
   return (
     <div className="w-full h-screen bg-slate-50 text-slate-700 flex flex-col overflow-hidden font-sans antialiased">

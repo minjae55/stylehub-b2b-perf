@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_toss_payments_order_id", columnList = "order_id")
         }
 )
-@Builder
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TossPayments {
@@ -28,7 +27,7 @@ public class TossPayments {
     @Column(name = "toss_order_id", length = 64, nullable = false, unique = true)
     private String tossOrderId; // 우리가 생성해서 토스에 보낸 주문 식별자
 
-    // 연관관계 매핑 (orders 테이블의 엔티티명이 Order라고 가정)
+    // 연관관계 매핑
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order; // 비즈니스 주문 ID
@@ -62,6 +61,6 @@ public class TossPayments {
     }
 
     public void updateStatus(PaymentStatus paymentStatus) {
-
+        this.status = paymentStatus.name();
     }
 }
