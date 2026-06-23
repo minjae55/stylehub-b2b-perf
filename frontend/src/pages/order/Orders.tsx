@@ -1,5 +1,6 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import api from "@/api/axios";
 import {
   AlertCircle,
   CheckCircle,
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 
 type OrderStatus =
+  | "PENDING"
   | "CONFIRMED"
   | "SAMPLE_PREPARING"
   | "SAMPLE_SHIPPED"
@@ -40,6 +42,19 @@ type OrderStatus =
   | "REFUNDED";
 
 type OrderType = "GENERAL" | "SAMPLE" | "SOURCING";
+type ApiOrderType = "NORMAL" | "READY" | "CUSTOM";
+
+type BuyerOrderListResponse = {
+  orderId: number;
+  orderNo: string;
+  orderType: ApiOrderType;
+  orderStatus: OrderStatus;
+  isSample: boolean;
+  totalAmount: number;
+  createdAt: string;
+  canceledAt: string | null;
+  canceledReason: string | null;
+};
 type StepKey =
   | "CONFIRMED"
   | "SAMPLE_PREPARING"
@@ -78,6 +93,7 @@ type Order = {
   paymentMethod: string;
   receiver: string;
   receiverAddress: string;
+  isExample?: boolean;
   stepTimestamps?: Partial<Record<StepKey, string>>;
   issueMemo?: string;
 };
@@ -115,6 +131,7 @@ const SOURCING_STEPS: StepKey[] = [
 ];
 
 const DONE_STEPS_BY_STATUS: Record<OrderStatus, StepKey[]> = {
+  PENDING: [],
   CONFIRMED: ["CONFIRMED"],
   SAMPLE_PREPARING: ["CONFIRMED", "SAMPLE_PREPARING"],
   SAMPLE_SHIPPED: ["CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED"],
@@ -185,6 +202,12 @@ const statusConfig: Record<
   OrderStatus,
   { label: string; tone: string; icon: ReactNode; group: "progress" | "sample" | "contract" | "done" | "issue" }
 > = {
+  PENDING: {
+    label: "결제 대기",
+    tone: "border-slate-200 bg-slate-50 text-slate-600",
+    icon: <Clock size={13} />,
+    group: "progress",
+  },
   CONFIRMED: {
     label: "주문 확정",
     tone: "border-blue-200 bg-blue-50 text-blue-700",
@@ -277,161 +300,92 @@ const typeConfig: Record<OrderType, { label: string; tone: string }> = {
   SOURCING: { label: "소싱 주문", tone: "border-primary/25 bg-secondary text-primary" },
 };
 
-const orders: Order[] = [
+const exampleOrders: Order[] = [
   {
-    id: "ORD-2024-0841",
-    date: "2024.05.18",
-    supplier: "르블랑",
-    buyer: "스타일위크",
+    id: "ORD-EXAMPLE-001",
+    date: "2026.06.23",
+    supplier: "예시 판매사",
+    buyer: "예시 바이어",
     type: "GENERAL",
     items: [
-      { name: "여성 린넨 오버핏 블라우스", quantity: 70, unit: "장", price: 12000, material: "린넨 혼방" },
-      { name: "와이드 린넨 슬랙스", quantity: 25, unit: "장", price: 18000, material: "린넨 혼방" },
+      {
+        name: "예시 여성 린넨 셔츠",
+        quantity: 20,
+        unit: "장",
+        price: 15000,
+        material: "린넨 혼방",
+      },
     ],
-    status: "SHIPPED",
-    subtotal: 1290000,
-    platformFee: 64500,
-    shippingFee: null,
-    trackingNo: "598412873021",
-    carrier: "CJ대한통운",
-    paymentMethod: "법인카드",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    stepTimestamps: {
-      CONFIRMED: "2024.05.18 11:22",
-      PREPARING: "2024.05.19 09:15",
-      SHIPPED: "2024.05.20 11:40",
-    },
-  },
-  {
-    id: "ORD-2024-0855",
-    date: "2024.05.16",
-    supplier: "데일리앤코",
-    buyer: "스타일위크",
-    type: "SAMPLE",
-    items: [{ name: "오버사이즈 코튼 셔츠", quantity: 100, unit: "장", price: 15000, material: "코튼" }],
-    status: "SAMPLE_DELIVERED",
-    subtotal: 1500000,
-    platformFee: 75000,
+    status: "PREPARING",
+    subtotal: 300000,
+    platformFee: 15000,
     shippingFee: 3000,
-    trackingNo: "112837465099",
-    carrier: "CJ대한통운",
-    paymentMethod: "무통장 입금",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    stepTimestamps: {
-      CONFIRMED: "2024.05.16 09:00",
-      SAMPLE_PREPARING: "2024.05.17 10:00",
-      SAMPLE_SHIPPED: "2024.05.18 14:00",
-      SAMPLE_DELIVERED: "2024.05.19 11:30",
-    },
-  },
-  {
-    id: "ORD-2024-0901",
-    date: "2024.05.20",
-    supplier: "르블랑 어패럴",
-    buyer: "스타일위크",
-    type: "SOURCING",
-    contractNo: "CTR-2024-0901",
-    items: [{ name: "여성 린넨 오버핏 블라우스 (주문제작)", quantity: 200, unit: "벌", price: 14000, material: "린넨 혼방" }],
-    status: "SAMPLE_RENEGOTIATING",
-    subtotal: 2800000,
-    platformFee: 140000,
-    shippingFee: null,
-    trackingNo: "384729103847",
-    carrier: "한진택배",
-    paymentMethod: "계약 후 결제",
-    receiver: "김민지 / 010-9876-5432",
-    receiverAddress: "경기도 용인시 기흥구 중부대로 456 B동 입고장",
-    issueMemo: "블루그레이 컬러 톤이 너무 밝습니다. 한 단계 진한 톤으로 재제작 요청드립니다.",
-    stepTimestamps: {
-      CONFIRMED: "2024.05.20 14:00",
-      SAMPLE_PREPARING: "2024.05.21 09:00",
-      SAMPLE_SHIPPED: "2024.05.23 11:00",
-      SAMPLE_DELIVERED: "2024.05.24 15:30",
-      SAMPLE_RENEGOTIATING: "2024.05.25 10:00",
-    },
-  },
-  {
-    id: "ORD-2024-0888",
-    date: "2024.05.15",
-    supplier: "에이블스튜디오",
-    buyer: "스타일위크",
-    type: "SOURCING",
-    contractNo: "CTR-2024-0888",
-    items: [{ name: "여성 와이드 팬츠 (주문제작)", quantity: 150, unit: "벌", price: 18000, material: "폴리 스판" }],
-    status: "CONTRACT_SIGNING",
-    subtotal: 2700000,
-    platformFee: 135000,
-    shippingFee: null,
     trackingNo: null,
-    paymentMethod: "계약 후 결제",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    stepTimestamps: {
-      CONFIRMED: "2024.05.15 10:00",
-      CONTRACT_SIGNING: "2024.05.15 13:20",
-    },
-  },
-  {
-    id: "ORD-2024-0807",
-    date: "2024.05.02",
-    supplier: "데일리앤코",
-    buyer: "스타일위크",
-    type: "GENERAL",
-    items: [{ name: "여성 봄 니트 가디건", quantity: 40, unit: "장", price: 16200, material: "아크릴 니트" }],
-    status: "COMPLETED",
-    subtotal: 648000,
-    platformFee: 32400,
-    shippingFee: 3000,
-    trackingNo: "293847102938",
-    carrier: "CJ대한통운",
     paymentMethod: "법인카드",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
+    receiver: "예시 수령인 / 010-0000-0000",
+    receiverAddress: "서울특별시 강남구 예시로 123",
+    isExample: true,
     stepTimestamps: {
-      CONFIRMED: "2024.05.02 11:00",
-      PREPARING: "2024.05.03 09:00",
-      SHIPPED: "2024.05.04 10:30",
-      DELIVERED: "2024.05.06 15:00",
+      CONFIRMED: "2026.06.23 10:00",
+      PREPARING: "2026.06.23 13:30",
     },
-  },
-  {
-    id: "ORD-2024-0780",
-    date: "2024.04.15",
-    supplier: "라온어패럴",
-    buyer: "스타일위크",
-    type: "GENERAL",
-    items: [{ name: "여성 베이직 오버핏 셔츠", quantity: 50, unit: "장", price: 18900, material: "코튼" }],
-    status: "DISPUTE",
-    subtotal: 945000,
-    platformFee: 47250,
-    shippingFee: 3000,
-    trackingNo: "192837465019",
-    carrier: "롯데택배",
-    paymentMethod: "법인카드",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    issueMemo: "수령한 상품 중 M 사이즈 10장에서 봉제 불량이 발견되었습니다.",
-  },
-  {
-    id: "ORD-2024-0791",
-    date: "2024.04.20",
-    supplier: "어반드레스",
-    buyer: "스타일위크",
-    type: "GENERAL",
-    items: [{ name: "플리츠 미디 스커트", quantity: 45, unit: "장", price: 15000, material: "폴리" }],
-    status: "CANCELED",
-    subtotal: 675000,
-    platformFee: 33750,
-    shippingFee: 0,
-    trackingNo: null,
-    paymentMethod: "무통장 입금",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    issueMemo: "내부 예산 변경으로 인해 주문을 진행하지 않기로 결정했습니다.",
   },
 ];
+
+function formatOrderDate(value: string) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value.replace("T", " ").slice(0, 16);
+  }
+
+  return date
+    .toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+    .replace(/\. /g, ".")
+    .replace(".", ".");
+}
+
+function mapOrderType(orderType: ApiOrderType, isSample: boolean): OrderType {
+  if (isSample) return "SAMPLE";
+  if (orderType === "CUSTOM") return "SOURCING";
+  return "GENERAL";
+}
+
+function mapOrderResponse(order: BuyerOrderListResponse): Order {
+  return {
+    id: order.orderNo,
+    date: formatOrderDate(order.createdAt),
+    supplier: "판매사 정보 확인 중",
+    buyer: "내 주문",
+    type: mapOrderType(order.orderType, order.isSample),
+    items: [
+      {
+        name: "주문 상품 상세는 상세 화면에서 확인",
+        quantity: 0,
+        unit: "건",
+        price: order.totalAmount ?? 0,
+        material: "-",
+      },
+    ],
+    status: order.orderStatus,
+    subtotal: order.totalAmount ?? 0,
+    platformFee: 0,
+    shippingFee: 0,
+    trackingNo: null,
+    paymentMethod: "결제 정보 확인 중",
+    receiver: "상세 화면에서 확인",
+    receiverAddress: "상세 화면에서 확인",
+    issueMemo: order.canceledReason ?? undefined,
+  };
+}
 
 const searchOptions = [
   { value: "product", label: "제품명" },
@@ -543,6 +497,7 @@ function matchesFilter(order: Order, filter: string) {
   if (filter === "ALL") return true;
   if (filter === "PROGRESS") {
     return [
+      "PENDING",
       "CONFIRMED",
       "SAMPLE_PREPARING",
       "SAMPLE_SHIPPED",
@@ -559,7 +514,10 @@ function matchesFilter(order: Order, filter: string) {
 }
 
 export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
-  const [expandedId, setExpandedId] = useState<string | null>("ORD-2024-0855");
+  const [orders, setOrders] = useState<Order[]>(exampleOrders);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState("PROGRESS");
   const [searchType, setSearchType] = useState<SearchType>("product");
   const [search, setSearch] = useState("");
@@ -568,6 +526,34 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [renegotiateTarget, setRenegotiateTarget] = useState<Order | null>(null);
   const [renegotiateText, setRenegotiateText] = useState("");
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+
+        const response = await api.get<BuyerOrderListResponse[]>("/orders");
+        const orderResponses = Array.isArray(response) ? response : [];
+        const nextOrders = orderResponses.map(mapOrderResponse);
+
+        if (!Array.isArray(response)) {
+          setLoadError("주문 목록 응답 형식이 맞지 않아 예시 데이터를 표시하고 있습니다.");
+        }
+
+        setOrders(nextOrders.length > 0 ? nextOrders : exampleOrders);
+        setExpandedId(null);
+      } catch (error) {
+        console.error("주문 목록 조회 실패", error);
+        setLoadError("주문 목록을 불러오지 못해 예시 데이터를 표시하고 있습니다.");
+        setOrders(exampleOrders);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadOrders();
+  }, []);
 
   const filteredOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -582,11 +568,11 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
 
       return filterMatched && keywordMatched;
     });
-  }, [activeFilter, search, searchType]);
+  }, [activeFilter, orders, search, searchType]);
 
   const stats = useMemo(() => {
     const inProgress = orders.filter((order) =>
-      ["CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "SAMPLE_RENEGOTIATING", "PREPARING"].includes(order.status)
+      ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "SAMPLE_RENEGOTIATING", "PREPARING"].includes(order.status)
     ).length;
     const shipping = orders.filter((order) => ["SHIPPED", "DELIVERED"].includes(order.status)).length;
     const issues = orders.filter((order) => ["DISPUTE", "CANCELED", "REFUNDED"].includes(order.status)).length;
@@ -597,7 +583,7 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
       { filter: "SHIPPING", label: "배송 중", value: `${shipping}건`, icon: <Package size={18} />, tone: "bg-amber-50 text-amber-700" },
       { filter: "ISSUE", label: "완료/이슈", value: `${issues}건`, icon: <AlertCircle size={18} />, tone: "bg-red-50 text-red-700" },
     ];
-  }, []);
+  }, [orders]);
 
   const handleConfirmTrade = () => {
     setConfirmTarget(null);
@@ -689,6 +675,12 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
             </div>
           </div>
         </section>
+
+        {(isLoading || loadError) && (
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+            {isLoading ? "주문 목록을 불러오는 중입니다." : loadError}
+          </div>
+        )}
 
         <main className="space-y-4">
           {filteredOrders.map((order) => (
@@ -843,6 +835,9 @@ function OrderCard({
           <div className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-black text-slate-950">{order.id}</span>
+              {order.isExample && (
+                <Badge className="border-slate-200 bg-slate-100 text-slate-500">예시 데이터</Badge>
+              )}
               <Badge className={type.tone}>{type.label}</Badge>
             </div>
 
