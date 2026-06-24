@@ -1,10 +1,11 @@
-import {Link, Outlet, useLocation, useNavigate} from "react-router";
+import {Link, Outlet, useNavigate} from "react-router";
 import {
     Bell,
     CheckCircle,
     ChevronDown,
     ClipboardList,
-    Info, LogOut,
+    Info,
+    LogOut,
     MapPin,
     Package,
     Search,
@@ -18,6 +19,7 @@ import {
 import {useEffect, useRef, useState} from "react";
 import {useAuthStore} from "@/store/useAuthStore";
 import {logout as apiLogout} from "@/api/auth";
+import logoSvg from "@/assets/style_hub_logo.svg";
 
 const hotKeywords = ["여성 린넨 블라우스", "와이드 슬랙스", "플로럴 원피스", "오버핏 자켓", "스포츠 레깅스"];
 
@@ -254,11 +256,10 @@ const searchDummyBrands = [
 ];
 
 export function Root() {
-    const location = useLocation();
     const [searchQuery, setSearchQuery] = useState("");
     const [notifOpen, setNotifOpen] = useState(false);
     const [readIds, setReadIds] = useState<number[]>([]);
-    const [dismissedIds, setDismissedIds] = useState<number[]>([]);
+    const [, setDismissedIds] = useState<number[]>([]);
     const notifRef = useRef<HTMLDivElement>(null);
     // [추가] 탭 드롭다운과 검색결과 드롭다운 state 분리
     const [searchTab, setSearchTab] = useState<"product" | "category" | "brand">("product");
@@ -267,8 +268,26 @@ export function Root() {
     const tabDropRef = useRef<HTMLDivElement>(null);
     const resultDropRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
+
+    const user = useAuthStore((state) => state.user);
     const clearUser = useAuthStore((state) => state.clearUser);
 
+    // 💡 유저의 비즈니스 권한에 따라 대시보드 경로를 동적으로 결정
+    // 기본값은 '/' 또는 메인으로 잡고, 권한별 분기 처리
+    let dashboardPath = "/";
+
+    if (user?.businessRole === "BUYER") {
+        dashboardPath = "/buyer";
+    } else if (user?.businessRole === "SELLER") {
+        dashboardPath = "/seller";
+    } else if (user?.businessRole === "BOTH") {
+        // BOTH(통합 관리자)일 경우, 기본적으로 어디를 먼저 보여줄지 기획에 따라 결정하시면 됩니다.
+        // 여기서는 기본값을 '/buyer'로 가되, 필요하면 판매자 대시보드로 전환하는 버튼을 화면에 따로 주는 게 정석입니다.
+        dashboardPath = "/buyer";
+    }
+
+    // 유저가 존재하고, 역할이 PRESIDENT이면서, BusinessRole이 BUYER인 경우에만 true
+    const isBuyerPresident = user?.role === "PRESIDENT" && user?.businessRole === "BUYER";
     const handleLogout = async () => {
         try {
             // 1. 백엔드 호출해서 토큰 쿠키 만료시키기
@@ -328,31 +347,28 @@ export function Root() {
     return ( //폰트변경
         <div className="min-h-screen bg-background font-[Pretendard,sans-serif] flex flex-col">
             {/* [추가] 셀러 등록 상단 바 */}
-            <div
+            {isBuyerPresident && (<div
                 className="bg-primary/10 border-b border-primary/20 py-1.5 text-center text-xs text-primary flex items-center justify-center gap-3">
-                <span>🏷️ 지금 셀러로 등록하고 전국 바이어와 연결되세요!</span>
+                <span>🏷️ {user?.name}님! 셀러로 등록하고 전국 바이어와 연결되세요!</span>
                 <Link to="/auth?tab=signup&role=seller"
                       className="bg-primary text-white text-[11px] font-semibold px-3 py-0.5 rounded-full hover:bg-primary/80 transition-colors">
                     셀러 등록하기 →
                 </Link>
             </div>
+            )}
             {/* Main Header */}
-            <header className="bg-white shadow-sm sticky top-0 z-50 flex-shrink-0 py-4">
-                <div className="max-w-[1280px] mx-auto px-4 py-3 flex justify-between">
+            <header className="bg-white shadow-sm sticky top-0 z-50 flex-shrink-0 py-2">
+                <div className="max-w-[1280px] mx-auto px-4 py-3 flex justify-between items-center">
                     {/* Logo */}
-                    <Link to="/" className="flex-shrink-0">
-                        <div className="text-4xl font-bold tracking-tight py-1">
-                            <span className="text-primary">Style</span>
-                            <span className="text-foreground">Hub</span>
-                            <div
-                                className="text-[11px] font-normal text-muted-foreground tracking-widest uppercase mt-1">
-                                국내 패션 B2B 도매 플랫폼
-                            </div>
-                        </div>
+                    <Link to="/">
+                        <img
+                            src={logoSvg}
+                            alt="StyleHub 로고"
+                            className="h-18 w-auto object-contain transform translate-y-[5px]"
+                        />
                     </Link>
-
                     {/* Search Bar */}
-                    <div className="flex-1 max-w-[700px]">
+                    <div className="flex-1 max-w-[700px] transform translate-y-[8px]">
                         {/* [수정] overflow-hidden 제거 (드롭다운 잘림 방지) */}
                         <div className="flex border-2 border-primary rounded">
                             {/* [수정] 탭 드롭다운 - 별도 ref로 분리 */}
@@ -612,17 +628,19 @@ export function Root() {
                         </Link>
 
                         {/* 대시보드 */}
-                        <Link to="/buyer"
-                              className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors">
+                        <Link
+                            to={dashboardPath}
+                            className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors"
+                        >
                             <ClipboardList size={25}/>
-                            <span className="text-[11px]">회사이름</span>
+                            <span className="text-[11px]">대시보드</span>
                         </Link>
 
                         {/* 마이 페이지 */}
                         <Link to="/mypage"
                               className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors">
                             <User size={25}/>
-                            <span className="text-[11px]">이름</span>
+                            <span className="text-[11px]">{user?.name}</span>
                         </Link>
 
                         {/* 마이 페이지 */}
