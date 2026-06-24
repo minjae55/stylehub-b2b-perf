@@ -65,6 +65,29 @@ function mapCartApiItems(apiItems: CartApiItem[]): CartItem[] {
   }));
 }
 
+function calculateShippingFee(selectedItems: CartItem[]) {
+  const groups = selectedItems.reduce<Record<string, CartItem[]>>((acc, item) => {
+    const key = String(item.sellerId ?? item.productId);
+    acc[key] ??= [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  return Object.values(groups).reduce((totalShippingFee, groupItems) => {
+    const groupSubtotal = groupItems.reduce(
+      (sum, item) => sum + item.totalPrice,
+      0
+    );
+    const firstItem = groupItems[0];
+    const shippingFee = firstItem?.shippingFee ?? 0;
+    const freeShippingThreshold = firstItem?.freeShippingThreshold ?? 0;
+    const isFreeShipping =
+      freeShippingThreshold > 0 && groupSubtotal >= freeShippingThreshold;
+
+    return totalShippingFee + (isFreeShipping ? 0 : shippingFee);
+  }, 0);
+}
+
 const demoCartItems: CartItem[] = [
   {
     cartItemId: -1,
@@ -453,6 +476,8 @@ export function Cart() {
   }
 
   const currentSubtotal = tab === "SAMPLE" ? sampleSubtotal : bulkSubtotal;
+  const currentShipping = calculateShippingFee(tab === "SAMPLE" ? sampleSelected : bulkSelected);
+  const currentTotal = currentSubtotal + currentShipping;
   const currentCount = tab === "SAMPLE" ? sampleSelected.length : bulkSelected.length;
 
   const handleCheckout = () => {
@@ -611,6 +636,8 @@ export function Cart() {
             tab={tab}
             count={currentCount}
             subtotal={currentSubtotal}
+            shipping={currentShipping}
+            total={currentTotal}
             onCheckout={handleCheckout}
           />
         </div>
@@ -970,14 +997,23 @@ function OrderSummary({
   tab,
   count,
   subtotal,
+  shipping,
+  total,
   onCheckout,
 }: {
   tab: CartTab;
   count: number;
   subtotal: number;
+  shipping: number;
+  total: number;
   onCheckout: () => void;
 }) {
   const isSample = tab === "SAMPLE";
+  const shippingText = shipping === 0 ? "무료" : formatPrice(shipping);
+  const shippingDescription =
+    shipping === 0
+      ? "무료 배송 조건이 적용되었습니다."
+      : "판매사별 배송비가 합산되어 결제 예정 금액에 포함됩니다.";
 
   return (
     <aside className="lg:sticky lg:top-6 lg:self-start">
@@ -993,7 +1029,20 @@ function OrderSummary({
 
         <div className="space-y-3 border-b border-slate-100 pb-4 text-sm">
           <SummaryRow label={isSample ? "샘플 상품 금액" : "상품 금액"} value={formatPrice(subtotal)} />
-          <SummaryRow label="국내 배송비" value="착불" />
+          <SummaryRow label="국내 배송비" value={shippingText} />
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-800">
+                <Truck size={14} />
+                배송비
+              </div>
+              {shipping > 0 && (
+                <span className="text-sm font-black text-amber-900">{shippingText}</span>
+              )}
+            </div>
+            <p className="mt-1 text-xs leading-5 text-amber-700">{shippingDescription}</p>
+          </div>
         </div>
 
         <div className="flex items-end justify-between border-b border-slate-100 py-5">
@@ -1003,12 +1052,12 @@ function OrderSummary({
                 </h2>
           </div>
           <p className="whitespace-nowrap text-right text-xl font-black leading-none text-primary md:text-2xl">
-            {formatPrice(subtotal)}
+            {formatPrice(total)}
           </p>
         </div>
 
         <div className="my-4 rounded-lg border border-primary/15 bg-secondary/60 px-3 py-2.5 text-xs leading-5 text-slate-700">
-          플랫폼 이용 수수료와 배송비는 결제 단계에서 별도 계산됩니다.
+          플랫폼 이용 수수료는 결제 단계에서 별도 계산됩니다.
         </div>
 
         {count === 0 ? (

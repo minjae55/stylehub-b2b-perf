@@ -9,8 +9,13 @@ import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.company.repository.AddressRepository;
 import kr.remerge.stylehub.domain.order.checkout.dto.AddressCreateRequest;
 import kr.remerge.stylehub.domain.order.checkout.dto.AddressResponse;
-import kr.remerge.stylehub.domain.order.checkout.dto.CheckoutRequest;
-import kr.remerge.stylehub.domain.order.checkout.dto.CheckoutResponse;
+import kr.remerge.stylehub.domain.order.checkout.dto.CartCheckoutRequest;
+import kr.remerge.stylehub.domain.order.checkout.dto.CartCheckoutResponse;
+import kr.remerge.stylehub.domain.order.checkout.dto.OrderCheckoutItemResponse;
+import kr.remerge.stylehub.domain.order.checkout.dto.OrderCheckoutResponse;
+import kr.remerge.stylehub.domain.order.entity.Order;
+import kr.remerge.stylehub.domain.order.repository.OrderItemRepository;
+import kr.remerge.stylehub.domain.order.repository.OrderRepository;
 import kr.remerge.stylehub.domain.product.entity.Product;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
 import kr.remerge.stylehub.domain.user.entity.User;
@@ -34,17 +39,20 @@ public class CheckoutService {
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
 
-    public CheckoutResponse getCheckout(Integer userId, CheckoutRequest checkoutRequest) {
 
-        List<Integer> cartItemIds = checkoutRequest.cartItemIds().stream()
+    public CartCheckoutResponse getCartCheckout(Integer userId, CartCheckoutRequest cartCheckoutRequest) {
+
+        List<Integer> cartItemIds = cartCheckoutRequest.cartItemIds().stream()
                 .distinct()
                 .toList();
 
         List<CartItem> cartItems = cartRepository.findByCartItemIdInAndUser_UserIdAndCartType(
                 cartItemIds,
                 userId,
-                checkoutRequest.cartType()
+                cartCheckoutRequest.cartType()
         );
 
         if (cartItems.size() != cartItemIds.size()) {
@@ -66,8 +74,8 @@ public class CheckoutService {
         long shippingFee = calculateShippingFee(items);
 
 
-        return new CheckoutResponse(
-                checkoutRequest.cartType(),
+        return new CartCheckoutResponse(
+                cartCheckoutRequest.cartType(),
                 items,
                 productAmount,
                 shippingFee,
@@ -188,5 +196,30 @@ public class CheckoutService {
         }
 
         return AddressResponse.from(savedAddress, isDefault);
+    }
+
+    public OrderCheckoutResponse getOrderCheckout(Integer userId, Integer orderId) {
+
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        Order order = orderRepository.findByOrderIdAndBuyer_UserId(orderId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        List<OrderCheckoutItemResponse> items =
+                orderItemRepository.findByOrder_OrderId(orderId)
+                        .stream()
+                        .map(OrderCheckoutItemResponse::from)
+                        .toList();
+
+        return new OrderCheckoutResponse(
+                order.getOrderId(),
+                order.getOrderNo(),
+                items,
+                order.getSubtotalAmount(),
+                order.getShippingFee(),
+                order.getTotalAmount()
+        );
     }
 }

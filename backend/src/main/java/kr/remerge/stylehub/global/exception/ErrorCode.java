@@ -85,8 +85,8 @@ public enum ErrorCode {
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "잘못된 입력값입니다."),
     EMPTY_FILE(HttpStatus.BAD_REQUEST, "COMMON_002", "업로드한 파일이 비어있습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_003", "서버 오류가 발생했습니다."),
-    FILE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_004", "파일 업로드 중 오류가 발생했습니다.");
-
+    FILE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_004", "파일 업로드 중 오류가 발생했습니다."),
+    ADDRESS_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_004", "파일 업로드 중 오류가 발생했습니다.");
     private final HttpStatus httpStatus; // 💡 400, 500 대신 HttpStatus 객체로 명확히 관리
     private final String code;           // 💡 프론트엔드가 식별할 비즈니스 커스텀 에러 코드 (ex: COMPANY_002)
     private final String message;        // 에러 메시지

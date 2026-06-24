@@ -29,8 +29,9 @@ public class SourcingAutoAssignService {
     public void assign(SourcingRequest sourcingRequest) {
         String requestType = sourcingRequest.getType(); // READY or CUSTOM
 
+        Integer subCategoryId = sourcingRequest.getSubCategoryId();
         List<Integer> candidateIds = supplierStatisticsService
-                .getAutoAssignCandidates(requestType, TOP_N);
+                .getAutoAssignCandidates(requestType, subCategoryId, TOP_N);
 
         if (candidateIds.isEmpty()) {
             log.warn("[AutoAssign] 배정 가능한 공급사 없음 - sourcingRequestId: {}",

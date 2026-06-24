@@ -67,4 +67,9 @@ public class SourcingRequest extends BaseEntity {
 
     @Lob
     private String detail;
+
+    // 모든 공급사 거절 시 자동 반려
+    public void cancel() {
+        this.status = SourcingStatus.CANCELLED;
+    }
 }

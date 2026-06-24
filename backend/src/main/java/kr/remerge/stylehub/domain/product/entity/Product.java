@@ -4,9 +4,13 @@ import jakarta.persistence.*;
 import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.company.entity.Brand;
 import kr.remerge.stylehub.domain.company.entity.Company;
+import kr.remerge.stylehub.domain.product.dto.ProductDto;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "products")
@@ -89,4 +93,32 @@ public class Product extends BaseEntity {
     @Builder.Default
     @Column(name = "white_label", nullable = false)
     private Boolean whiteLabel = false;
+
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<ProductOption> options = new ArrayList<>();
+
+    // ───────────────────────────────────────────
+    // 수정 메서드
+    // ───────────────────────────────────────────
+    public void update(ProductDto.UpdateRequest request) {
+        if (request.productName() != null) this.productName = request.productName();
+        if (request.productEngName() != null) this.productEngName = request.productEngName();
+        if (request.returnPolicy() != null) this.returnPolicy = request.returnPolicy();
+        if (request.season() != null) this.season = request.season();
+        if (request.moq() != null) this.moq = request.moq();
+        if (request.unitPrice() != null) this.unitPrice = request.unitPrice();
+        if (request.leadTimeDays() != null) this.leadTimeDays = request.leadTimeDays();
+        if (request.mainMaterial() != null) this.mainMaterial = request.mainMaterial();
+        if (request.materialCert() != null) this.materialCert = request.materialCert();
+        if (request.description() != null) this.description = request.description();
+        if (request.careInstruction() != null) this.careInstruction = request.careInstruction();
+        if (request.productUrl() != null) this.productUrl = request.productUrl();
+        if (request.oemAvailable() != null) this.oemAvailable = request.oemAvailable();
+        if (request.sampleAvailable() != null) this.sampleAvailable = request.sampleAvailable();
+        if (request.whiteLabel() != null) this.whiteLabel = request.whiteLabel();
+    }
+    public void increaseViewCount() {
+        this.viewCount = (this.viewCount == null ? 0 : this.viewCount) + 1;
+    }
 }

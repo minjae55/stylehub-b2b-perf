@@ -1,7 +1,6 @@
 package kr.remerge.stylehub.domain.product.entity;
 
 import jakarta.persistence.*;
-import kr.remerge.stylehub.domain.cart.dto.CartOptionResponse;
 import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.*;
 
@@ -69,4 +68,7 @@ public class ProductOption extends BaseEntity {
 
     @OneToMany(mappedBy = "productOption")
     private List<ProductOptionValue> optionValues = new ArrayList<>();
+
+    @OneToMany(mappedBy = "productOption", fetch = FetchType.LAZY)
+    private List<ProductImage> images = new ArrayList<>();
 }
