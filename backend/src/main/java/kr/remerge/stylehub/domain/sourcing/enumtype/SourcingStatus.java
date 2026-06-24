@@ -12,6 +12,8 @@ public enum SourcingStatus {
     TRADING,
     // 협의중
     NEGOTIATING,
+    //반려(소싱 전부 거절시)
+    CANCELLED,
     // 완료
     COMPLETED
 }
