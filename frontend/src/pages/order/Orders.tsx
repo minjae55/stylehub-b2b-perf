@@ -4,8 +4,6 @@ import api from "@/api/axios";
 import {
   AlertCircle,
   CheckCircle,
-  ChevronDown,
-  ChevronUp,
   Clock,
   ExternalLink,
   Eye,
@@ -957,7 +955,6 @@ function OrderCard({
               <p className="text-xs font-bold text-slate-500">결제 금액</p>
               <p className="mt-1 whitespace-nowrap text-xl font-black text-primary">{formatPrice(getOrderTotal(order))}</p>
             </div>
-            <span className="text-slate-400">{expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
           </div>
         </div>
       </button>
@@ -1107,7 +1104,11 @@ function OrderActions({
     <div className="flex flex-wrap items-center gap-2">
       {order.status === "PENDING" && (
         <>
-          <ActionButton tone="ghost" icon={<Clock size={13} />} onClick={() => undefined}>결제 대기</ActionButton>
+          {order.orderId ? (
+            <LinkButton to={`/checkout?orderId=${order.orderId}`} icon={<Clock size={13} />}>결제하러 가기</LinkButton>
+          ) : (
+            <ActionButton tone="ghost" icon={<Clock size={13} />} onClick={() => undefined}>결제 대기</ActionButton>
+          )}
           <ActionButton tone="ghost" icon={<XCircle size={13} />} onClick={() => onCancel(order)}>주문 취소</ActionButton>
         </>
       )}
