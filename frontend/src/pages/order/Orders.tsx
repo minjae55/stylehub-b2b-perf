@@ -55,7 +55,35 @@ type BuyerOrderListResponse = {
   canceledAt: string | null;
   canceledReason: string | null;
 };
+
+type BuyerOrderItemResponse = {
+  orderItemId: number;
+  productName: string;
+  optionSummary: string | null;
+  quantity: number;
+  unitPrice: number;
+  additionalPrice: number;
+  totalPrice: number;
+};
+
+type BuyerOrderSummaryResponse = {
+  subtotalAmount: number;
+  shippingFee: number;
+  platformFee: number;
+  totalAmount: number;
+  paymentMethod: string | null;
+  receiverName: string | null;
+  receiverAddress: string | null;
+  receiverAddressDetail: string | null;
+};
+
+type BuyerOrderOverviewResponse = {
+  items: BuyerOrderItemResponse[];
+  amountSummary: BuyerOrderSummaryResponse;
+  orderStatus: OrderStatus;
+};
 type StepKey =
+  | "PENDING"
   | "CONFIRMED"
   | "SAMPLE_PREPARING"
   | "SAMPLE_SHIPPED"
@@ -76,6 +104,7 @@ type OrderItem = {
 };
 
 type Order = {
+  orderId?: number;
   id: string;
   date: string;
   supplier: string;
@@ -91,14 +120,16 @@ type Order = {
   contractNo?: string;
   contractSignedAt?: string;
   paymentMethod: string;
-  receiver: string;
+  receiverName: string;
   receiverAddress: string;
+  receiverAddressDetail: string | null;
   isExample?: boolean;
   stepTimestamps?: Partial<Record<StepKey, string>>;
   issueMemo?: string;
 };
 
 const STEP_LABELS: Record<StepKey, string> = {
+  PENDING: "결제 대기",
   CONFIRMED: "주문 확정",
   SAMPLE_PREPARING: "샘플 준비",
   SAMPLE_SHIPPED: "샘플 발송",
@@ -111,14 +142,16 @@ const STEP_LABELS: Record<StepKey, string> = {
   DELIVERED: "배송 완료",
 };
 
-const GENERAL_STEPS: StepKey[] = ["CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"];
+const GENERAL_STEPS: StepKey[] = ["PENDING", "CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"];
 const SAMPLE_STEPS: StepKey[] = [
+  "PENDING",
   "CONFIRMED",
   "SAMPLE_PREPARING",
   "SAMPLE_SHIPPED",
   "SAMPLE_DELIVERED",
 ];
 const SOURCING_STEPS: StepKey[] = [
+  "PENDING",
   "CONFIRMED",
   "SAMPLE_PREPARING",
   "SAMPLE_SHIPPED",
@@ -131,20 +164,22 @@ const SOURCING_STEPS: StepKey[] = [
 ];
 
 const DONE_STEPS_BY_STATUS: Record<OrderStatus, StepKey[]> = {
-  PENDING: [],
-  CONFIRMED: ["CONFIRMED"],
-  SAMPLE_PREPARING: ["CONFIRMED", "SAMPLE_PREPARING"],
-  SAMPLE_SHIPPED: ["CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED"],
-  SAMPLE_DELIVERED: ["CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED"],
+  PENDING: ["PENDING"],
+  CONFIRMED: ["PENDING", "CONFIRMED"],
+  SAMPLE_PREPARING: ["PENDING", "CONFIRMED", "SAMPLE_PREPARING"],
+  SAMPLE_SHIPPED: ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED"],
+  SAMPLE_DELIVERED: ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED"],
   SAMPLE_RENEGOTIATING: [
+    "PENDING",
     "CONFIRMED",
     "SAMPLE_PREPARING",
     "SAMPLE_SHIPPED",
     "SAMPLE_DELIVERED",
     "SAMPLE_RENEGOTIATING",
   ],
-  CONTRACT_SIGNING: ["CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "CONTRACT_SIGNING"],
+  CONTRACT_SIGNING: ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "CONTRACT_SIGNING"],
   CONTRACT_CONFIRMED: [
+    "PENDING",
     "CONFIRMED",
     "SAMPLE_PREPARING",
     "SAMPLE_SHIPPED",
@@ -153,49 +188,33 @@ const DONE_STEPS_BY_STATUS: Record<OrderStatus, StepKey[]> = {
     "CONTRACT_CONFIRMED",
   ],
   PREPARING: [
+    "PENDING",
     "CONFIRMED",
-    "SAMPLE_PREPARING",
-    "SAMPLE_SHIPPED",
-    "SAMPLE_DELIVERED",
-    "CONTRACT_SIGNING",
-    "CONTRACT_CONFIRMED",
     "PREPARING",
   ],
   SHIPPED: [
+    "PENDING",
     "CONFIRMED",
-    "SAMPLE_PREPARING",
-    "SAMPLE_SHIPPED",
-    "SAMPLE_DELIVERED",
-    "CONTRACT_SIGNING",
-    "CONTRACT_CONFIRMED",
     "PREPARING",
     "SHIPPED",
   ],
   DELIVERED: [
+    "PENDING",
     "CONFIRMED",
-    "SAMPLE_PREPARING",
-    "SAMPLE_SHIPPED",
-    "SAMPLE_DELIVERED",
-    "CONTRACT_SIGNING",
-    "CONTRACT_CONFIRMED",
     "PREPARING",
     "SHIPPED",
     "DELIVERED",
   ],
   COMPLETED: [
+    "PENDING",
     "CONFIRMED",
-    "SAMPLE_PREPARING",
-    "SAMPLE_SHIPPED",
-    "SAMPLE_DELIVERED",
-    "CONTRACT_SIGNING",
-    "CONTRACT_CONFIRMED",
     "PREPARING",
     "SHIPPED",
     "DELIVERED",
   ],
-  CANCELED: [],
-  DISPUTE: ["CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"],
-  REFUNDED: [],
+  CANCELED: ["PENDING"],
+  DISPUTE: ["PENDING", "CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"],
+  REFUNDED: ["PENDING", "CONFIRMED"],
 };
 
 const statusConfig: Record<
@@ -322,8 +341,9 @@ const exampleOrders: Order[] = [
     shippingFee: 3000,
     trackingNo: null,
     paymentMethod: "법인카드",
-    receiver: "예시 수령인 / 010-0000-0000",
+    receiverName: "예시 수령인",
     receiverAddress: "서울특별시 강남구 예시로 123",
+    receiverAddressDetail: null,
     isExample: true,
     stepTimestamps: {
       CONFIRMED: "2026.06.23 10:00",
@@ -361,6 +381,7 @@ function mapOrderType(orderType: ApiOrderType, isSample: boolean): OrderType {
 
 function mapOrderResponse(order: BuyerOrderListResponse): Order {
   return {
+    orderId: order.orderId,
     id: order.orderNo,
     date: formatOrderDate(order.createdAt),
     supplier: "판매사 정보 확인 중",
@@ -381,9 +402,33 @@ function mapOrderResponse(order: BuyerOrderListResponse): Order {
     shippingFee: 0,
     trackingNo: null,
     paymentMethod: "결제 정보 확인 중",
-    receiver: "상세 화면에서 확인",
+    receiverName: "상세 화면에서 확인",
     receiverAddress: "상세 화면에서 확인",
+    receiverAddressDetail: null,
     issueMemo: order.canceledReason ?? undefined,
+  };
+}
+
+function applyOrderOverview(order: Order, overview: BuyerOrderOverviewResponse): Order {
+  const summary = overview.amountSummary;
+
+  return {
+    ...order,
+    items: overview.items.map((item) => ({
+      name: item.productName,
+      quantity: item.quantity,
+      unit: "개",
+      price: item.unitPrice + item.additionalPrice,
+      material: item.optionSummary ?? "-",
+    })),
+    status: overview.orderStatus,
+    subtotal: summary.subtotalAmount,
+    platformFee: summary.platformFee,
+    shippingFee: summary.shippingFee,
+    paymentMethod: summary.paymentMethod ?? "결제 정보 없음",
+    receiverName: summary.receiverName ?? "수령인 정보 없음",
+    receiverAddress: summary.receiverAddress ?? "배송지 정보 없음",
+    receiverAddressDetail: summary.receiverAddressDetail,
   };
 }
 
@@ -447,6 +492,12 @@ function buildTimeline(order: Order) {
 
 function getNextAction(order: Order) {
   switch (order.status) {
+    case "PENDING":
+      return "결제 완료 후 주문이 확정됩니다";
+    case "CONFIRMED":
+      return "셀러가 주문을 확인하고 출고 준비를 시작합니다";
+    case "PREPARING":
+      return "셀러가 상품 출고를 준비 중입니다";
     case "SAMPLE_DELIVERED":
       return "샘플 확인 후 본생산 확정, 재협상, 취소 중 선택";
     case "SAMPLE_RENEGOTIATING":
@@ -465,17 +516,23 @@ function getNextAction(order: Order) {
       return "취소 처리된 주문입니다";
     case "COMPLETED":
       return "거래가 완료되었습니다";
+    case "REFUNDED":
+      return "환불 처리가 완료되었습니다";
     default:
       return "셀러의 다음 처리를 기다리는 중입니다";
   }
 }
 
 function needsBuyerAction(order: Order) {
-  return ["SAMPLE_DELIVERED", "CONTRACT_SIGNING", "CONTRACT_CONFIRMED", "DELIVERED"].includes(order.status);
+  return ["PENDING", "SAMPLE_DELIVERED", "CONTRACT_SIGNING", "CONTRACT_CONFIRMED", "DELIVERED"].includes(order.status);
 }
 
 function getPassiveNotice(order: Order) {
   switch (order.status) {
+    case "CONFIRMED":
+      return "주문 확정";
+    case "PREPARING":
+      return "출고 준비 중";
     case "SAMPLE_RENEGOTIATING":
       return "셀러 검토 대기";
     case "SHIPPED":
@@ -509,7 +566,8 @@ function matchesFilter(order: Order, filter: string) {
     ].includes(order.status);
   }
   if (filter === "SHIPPING") return ["SHIPPED", "DELIVERED"].includes(order.status);
-  if (filter === "ISSUE") return ["DISPUTE", "CANCELED", "REFUNDED", "COMPLETED"].includes(order.status);
+  if (filter === "DONE") return order.status === "COMPLETED";
+  if (filter === "ISSUE") return ["DISPUTE", "CANCELED", "REFUNDED"].includes(order.status);
   return true;
 }
 
@@ -518,6 +576,8 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loadingOverviewId, setLoadingOverviewId] = useState<string | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState("PROGRESS");
   const [searchType, setSearchType] = useState<SearchType>("product");
   const [search, setSearch] = useState("");
@@ -555,6 +615,32 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
     loadOrders();
   }, []);
 
+  const handleToggleOrder = async (order: Order) => {
+    const nextExpandedId = expandedId === order.id ? null : order.id;
+    setExpandedId(nextExpandedId);
+    setOverviewError(null);
+
+    if (!nextExpandedId || !order.orderId || order.isExample) {
+      return;
+    }
+
+    try {
+      setLoadingOverviewId(order.id);
+      const overview = await api.get<BuyerOrderOverviewResponse>(`/orders/${order.orderId}`);
+
+      setOrders((previous) =>
+        previous.map((current) =>
+          current.id === order.id ? applyOrderOverview(current, overview) : current
+        )
+      );
+    } catch (error) {
+      console.error("주문 상세 요약 조회 실패", error);
+      setOverviewError("주문 상품 정보를 불러오지 못했습니다.");
+    } finally {
+      setLoadingOverviewId(null);
+    }
+  };
+
   const filteredOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     return orders.filter((order) => {
@@ -575,13 +661,15 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
       ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "SAMPLE_RENEGOTIATING", "PREPARING"].includes(order.status)
     ).length;
     const shipping = orders.filter((order) => ["SHIPPED", "DELIVERED"].includes(order.status)).length;
+    const done = orders.filter((order) => order.status === "COMPLETED").length;
     const issues = orders.filter((order) => ["DISPUTE", "CANCELED", "REFUNDED"].includes(order.status)).length;
 
     return [
       { filter: "ALL", label: "전체 주문", value: `${orders.length}건`, icon: <ReceiptText size={18} />, tone: "bg-secondary text-primary" },
       { filter: "PROGRESS", label: "진행 중", value: `${inProgress}건`, icon: <Truck size={18} />, tone: "bg-sky-50 text-sky-700" },
       { filter: "SHIPPING", label: "배송 중", value: `${shipping}건`, icon: <Package size={18} />, tone: "bg-amber-50 text-amber-700" },
-      { filter: "ISSUE", label: "완료/이슈", value: `${issues}건`, icon: <AlertCircle size={18} />, tone: "bg-red-50 text-red-700" },
+      { filter: "DONE", label: "거래 완료", value: `${done}건`, icon: <CheckCircle size={18} />, tone: "bg-green-50 text-green-700" },
+      { filter: "ISSUE", label: "이슈", value: `${issues}건`, icon: <AlertCircle size={18} />, tone: "bg-red-50 text-red-700" },
     ];
   }, [orders]);
 
@@ -627,7 +715,7 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
           </div>
         </header>
 
-        <section className="mb-5 grid gap-3 md:grid-cols-4">
+        <section className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {stats.map((stat) => (
             <button
               key={stat.label}
@@ -688,7 +776,9 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
               key={order.id}
               order={order}
               expanded={expandedId === order.id}
-              onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
+              overviewLoading={loadingOverviewId === order.id}
+              overviewError={expandedId === order.id ? overviewError : null}
+              onToggle={() => handleToggleOrder(order)}
               onConfirm={setConfirmTarget}
               onDispute={setDisputeTarget}
               onCancel={setCancelTarget}
@@ -808,6 +898,8 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
 function OrderCard({
   order,
   expanded,
+  overviewLoading,
+  overviewError,
   onToggle,
   onConfirm,
   onDispute,
@@ -816,6 +908,8 @@ function OrderCard({
 }: {
   order: Order;
   expanded: boolean;
+  overviewLoading: boolean;
+  overviewError: string | null;
   onToggle: () => void;
   onConfirm: (order: Order) => void;
   onDispute: (order: Order) => void;
@@ -902,6 +996,16 @@ function OrderCard({
 
       {expanded && (
         <div className="border-t border-slate-100 p-5">
+          {overviewLoading && (
+            <div className="mb-4 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-500">
+              주문 상품 정보를 불러오는 중입니다.
+            </div>
+          )}
+          {overviewError && (
+            <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+              {overviewError}
+            </div>
+          )}
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="space-y-5">
               <section>
@@ -967,10 +1071,12 @@ function OrderCard({
                   <SummaryRow label="최종 금액" value={formatPrice(getOrderTotal(order))} strong />
                 </div>
                 <SummaryRow label="결제 방식" value={order.paymentMethod} />
-                <SummaryRow label="수령인" value={order.receiver} />
+                <SummaryRow label="수령인" value={order.receiverName} />
                 <div>
                   <p className="text-xs font-bold text-slate-500">배송지</p>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">{order.receiverAddress}</p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">
+                    {[order.receiverAddress, order.receiverAddressDetail].filter(Boolean).join(" ")}
+                  </p>
                 </div>
                 {order.trackingNo && (
                   <SummaryRow label="송장번호" value={`${order.carrier ?? ""} ${order.trackingNo}`} />
@@ -999,6 +1105,21 @@ function OrderActions({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {order.status === "PENDING" && (
+        <>
+          <ActionButton tone="ghost" icon={<Clock size={13} />} onClick={() => undefined}>결제 대기</ActionButton>
+          <ActionButton tone="ghost" icon={<XCircle size={13} />} onClick={() => onCancel(order)}>주문 취소</ActionButton>
+        </>
+      )}
+
+      {order.status === "CONFIRMED" && (
+        <ActionButton tone="ghost" icon={<CheckCircle size={13} />} onClick={() => undefined}>주문 확정</ActionButton>
+      )}
+
+      {order.status === "PREPARING" && (
+        <ActionButton tone="ghost" icon={<Package size={13} />} onClick={() => undefined}>출고 준비 중</ActionButton>
+      )}
+
       {order.status === "SAMPLE_DELIVERED" && (
         <>
           <ActionButton tone="ghost" icon={<XCircle size={13} />} onClick={() => onCancel(order)}>샘플 거절</ActionButton>
@@ -1031,6 +1152,10 @@ function OrderActions({
         </a>
       )}
 
+      {order.status === "SHIPPED" && !order.trackingNo && (
+        <ActionButton tone="ghost" icon={<Truck size={13} />} onClick={() => undefined}>배송 진행 중</ActionButton>
+      )}
+
       {order.status === "DELIVERED" && (
         <>
           <ActionButton icon={<CheckCircle size={13} />} onClick={() => onConfirm(order)}>거래 확정</ActionButton>
@@ -1040,6 +1165,10 @@ function OrderActions({
 
       {order.status === "CANCELED" && (
         <ActionButton tone="ghost" icon={<Eye size={13} />} onClick={() => onCancel(order)}>취소 사유</ActionButton>
+      )}
+
+      {order.status === "REFUNDED" && (
+        <ActionButton tone="ghost" icon={<RotateCcw size={13} />} onClick={() => undefined}>환불 완료</ActionButton>
       )}
 
       <Link
