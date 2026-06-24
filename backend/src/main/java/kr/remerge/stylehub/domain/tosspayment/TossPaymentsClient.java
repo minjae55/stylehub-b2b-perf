@@ -18,7 +18,12 @@ public class TossPaymentsClient {
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, response ->
                         response.bodyToMono(String.class)
-                                .flatMap(errorBody -> Mono.error(new RuntimeException("결제 승인 실패(4xx): " + errorBody)))
+                                .flatMap(errorBody -> {
+                                    if (errorBody.contains("ALREADY_PROCESSED_PAYMENT")) {
+                                        return Mono.error(new AlreadyProcessedPaymentException());
+                                    }
+                                    return Mono.error(new RuntimeException("결제 승인 실패(4xx): " + errorBody));
+                                })
                 )
                 .onStatus(HttpStatusCode::is5xxServerError, response ->
                         Mono.error(new RuntimeException("토스페이먼츠 서버 에러(5xx)가 발생했습니다."))
@@ -38,5 +43,12 @@ public class TossPaymentsClient {
                 )
                 .bodyToMono(PaymentResult.class)
                 .block();
+    }
+
+    // 커스텀 예외 클래스 하나 추가
+    public class AlreadyProcessedPaymentException extends RuntimeException {
+        public AlreadyProcessedPaymentException() {
+            super("ALREADY_PROCESSED_PAYMENT");
+        }
     }
 }

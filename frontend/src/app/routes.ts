@@ -73,6 +73,7 @@ import {SupplierRegister} from "@/pages/company/SupplierRegister";
 
 //토스페이먼츠
 import PaymentSuccessPage from "@/pages/tosspayment/PaymentSuccessPage";
+import OrderCompletePage from "@/pages/tosspayment/OrderCompletePage";
 
 export const router = createBrowserRouter([
     // ─────────────────────────────────────────
@@ -121,12 +122,14 @@ export const router = createBrowserRouter([
                     {path: "orders/:id", Component: OrderDetail},
                     {path: "checkout", Component: Checkout},
 
-                    // ✨ Toss Payments
-                    {path: "payment/success", Component: PaymentSuccessPage},
 
                     // Trade Flow
                     {path: "orders/:orderId/negotiations", Component: Negotiations},
                     {path: "orders/:orderId/disputes", Component: Disputes},
+
+                    // ✨ Toss Payments
+                    {path: "payment/success", Component: PaymentSuccessPage},
+                    {path: "payment/ordersuccess", Component: OrderCompletePage},
                 ],
             },
             {

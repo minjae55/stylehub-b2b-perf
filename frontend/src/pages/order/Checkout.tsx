@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 
+
 type OrderItem = {
   id: number;
   name: string;
@@ -71,6 +72,7 @@ type OrderCreateResponse = {
 };
 
 type DeliveryAddress = {
+  receiverName: any;
   addressId: number;
   addressName: string;
   zipcode: string;
@@ -330,44 +332,59 @@ export function Checkout() {
 
   const handlePayment = async () => {
     if (!agreeTerms || !isSigned || !selectedAddress || isPaymentLoading) return;
-
-    const newOrderNumber = `STYLEHUB${Date.now()}`;
+    if (!checkoutState?.cartItemIds.length) return;
 
     try {
-      setIsPaymentLoading(true);
+        setIsPaymentLoading(true);
 
-      const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
-      const payment = tossPayments.payment({ customerKey: "ANONYMOUS" });
-      const orderName = orderItems.length > 1
-        ? `${orderItems[0].name} 외 ${orderItems.length - 1}건`
-        : orderItems[0].name;
-      const commonRequest = {
-        amount: { currency: "KRW" as const, value: total },
-        orderId: newOrderNumber,
-        orderName,
-        successUrl: `${window.location.origin}/payment/success`,
-        failUrl: `${window.location.origin}/payment/fail`,
-        customerName: "구매 담당자",
-      };
-
-      if (paymentMethod === "card") {
-        await payment.requestPayment({
-          method: "CARD",
-          ...commonRequest,
+        const orderResponse = await api.post<OrderCreateResponse>("/orders", {
+            cartItemIds: checkoutState.cartItemIds,
+            addressId: selectedAddress.addressId,
+            cartType: checkoutState.cartType,
         });
-        return;
-      }
 
-      await payment.requestPayment({
-        method: "VIRTUAL_ACCOUNT",
-        ...commonRequest,
-      });
+        const realOrderNumber = orderResponse.orderNos[0];
+
+        if (!realOrderNumber) {
+            alert("주문 번호를 발급받지 못했습니다.");
+            return;
+        }
+
+        const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
+        const payment = tossPayments.payment({ customerKey: "ANONYMOUS" });
+
+        const orderName = orderItems.length > 1
+            ? `${orderItems[0].name} 외 ${orderItems.length - 1}건`
+            : orderItems[0].name;
+
+        const commonRequest = {
+            amount: { currency: "KRW" as const, value: total },
+            orderId: realOrderNumber,
+            orderName,
+            successUrl: `${window.location.origin}/payment/success`,
+            failUrl: `${window.location.origin}/payment/fail`,
+            customerName: "구매 담당자",
+        };
+
+        if (paymentMethod === "card") {
+            await payment.requestPayment({
+                method: "CARD",
+                ...commonRequest,
+            });
+        } else {
+            await payment.requestPayment({
+                method: "VIRTUAL_ACCOUNT",
+                ...commonRequest,
+            });
+        }
+
     } catch (error) {
-      console.error("토스 결제창 호출 실패", error);
-      alert("결제창을 열지 못했습니다. 잠시 후 다시 시도해 주세요.");
-      setIsPaymentLoading(false);
+        console.error("주문 생성 또는 결제 요청 실패:", error);
+        alert("결제 처리 중 오류가 발생했습니다.");
+    } finally {
+        setIsPaymentLoading(false);
     }
-  };
+};
 
   const handleTestOrder = async () => {
     if (isOrderCheckout || !checkoutState?.cartItemIds.length || !selectedAddress || isTestOrderLoading) return;
