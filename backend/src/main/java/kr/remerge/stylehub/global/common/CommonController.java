@@ -9,7 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/upload") // 💡 프론트엔드의 /api/common 주소와 매핑
 @RequiredArgsConstructor
-public class CommonController2 {
+public class CommonController {
 
     private final ImageUploadService imageUploadService;
 

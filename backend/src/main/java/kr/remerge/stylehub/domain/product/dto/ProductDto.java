@@ -29,9 +29,18 @@ public class ProductDto {
             String productUrl,
             Boolean oemAvailable,
             Boolean sampleAvailable,
-            Boolean whiteLabel
+            Boolean whiteLabel,
+            List<String> imageUrls,
+            List<OptionRequest> options
     ) {}
-
+    // 옵션 요청 DTO
+    public record OptionRequest(
+            String optionLabel,
+            String sku,
+            Integer stockQuantity,
+            Long additionalPrice,
+            Integer restockAlertQuantity
+    ) {}
     // ───────────────────────────────────────────
     // [UPDATE] 상품 수정 요청
     // ───────────────────────────────────────────

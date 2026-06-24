@@ -3,6 +3,7 @@ package kr.remerge.stylehub.domain.product;
 import kr.remerge.stylehub.domain.product.dto.ProductDto;
 import kr.remerge.stylehub.domain.product.service.ProductService;
 import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
+import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
