@@ -33,6 +33,18 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(productService.getAll()));
     }
 
+    // [GET] 신규 상품 (최근 등록순 6개)
+    @GetMapping("/new")
+    public ResponseEntity<ApiResponse<List<ProductDto.SummaryResponse>>> getNewProducts() {
+        return ResponseEntity.ok(ApiResponse.success(productService.getNewProducts()));
+    }
+
+    // [GET] 인기 상품 (7일 내 조회수 높은 순 5개)
+    @GetMapping("/popular")
+    public ResponseEntity<ApiResponse<List<ProductDto.SummaryResponse>>> getPopularProducts() {
+        return ResponseEntity.ok(ApiResponse.success(productService.getPopularProducts()));
+    }
+
     // [GET] 상품 단건 조회
     @GetMapping("/{productId}")
     public ResponseEntity<ApiResponse<ProductDto.DetailResponse>> getById(

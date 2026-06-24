@@ -94,6 +94,14 @@ interface ProductImage {
   isMain: boolean;
 }
 
+interface CertFile {
+  certName: string;
+  files: File[];
+  uploadedUrls: string[];
+  expiryYear: string;
+  expiryMonth: string;
+}
+
 function ToggleChip({ label, selected, onToggle }: { label: string; selected: boolean; onToggle: () => void }) {
   return (
       <button type="button" onClick={onToggle}
@@ -134,16 +142,32 @@ function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onCon
   );
 }
 
-function CertUploadModal({ certName, onSave, onCancel }: { certName: string; onSave: () => void; onCancel: () => void }) {
+function CertUploadModal({
+                           certName,
+                           onSave,
+                           onCancel,
+                         }: {
+  certName: string;
+  onSave: (data: { files: File[]; expiryYear: string; expiryMonth: string }) => void;
+  onCancel: () => void;
+}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [expiryYear, setExpiryYear] = useState("");
+  const [expiryMonth, setExpiryMonth] = useState("");
 
   const addFiles = (incoming: FileList | null) => {
     if (!incoming) return;
-    const valid = Array.from(incoming).filter((f) => ["application/pdf", "image/jpeg", "image/png"].includes(f.type));
-    setFiles((prev) => { const names = new Set(prev.map((f) => f.name)); return [...prev, ...valid.filter((f) => !names.has(f.name))]; });
+    const valid = Array.from(incoming).filter((f) =>
+        ["application/pdf", "image/jpeg", "image/png"].includes(f.type)
+    );
+    setFiles((prev) => {
+      const names = new Set(prev.map((f) => f.name));
+      return [...prev, ...valid.filter((f) => !names.has(f.name))];
+    });
   };
+
   const removeFile = (name: string) => setFiles((p) => p.filter((f) => f.name !== name));
 
   return (
@@ -171,13 +195,17 @@ function CertUploadModal({ certName, onSave, onCancel }: { certName: string; onS
           <div className="mb-4">
             <label className="block text-sm font-medium text-foreground mb-1.5">인증서 유효기간</label>
             <div className="flex items-center gap-2">
-              <select className="border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors flex-1">
+              <select value={expiryYear} onChange={(e) => setExpiryYear(e.target.value)} className="border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors flex-1">
                 <option value="">년도</option>
-                {Array.from({ length: 10 }, (_, i) => (<option key={i} value={2025 + i}>{2025 + i}년</option>))}
+                {Array.from({ length: 10 }, (_, i) => (
+                    <option key={i} value={String(2025 + i)}>{2025 + i}년</option>
+                ))}
               </select>
-              <select className="border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors flex-1">
+              <select value={expiryMonth} onChange={(e) => setExpiryMonth(e.target.value)} className="border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors flex-1">
                 <option value="">월</option>
-                {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{String(i + 1).padStart(2, "0")}월</option>))}
+                {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i + 1} value={String(i + 1).padStart(2, "0")}>{String(i + 1).padStart(2, "0")}월</option>
+                ))}
               </select>
             </div>
           </div>
@@ -197,7 +225,11 @@ function CertUploadModal({ certName, onSave, onCancel }: { certName: string; onS
           )}
           <div className="flex gap-2 justify-end">
             <button onClick={onCancel} className="border border-border text-foreground hover:border-primary hover:text-primary px-5 py-2 rounded text-sm font-medium transition-colors">취소</button>
-            <button onClick={onSave} disabled={files.length === 0} className="bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2 rounded text-sm font-semibold transition-colors flex items-center gap-1.5">
+            <button
+                onClick={() => onSave({ files, expiryYear, expiryMonth })}
+                disabled={files.length === 0}
+                className="bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2 rounded text-sm font-semibold transition-colors flex items-center gap-1.5"
+            >
               <Upload size={14} /> 저장
             </button>
           </div>
@@ -222,8 +254,8 @@ const newOption = (): ProductOption => ({
 
 export function SellerProductRegister() {
   const [submitted, setSubmitted] = useState(false);
-  const [categories, setCategories] = useState<{id: number; name: string; group: string}[]>([]);
-  const [brands, setBrands] = useState<{brandId: number; brandName: string}[]>([]);
+  const [categories, setCategories] = useState<{ id: number; name: string; group: string }[]>([]);
+  const [brands, setBrands] = useState<{ brandId: number; brandName: string }[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
   const [form, setForm] = useState(initialForm);
@@ -231,6 +263,7 @@ export function SellerProductRegister() {
   const [selectedSizeSystem, setSelectedSizeSystem] = useState<string>("");
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedCerts, setSelectedCerts] = useState<string[]>([]);
+  const [certFiles, setCertFiles] = useState<Record<string, CertFile>>({});
   const [certModalTarget, setCertModalTarget] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
   const [options, setOptions] = useState<ProductOption[]>([newOption()]);
@@ -238,7 +271,6 @@ export function SellerProductRegister() {
   const [imageUploading, setImageUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  // [추가] 드래그 상태
   const dragIdx = useRef<number | null>(null);
   const dragOverIdx = useRef<number | null>(null);
 
@@ -300,7 +332,6 @@ export function SellerProductRegister() {
     );
     setProductImages(prev => {
       const updated = [...prev, ...results];
-      // 첫 번째 이미지가 없으면 자동 대표 설정
       if (updated.length > 0 && !updated.some(img => img.isMain)) {
         updated[0] = { ...updated[0], isMain: true };
       }
@@ -313,7 +344,6 @@ export function SellerProductRegister() {
     setProductImages(prev => {
       URL.revokeObjectURL(prev[idx].previewUrl);
       const updated = prev.filter((_, i) => i !== idx);
-      // 삭제된 게 대표였으면 첫 번째를 대표로
       if (prev[idx].isMain && updated.length > 0) {
         updated[0] = { ...updated[0], isMain: true };
       }
@@ -321,33 +351,55 @@ export function SellerProductRegister() {
     });
   };
 
-  // [추가] 대표 이미지 설정
   const setMainImage = (idx: number) => {
     setProductImages(prev => prev.map((img, i) => ({ ...img, isMain: i === idx })));
   };
 
-  // [추가] 드래그앤드롭 핸들러
-  const handleDragStart = (idx: number) => {
-    dragIdx.current = idx;
-  };
-
-  const handleDragEnter = (idx: number) => {
-    dragOverIdx.current = idx;
-  };
-
+  const handleDragStart = (idx: number) => { dragIdx.current = idx; };
+  const handleDragEnter = (idx: number) => { dragOverIdx.current = idx; };
   const handleDragEnd = () => {
     if (dragIdx.current === null || dragOverIdx.current === null) return;
     if (dragIdx.current === dragOverIdx.current) return;
-
     setProductImages(prev => {
       const updated = [...prev];
       const [moved] = updated.splice(dragIdx.current!, 1);
       updated.splice(dragOverIdx.current!, 0, moved);
       return updated;
     });
-
     dragIdx.current = null;
     dragOverIdx.current = null;
+  };
+
+  const handleCertSave = async (data: { files: File[]; expiryYear: string; expiryMonth: string }) => {
+    if (!certModalTarget) return;
+    console.log("인증서 저장 시작:", certModalTarget, data.files);  // 여기
+    try {
+      const uploadedUrls = await Promise.all(
+          data.files.map(async (file) => {
+            const formData = new FormData();
+            formData.append("file", file);
+            const res = await api.post("/upload/pdf", formData, {
+              headers: { "Content-Type": "multipart/form-data" },
+            });
+            return res as string;
+          })
+      );
+      console.log("업로드된 URLs:", uploadedUrls);
+
+      setCertFiles((prev) => ({
+        ...prev,
+        [certModalTarget]: {
+          certName: certModalTarget,
+          files: data.files,
+          uploadedUrls,
+          expiryYear: data.expiryYear,
+          expiryMonth: data.expiryMonth,
+        },
+      }));
+    } catch {
+      alert("인증서 업로드 중 오류가 발생했습니다.");
+    }
+    setCertModalTarget(null);
   };
 
   const resetAll = () => {
@@ -356,6 +408,7 @@ export function SellerProductRegister() {
     setSelectedSizeSystem("");
     setSelectedSizes([]);
     setSelectedCerts([]);
+    setCertFiles({});
     setOptions([newOption()]);
     setProductImages([]);
   };
@@ -392,7 +445,14 @@ export function SellerProductRegister() {
         restockAlertQuantity: o.restockAlertQuantity ? parseInt(o.restockAlertQuantity) : null,
         optionValues: o.optionValues.filter(v => v.optionValue),
       })),
+      certifications: Object.values(certFiles).map((c) => ({
+        certName: c.certName,
+        fileUrls: c.uploadedUrls,
+        expiryYear: c.expiryYear,
+        expiryMonth: c.expiryMonth,
+      })),
     };
+
     try {
       await api.post("/products", payload);
       setSubmitted(true);
@@ -428,14 +488,22 @@ export function SellerProductRegister() {
         {certModalTarget && (
             <CertUploadModal
                 certName={certModalTarget}
-                onSave={() => setCertModalTarget(null)}
+                onSave={handleCertSave}
                 onCancel={() => { toggleItem(selectedCerts, setSelectedCerts, certModalTarget); setCertModalTarget(null); }}
             />
         )}
         {confirmTarget && (
             <ConfirmModal
                 message="등록된 인증서를 삭제하시겠습니까?"
-                onConfirm={() => { toggleItem(selectedCerts, setSelectedCerts, confirmTarget); setConfirmTarget(null); }}
+                onConfirm={() => {
+                  toggleItem(selectedCerts, setSelectedCerts, confirmTarget);
+                  setCertFiles(prev => {
+                    const updated = { ...prev };
+                    delete updated[confirmTarget];
+                    return updated;
+                  });
+                  setConfirmTarget(null);
+                }}
                 onCancel={() => setConfirmTarget(null)}
             />
         )}
@@ -477,7 +545,6 @@ export function SellerProductRegister() {
               )}
             </div>
 
-            {/* [추가] 드래그앤드롭 썸네일 */}
             {productImages.length > 0 && (
                 <>
                   <p className="text-xs text-muted-foreground mt-4 mb-2">드래그로 순서 변경 · ★ 클릭으로 대표 이미지 설정</p>
@@ -494,35 +561,21 @@ export function SellerProductRegister() {
                             style={{ borderColor: img.isMain ? "var(--primary)" : "var(--border)" }}
                         >
                           <img src={img.previewUrl} alt={`product-${idx}`} className="w-full h-full object-cover" />
-
-                          {/* 대표 배지 */}
                           {img.isMain && (
                               <span className="absolute top-1 left-1 bg-primary text-white text-[10px] px-1.5 py-0.5 rounded font-medium">대표</span>
                           )}
-
-                          {/* 실패 배지 */}
                           {img.uploadedUrl === null && (
                               <span className="absolute bottom-1 left-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded">실패</span>
                           )}
-
-                          {/* 호버 버튼들 */}
                           <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
-                            {/* 대표 설정 버튼 */}
-                            <button
-                                type="button"
-                                onClick={() => setMainImage(idx)}
-                                className={`p-1.5 rounded-full transition-colors ${img.isMain ? "bg-primary text-white" : "bg-white/90 text-foreground hover:bg-primary hover:text-white"}`}
-                                title="대표 이미지로 설정"
-                            >
+                            <button type="button" onClick={() => setMainImage(idx)}
+                                    className={`p-1.5 rounded-full transition-colors ${img.isMain ? "bg-primary text-white" : "bg-white/90 text-foreground hover:bg-primary hover:text-white"}`}
+                                    title="대표 이미지로 설정">
                               <Star size={12} fill={img.isMain ? "currentColor" : "none"} />
                             </button>
-                            {/* 삭제 버튼 */}
-                            <button
-                                type="button"
-                                onClick={() => removeImage(idx)}
-                                className="bg-white/90 hover:bg-red-500 hover:text-white text-foreground rounded-full p-1.5 transition-colors"
-                                title="삭제"
-                            >
+                            <button type="button" onClick={() => removeImage(idx)}
+                                    className="bg-white/90 hover:bg-red-500 hover:text-white text-foreground rounded-full p-1.5 transition-colors"
+                                    title="삭제">
                               <X size={12} />
                             </button>
                           </div>
@@ -608,10 +661,7 @@ export function SellerProductRegister() {
               <div className="flex flex-wrap gap-2">
                 {sizeSystems.map((item) => (
                     <ToggleChip key={item} label={item} selected={selectedSizeSystem === item}
-                                onToggle={() => {
-                                  setSelectedSizeSystem(prev => prev === item ? "" : item);
-                                  setSelectedSizes([]);
-                                }} />
+                                onToggle={() => { setSelectedSizeSystem(prev => prev === item ? "" : item); setSelectedSizes([]); }} />
                 ))}
               </div>
             </div>
@@ -642,12 +692,23 @@ export function SellerProductRegister() {
                     <div className="flex flex-wrap gap-2">
                       {group.items.map((item) => {
                         const isSelected = selectedCerts.includes(item);
+                        const hasCert = !!certFiles[item];
                         return (
-                            <div key={item} className="flex items-center">
-                              <button type="button"
-                                      onClick={() => { if (isSelected) { setConfirmTarget(item); } else { toggleItem(selectedCerts, setSelectedCerts, item); setCertModalTarget(item); } }}
-                                      className={`py-1.5 px-3 text-xs border transition-colors rounded ${isSelected ? "bg-primary text-white border-primary" : "border-border text-foreground hover:border-primary hover:text-primary"}`}>
+                            <div key={item} className="flex items-center gap-1">
+                              <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setConfirmTarget(item);
+                                    } else {
+                                      toggleItem(selectedCerts, setSelectedCerts, item);
+                                      setCertModalTarget(item);
+                                    }
+                                  }}
+                                  className={`py-1.5 px-3 text-xs border transition-colors rounded flex items-center gap-1 ${isSelected ? "bg-primary text-white border-primary" : "border-border text-foreground hover:border-primary hover:text-primary"}`}
+                              >
                                 {item}
+                                {hasCert && <CheckCircle size={11} className={isSelected ? "text-white" : "text-primary"} />}
                               </button>
                             </div>
                         );
@@ -656,6 +717,26 @@ export function SellerProductRegister() {
                   </div>
               ))}
             </div>
+            {/* 업로드된 인증서 목록 */}
+            {Object.keys(certFiles).length > 0 && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">업로드된 인증서</p>
+                  <ul className="space-y-2">
+                    {Object.values(certFiles).map((cert) => (
+                        <li key={cert.certName} className="flex items-center justify-between bg-muted/30 border border-border rounded px-3 py-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText size={13} className="text-primary flex-shrink-0" />
+                            <span className="text-xs font-medium text-foreground">{cert.certName}</span>
+                            <span className="text-xs text-muted-foreground">파일 {cert.files.length}개</span>
+                            {cert.expiryYear && cert.expiryMonth && (
+                                <span className="text-xs text-muted-foreground">· 유효기간 {cert.expiryYear}.{cert.expiryMonth}</span>
+                            )}
+                          </div>
+                        </li>
+                    ))}
+                  </ul>
+                </div>
+            )}
           </div>
 
           {/* 6. 상품 옵션 */}

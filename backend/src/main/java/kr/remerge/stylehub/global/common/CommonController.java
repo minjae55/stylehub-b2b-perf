@@ -34,4 +34,14 @@ public class CommonController {
         return ResponseEntity.ok(ApiResponse.success(url));
 
     }
+
+    @PostMapping("/pdf")
+    public ResponseEntity<?> uploadPdf(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.success("파일이 비어있습니다."));
+        }
+        String url = imageUploadService.uploadPdf(file, "certifications");
+        return ResponseEntity.ok(ApiResponse.success(url));
+    }
+
 }

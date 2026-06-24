@@ -6,8 +6,10 @@ import kr.remerge.stylehub.domain.company.entity.Brand;
 import kr.remerge.stylehub.domain.company.repository.BrandRepository;
 import kr.remerge.stylehub.domain.product.dto.ProductDto;
 import kr.remerge.stylehub.domain.product.entity.Product;
+import kr.remerge.stylehub.domain.product.entity.ProductCertification;
 import kr.remerge.stylehub.domain.product.entity.ProductImage;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
+import kr.remerge.stylehub.domain.product.repository.ProductCertificationRepository;
 import kr.remerge.stylehub.domain.product.repository.ProductImageRepository;
 import kr.remerge.stylehub.domain.product.repository.ProductOptionRepository;
 import kr.remerge.stylehub.domain.product.repository.ProductRepository;
@@ -17,7 +19,10 @@ import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -31,6 +36,7 @@ public class ProductService {
     private final BrandRepository brandRepository;
     private final ProductOptionRepository productOptionRepository;
     private final ProductImageRepository productImageRepository;
+    private final ProductCertificationRepository productCertificationRepository;
 
     // [CREATE] 상품 등록
     @Transactional
@@ -95,6 +101,25 @@ public class ProductService {
             }
         }
 
+        // 인증서 저장
+        if (request.certifications() != null && !request.certifications().isEmpty()) {
+            for (ProductDto.CertificationRequest cert : request.certifications()) {
+                if (cert.fileUrls() != null) {
+                    for (String fileUrl : cert.fileUrls()) {
+                        productCertificationRepository.save(
+                                ProductCertification.builder()
+                                        .product(savedProduct)
+                                        .certName(cert.certName())
+                                        .fileUrl(fileUrl)
+                                        .expiryYear(cert.expiryYear())
+                                        .expiryMonth(cert.expiryMonth())
+                                        .build()
+                        );
+                    }
+                }
+            }
+        }
+
         return ProductDto.DetailResponse.from(savedProduct);
     }
 
@@ -106,16 +131,35 @@ public class ProductService {
                 .toList();
     }
 
-    // [READ] 상품 단건 조회
+    // [READ] 상품 단건 조회 (조회수 증가)
+    @Transactional
     public ProductDto.DetailResponse getById(Integer productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+        product.increaseViewCount();
         return ProductDto.DetailResponse.from(product);
     }
 
     // [READ] 내 상품 목록 (셀러용)
     public List<ProductDto.SummaryResponse> getMy(CustomUserDetails userDetails) {
         return productRepository.findBySeller_UserId(userDetails.getUserId())
+                .stream()
+                .map(ProductDto.SummaryResponse::from)
+                .toList();
+    }
+
+    // [READ] 신규 상품 (최근 등록순 6개)
+    public List<ProductDto.SummaryResponse> getNewProducts() {
+        return productRepository.findTop6ByOrderByCreatedAtDesc()
+                .stream()
+                .map(ProductDto.SummaryResponse::from)
+                .toList();
+    }
+
+    // [READ] 인기 상품 (7일 내 조회수 높은 순 5개)
+    public List<ProductDto.SummaryResponse> getPopularProducts() {
+        LocalDateTime since = LocalDateTime.now().minusDays(7);
+        return productRepository.findTop5ByViewCountSince(since, PageRequest.of(0, 5))
                 .stream()
                 .map(ProductDto.SummaryResponse::from)
                 .toList();

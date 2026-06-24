@@ -46,14 +46,37 @@ public class ImageUploadService {
             return supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + fileName;
 
         } catch (IOException e) {
-            throw new RuntimeException("이미지 업로드 실패", e);
+            throw new RuntimeException("파일 업로드 실패", e);
         }
     }
 
     private String getExtension(String filename) {
         if (filename == null || !filename.contains(".")) return "jpg";
         String ext = filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
-        if (!List.of("jpg", "jpeg", "png", "webp", "gif").contains(ext)) return "jpg";
+        if (!List.of("jpg", "jpeg", "png", "webp", "gif", "pdf").contains(ext)) return "jpg";  // pdf 추가
         return ext;
+    }
+    @Value("${supabase.pdf-bucket}")
+    private String pdfBucket;
+
+    public String uploadPdf(MultipartFile file, String folder) {
+        try {
+            String ext = getExtension(file.getOriginalFilename());
+            String fileName = folder + "/" + UUID.randomUUID() + "." + ext;
+
+            String uploadUrl = supabaseUrl + "/storage/v1/object/" + pdfBucket + "/" + fileName;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + supabaseKey);
+            headers.setContentType(MediaType.parseMediaType(file.getContentType()));
+
+            HttpEntity<byte[]> entity = new HttpEntity<>(file.getBytes(), headers);
+            restTemplate.exchange(uploadUrl, HttpMethod.POST, entity, String.class);
+
+            return supabaseUrl + "/storage/v1/object/public/" + pdfBucket + "/" + fileName;
+
+        } catch (IOException e) {
+            throw new RuntimeException("PDF 업로드 실패", e);
+        }
     }
 }

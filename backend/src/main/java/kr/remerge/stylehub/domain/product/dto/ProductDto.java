@@ -10,6 +10,16 @@ import java.util.List;
 public class ProductDto {
 
     // ───────────────────────────────────────────
+    // [CREATE] 인증서 요청
+    // ───────────────────────────────────────────
+    public record CertificationRequest(
+            String certName,
+            List<String> fileUrls,
+            Integer expiryYear,
+            Integer expiryMonth
+    ) {}
+
+    // ───────────────────────────────────────────
     // [CREATE] 상품 등록 요청
     // ───────────────────────────────────────────
     public record CreateRequest(
@@ -31,9 +41,13 @@ public class ProductDto {
             Boolean sampleAvailable,
             Boolean whiteLabel,
             List<String> imageUrls,
-            List<OptionRequest> options
+            List<OptionRequest> options,
+            List<CertificationRequest> certifications
     ) {}
-    // 옵션 요청 DTO
+
+    // ───────────────────────────────────────────
+    // [CREATE] 옵션 요청
+    // ───────────────────────────────────────────
     public record OptionRequest(
             String optionLabel,
             String sku,
@@ -41,6 +55,7 @@ public class ProductDto {
             Long additionalPrice,
             Integer restockAlertQuantity
     ) {}
+
     // ───────────────────────────────────────────
     // [UPDATE] 상품 수정 요청
     // ───────────────────────────────────────────

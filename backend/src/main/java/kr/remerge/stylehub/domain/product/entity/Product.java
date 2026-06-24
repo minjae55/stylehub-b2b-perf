@@ -118,4 +118,7 @@ public class Product extends BaseEntity {
         if (request.sampleAvailable() != null) this.sampleAvailable = request.sampleAvailable();
         if (request.whiteLabel() != null) this.whiteLabel = request.whiteLabel();
     }
+    public void increaseViewCount() {
+        this.viewCount = (this.viewCount == null ? 0 : this.viewCount) + 1;
+    }
 }
