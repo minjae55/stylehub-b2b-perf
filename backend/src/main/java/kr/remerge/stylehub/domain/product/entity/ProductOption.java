@@ -68,4 +68,7 @@ public class ProductOption extends BaseEntity {
 
     @OneToMany(mappedBy = "productOption")
     private List<ProductOptionValue> optionValues = new ArrayList<>();
+
+    @OneToMany(mappedBy = "productOption", fetch = FetchType.LAZY)
+    private List<ProductImage> images = new ArrayList<>();
 }
