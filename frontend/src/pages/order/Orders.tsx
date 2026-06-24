@@ -1,10 +1,9 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import api from "@/api/axios";
 import {
   AlertCircle,
   CheckCircle,
-  ChevronDown,
-  ChevronUp,
   Clock,
   ExternalLink,
   Eye,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 
 type OrderStatus =
+  | "PENDING"
   | "CONFIRMED"
   | "SAMPLE_PREPARING"
   | "SAMPLE_SHIPPED"
@@ -40,7 +40,48 @@ type OrderStatus =
   | "REFUNDED";
 
 type OrderType = "GENERAL" | "SAMPLE" | "SOURCING";
+type ApiOrderType = "NORMAL" | "READY" | "CUSTOM";
+
+type BuyerOrderListResponse = {
+  orderId: number;
+  orderNo: string;
+  orderType: ApiOrderType;
+  orderStatus: OrderStatus;
+  isSample: boolean;
+  totalAmount: number;
+  createdAt: string;
+  canceledAt: string | null;
+  canceledReason: string | null;
+};
+
+type BuyerOrderItemResponse = {
+  orderItemId: number;
+  productName: string;
+  optionSummary: string | null;
+  quantity: number;
+  unitPrice: number;
+  additionalPrice: number;
+  totalPrice: number;
+};
+
+type BuyerOrderSummaryResponse = {
+  subtotalAmount: number;
+  shippingFee: number;
+  platformFee: number;
+  totalAmount: number;
+  paymentMethod: string | null;
+  receiverName: string | null;
+  receiverAddress: string | null;
+  receiverAddressDetail: string | null;
+};
+
+type BuyerOrderOverviewResponse = {
+  items: BuyerOrderItemResponse[];
+  amountSummary: BuyerOrderSummaryResponse;
+  orderStatus: OrderStatus;
+};
 type StepKey =
+  | "PENDING"
   | "CONFIRMED"
   | "SAMPLE_PREPARING"
   | "SAMPLE_SHIPPED"
@@ -61,6 +102,7 @@ type OrderItem = {
 };
 
 type Order = {
+  orderId?: number;
   id: string;
   date: string;
   supplier: string;
@@ -76,13 +118,16 @@ type Order = {
   contractNo?: string;
   contractSignedAt?: string;
   paymentMethod: string;
-  receiver: string;
+  receiverName: string;
   receiverAddress: string;
+  receiverAddressDetail: string | null;
+  isExample?: boolean;
   stepTimestamps?: Partial<Record<StepKey, string>>;
   issueMemo?: string;
 };
 
 const STEP_LABELS: Record<StepKey, string> = {
+  PENDING: "결제 대기",
   CONFIRMED: "주문 확정",
   SAMPLE_PREPARING: "샘플 준비",
   SAMPLE_SHIPPED: "샘플 발송",
@@ -95,14 +140,16 @@ const STEP_LABELS: Record<StepKey, string> = {
   DELIVERED: "배송 완료",
 };
 
-const GENERAL_STEPS: StepKey[] = ["CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"];
+const GENERAL_STEPS: StepKey[] = ["PENDING", "CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"];
 const SAMPLE_STEPS: StepKey[] = [
+  "PENDING",
   "CONFIRMED",
   "SAMPLE_PREPARING",
   "SAMPLE_SHIPPED",
   "SAMPLE_DELIVERED",
 ];
 const SOURCING_STEPS: StepKey[] = [
+  "PENDING",
   "CONFIRMED",
   "SAMPLE_PREPARING",
   "SAMPLE_SHIPPED",
@@ -115,19 +162,22 @@ const SOURCING_STEPS: StepKey[] = [
 ];
 
 const DONE_STEPS_BY_STATUS: Record<OrderStatus, StepKey[]> = {
-  CONFIRMED: ["CONFIRMED"],
-  SAMPLE_PREPARING: ["CONFIRMED", "SAMPLE_PREPARING"],
-  SAMPLE_SHIPPED: ["CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED"],
-  SAMPLE_DELIVERED: ["CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED"],
+  PENDING: ["PENDING"],
+  CONFIRMED: ["PENDING", "CONFIRMED"],
+  SAMPLE_PREPARING: ["PENDING", "CONFIRMED", "SAMPLE_PREPARING"],
+  SAMPLE_SHIPPED: ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED"],
+  SAMPLE_DELIVERED: ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED"],
   SAMPLE_RENEGOTIATING: [
+    "PENDING",
     "CONFIRMED",
     "SAMPLE_PREPARING",
     "SAMPLE_SHIPPED",
     "SAMPLE_DELIVERED",
     "SAMPLE_RENEGOTIATING",
   ],
-  CONTRACT_SIGNING: ["CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "CONTRACT_SIGNING"],
+  CONTRACT_SIGNING: ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "CONTRACT_SIGNING"],
   CONTRACT_CONFIRMED: [
+    "PENDING",
     "CONFIRMED",
     "SAMPLE_PREPARING",
     "SAMPLE_SHIPPED",
@@ -136,55 +186,45 @@ const DONE_STEPS_BY_STATUS: Record<OrderStatus, StepKey[]> = {
     "CONTRACT_CONFIRMED",
   ],
   PREPARING: [
+    "PENDING",
     "CONFIRMED",
-    "SAMPLE_PREPARING",
-    "SAMPLE_SHIPPED",
-    "SAMPLE_DELIVERED",
-    "CONTRACT_SIGNING",
-    "CONTRACT_CONFIRMED",
     "PREPARING",
   ],
   SHIPPED: [
+    "PENDING",
     "CONFIRMED",
-    "SAMPLE_PREPARING",
-    "SAMPLE_SHIPPED",
-    "SAMPLE_DELIVERED",
-    "CONTRACT_SIGNING",
-    "CONTRACT_CONFIRMED",
     "PREPARING",
     "SHIPPED",
   ],
   DELIVERED: [
+    "PENDING",
     "CONFIRMED",
-    "SAMPLE_PREPARING",
-    "SAMPLE_SHIPPED",
-    "SAMPLE_DELIVERED",
-    "CONTRACT_SIGNING",
-    "CONTRACT_CONFIRMED",
     "PREPARING",
     "SHIPPED",
     "DELIVERED",
   ],
   COMPLETED: [
+    "PENDING",
     "CONFIRMED",
-    "SAMPLE_PREPARING",
-    "SAMPLE_SHIPPED",
-    "SAMPLE_DELIVERED",
-    "CONTRACT_SIGNING",
-    "CONTRACT_CONFIRMED",
     "PREPARING",
     "SHIPPED",
     "DELIVERED",
   ],
-  CANCELED: [],
-  DISPUTE: ["CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"],
-  REFUNDED: [],
+  CANCELED: ["PENDING"],
+  DISPUTE: ["PENDING", "CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"],
+  REFUNDED: ["PENDING", "CONFIRMED"],
 };
 
 const statusConfig: Record<
   OrderStatus,
   { label: string; tone: string; icon: ReactNode; group: "progress" | "sample" | "contract" | "done" | "issue" }
 > = {
+  PENDING: {
+    label: "결제 대기",
+    tone: "border-slate-200 bg-slate-50 text-slate-600",
+    icon: <Clock size={13} />,
+    group: "progress",
+  },
   CONFIRMED: {
     label: "주문 확정",
     tone: "border-blue-200 bg-blue-50 text-blue-700",
@@ -277,161 +317,118 @@ const typeConfig: Record<OrderType, { label: string; tone: string }> = {
   SOURCING: { label: "소싱 주문", tone: "border-primary/25 bg-secondary text-primary" },
 };
 
-const orders: Order[] = [
+const exampleOrders: Order[] = [
   {
-    id: "ORD-2024-0841",
-    date: "2024.05.18",
-    supplier: "르블랑",
-    buyer: "스타일위크",
+    id: "ORD-EXAMPLE-001",
+    date: "2026.06.23",
+    supplier: "예시 판매사",
+    buyer: "예시 바이어",
     type: "GENERAL",
     items: [
-      { name: "여성 린넨 오버핏 블라우스", quantity: 70, unit: "장", price: 12000, material: "린넨 혼방" },
-      { name: "와이드 린넨 슬랙스", quantity: 25, unit: "장", price: 18000, material: "린넨 혼방" },
+      {
+        name: "예시 여성 린넨 셔츠",
+        quantity: 20,
+        unit: "장",
+        price: 15000,
+        material: "린넨 혼방",
+      },
     ],
-    status: "SHIPPED",
-    subtotal: 1290000,
-    platformFee: 64500,
-    shippingFee: null,
-    trackingNo: "598412873021",
-    carrier: "CJ대한통운",
-    paymentMethod: "법인카드",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    stepTimestamps: {
-      CONFIRMED: "2024.05.18 11:22",
-      PREPARING: "2024.05.19 09:15",
-      SHIPPED: "2024.05.20 11:40",
-    },
-  },
-  {
-    id: "ORD-2024-0855",
-    date: "2024.05.16",
-    supplier: "데일리앤코",
-    buyer: "스타일위크",
-    type: "SAMPLE",
-    items: [{ name: "오버사이즈 코튼 셔츠", quantity: 100, unit: "장", price: 15000, material: "코튼" }],
-    status: "SAMPLE_DELIVERED",
-    subtotal: 1500000,
-    platformFee: 75000,
+    status: "PREPARING",
+    subtotal: 300000,
+    platformFee: 15000,
     shippingFee: 3000,
-    trackingNo: "112837465099",
-    carrier: "CJ대한통운",
-    paymentMethod: "무통장 입금",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    stepTimestamps: {
-      CONFIRMED: "2024.05.16 09:00",
-      SAMPLE_PREPARING: "2024.05.17 10:00",
-      SAMPLE_SHIPPED: "2024.05.18 14:00",
-      SAMPLE_DELIVERED: "2024.05.19 11:30",
-    },
-  },
-  {
-    id: "ORD-2024-0901",
-    date: "2024.05.20",
-    supplier: "르블랑 어패럴",
-    buyer: "스타일위크",
-    type: "SOURCING",
-    contractNo: "CTR-2024-0901",
-    items: [{ name: "여성 린넨 오버핏 블라우스 (주문제작)", quantity: 200, unit: "벌", price: 14000, material: "린넨 혼방" }],
-    status: "SAMPLE_RENEGOTIATING",
-    subtotal: 2800000,
-    platformFee: 140000,
-    shippingFee: null,
-    trackingNo: "384729103847",
-    carrier: "한진택배",
-    paymentMethod: "계약 후 결제",
-    receiver: "김민지 / 010-9876-5432",
-    receiverAddress: "경기도 용인시 기흥구 중부대로 456 B동 입고장",
-    issueMemo: "블루그레이 컬러 톤이 너무 밝습니다. 한 단계 진한 톤으로 재제작 요청드립니다.",
-    stepTimestamps: {
-      CONFIRMED: "2024.05.20 14:00",
-      SAMPLE_PREPARING: "2024.05.21 09:00",
-      SAMPLE_SHIPPED: "2024.05.23 11:00",
-      SAMPLE_DELIVERED: "2024.05.24 15:30",
-      SAMPLE_RENEGOTIATING: "2024.05.25 10:00",
-    },
-  },
-  {
-    id: "ORD-2024-0888",
-    date: "2024.05.15",
-    supplier: "에이블스튜디오",
-    buyer: "스타일위크",
-    type: "SOURCING",
-    contractNo: "CTR-2024-0888",
-    items: [{ name: "여성 와이드 팬츠 (주문제작)", quantity: 150, unit: "벌", price: 18000, material: "폴리 스판" }],
-    status: "CONTRACT_SIGNING",
-    subtotal: 2700000,
-    platformFee: 135000,
-    shippingFee: null,
     trackingNo: null,
-    paymentMethod: "계약 후 결제",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    stepTimestamps: {
-      CONFIRMED: "2024.05.15 10:00",
-      CONTRACT_SIGNING: "2024.05.15 13:20",
-    },
-  },
-  {
-    id: "ORD-2024-0807",
-    date: "2024.05.02",
-    supplier: "데일리앤코",
-    buyer: "스타일위크",
-    type: "GENERAL",
-    items: [{ name: "여성 봄 니트 가디건", quantity: 40, unit: "장", price: 16200, material: "아크릴 니트" }],
-    status: "COMPLETED",
-    subtotal: 648000,
-    platformFee: 32400,
-    shippingFee: 3000,
-    trackingNo: "293847102938",
-    carrier: "CJ대한통운",
     paymentMethod: "법인카드",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
+    receiverName: "예시 수령인",
+    receiverAddress: "서울특별시 강남구 예시로 123",
+    receiverAddressDetail: null,
+    isExample: true,
     stepTimestamps: {
-      CONFIRMED: "2024.05.02 11:00",
-      PREPARING: "2024.05.03 09:00",
-      SHIPPED: "2024.05.04 10:30",
-      DELIVERED: "2024.05.06 15:00",
+      CONFIRMED: "2026.06.23 10:00",
+      PREPARING: "2026.06.23 13:30",
     },
-  },
-  {
-    id: "ORD-2024-0780",
-    date: "2024.04.15",
-    supplier: "라온어패럴",
-    buyer: "스타일위크",
-    type: "GENERAL",
-    items: [{ name: "여성 베이직 오버핏 셔츠", quantity: 50, unit: "장", price: 18900, material: "코튼" }],
-    status: "DISPUTE",
-    subtotal: 945000,
-    platformFee: 47250,
-    shippingFee: 3000,
-    trackingNo: "192837465019",
-    carrier: "롯데택배",
-    paymentMethod: "법인카드",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    issueMemo: "수령한 상품 중 M 사이즈 10장에서 봉제 불량이 발견되었습니다.",
-  },
-  {
-    id: "ORD-2024-0791",
-    date: "2024.04.20",
-    supplier: "어반드레스",
-    buyer: "스타일위크",
-    type: "GENERAL",
-    items: [{ name: "플리츠 미디 스커트", quantity: 45, unit: "장", price: 15000, material: "폴리" }],
-    status: "CANCELED",
-    subtotal: 675000,
-    platformFee: 33750,
-    shippingFee: 0,
-    trackingNo: null,
-    paymentMethod: "무통장 입금",
-    receiver: "홍길동 / 010-1234-5678",
-    receiverAddress: "서울특별시 강남구 테헤란로 123 A동 5층",
-    issueMemo: "내부 예산 변경으로 인해 주문을 진행하지 않기로 결정했습니다.",
   },
 ];
+
+function formatOrderDate(value: string) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value.replace("T", " ").slice(0, 16);
+  }
+
+  return date
+    .toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+    .replace(/\. /g, ".")
+    .replace(".", ".");
+}
+
+function mapOrderType(orderType: ApiOrderType, isSample: boolean): OrderType {
+  if (isSample) return "SAMPLE";
+  if (orderType === "CUSTOM") return "SOURCING";
+  return "GENERAL";
+}
+
+function mapOrderResponse(order: BuyerOrderListResponse): Order {
+  return {
+    orderId: order.orderId,
+    id: order.orderNo,
+    date: formatOrderDate(order.createdAt),
+    supplier: "판매사 정보 확인 중",
+    buyer: "내 주문",
+    type: mapOrderType(order.orderType, order.isSample),
+    items: [
+      {
+        name: "주문 상품 상세는 상세 화면에서 확인",
+        quantity: 0,
+        unit: "건",
+        price: order.totalAmount ?? 0,
+        material: "-",
+      },
+    ],
+    status: order.orderStatus,
+    subtotal: order.totalAmount ?? 0,
+    platformFee: 0,
+    shippingFee: 0,
+    trackingNo: null,
+    paymentMethod: "결제 정보 확인 중",
+    receiverName: "상세 화면에서 확인",
+    receiverAddress: "상세 화면에서 확인",
+    receiverAddressDetail: null,
+    issueMemo: order.canceledReason ?? undefined,
+  };
+}
+
+function applyOrderOverview(order: Order, overview: BuyerOrderOverviewResponse): Order {
+  const summary = overview.amountSummary;
+
+  return {
+    ...order,
+    items: overview.items.map((item) => ({
+      name: item.productName,
+      quantity: item.quantity,
+      unit: "개",
+      price: item.unitPrice + item.additionalPrice,
+      material: item.optionSummary ?? "-",
+    })),
+    status: overview.orderStatus,
+    subtotal: summary.subtotalAmount,
+    platformFee: summary.platformFee,
+    shippingFee: summary.shippingFee,
+    paymentMethod: summary.paymentMethod ?? "결제 정보 없음",
+    receiverName: summary.receiverName ?? "수령인 정보 없음",
+    receiverAddress: summary.receiverAddress ?? "배송지 정보 없음",
+    receiverAddressDetail: summary.receiverAddressDetail,
+  };
+}
 
 const searchOptions = [
   { value: "product", label: "제품명" },
@@ -493,6 +490,12 @@ function buildTimeline(order: Order) {
 
 function getNextAction(order: Order) {
   switch (order.status) {
+    case "PENDING":
+      return "결제 완료 후 주문이 확정됩니다";
+    case "CONFIRMED":
+      return "셀러가 주문을 확인하고 출고 준비를 시작합니다";
+    case "PREPARING":
+      return "셀러가 상품 출고를 준비 중입니다";
     case "SAMPLE_DELIVERED":
       return "샘플 확인 후 본생산 확정, 재협상, 취소 중 선택";
     case "SAMPLE_RENEGOTIATING":
@@ -511,17 +514,23 @@ function getNextAction(order: Order) {
       return "취소 처리된 주문입니다";
     case "COMPLETED":
       return "거래가 완료되었습니다";
+    case "REFUNDED":
+      return "환불 처리가 완료되었습니다";
     default:
       return "셀러의 다음 처리를 기다리는 중입니다";
   }
 }
 
 function needsBuyerAction(order: Order) {
-  return ["SAMPLE_DELIVERED", "CONTRACT_SIGNING", "CONTRACT_CONFIRMED", "DELIVERED"].includes(order.status);
+  return ["PENDING", "SAMPLE_DELIVERED", "CONTRACT_SIGNING", "CONTRACT_CONFIRMED", "DELIVERED"].includes(order.status);
 }
 
 function getPassiveNotice(order: Order) {
   switch (order.status) {
+    case "CONFIRMED":
+      return "주문 확정";
+    case "PREPARING":
+      return "출고 준비 중";
     case "SAMPLE_RENEGOTIATING":
       return "셀러 검토 대기";
     case "SHIPPED":
@@ -543,6 +552,7 @@ function matchesFilter(order: Order, filter: string) {
   if (filter === "ALL") return true;
   if (filter === "PROGRESS") {
     return [
+      "PENDING",
       "CONFIRMED",
       "SAMPLE_PREPARING",
       "SAMPLE_SHIPPED",
@@ -554,12 +564,18 @@ function matchesFilter(order: Order, filter: string) {
     ].includes(order.status);
   }
   if (filter === "SHIPPING") return ["SHIPPED", "DELIVERED"].includes(order.status);
-  if (filter === "ISSUE") return ["DISPUTE", "CANCELED", "REFUNDED", "COMPLETED"].includes(order.status);
+  if (filter === "DONE") return order.status === "COMPLETED";
+  if (filter === "ISSUE") return ["DISPUTE", "CANCELED", "REFUNDED"].includes(order.status);
   return true;
 }
 
 export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
-  const [expandedId, setExpandedId] = useState<string | null>("ORD-2024-0855");
+  const [orders, setOrders] = useState<Order[]>(exampleOrders);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loadingOverviewId, setLoadingOverviewId] = useState<string | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState("PROGRESS");
   const [searchType, setSearchType] = useState<SearchType>("product");
   const [search, setSearch] = useState("");
@@ -568,6 +584,60 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [renegotiateTarget, setRenegotiateTarget] = useState<Order | null>(null);
   const [renegotiateText, setRenegotiateText] = useState("");
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+
+        const response = await api.get<BuyerOrderListResponse[]>("/orders");
+        const orderResponses = Array.isArray(response) ? response : [];
+        const nextOrders = orderResponses.map(mapOrderResponse);
+
+        if (!Array.isArray(response)) {
+          setLoadError("주문 목록 응답 형식이 맞지 않아 예시 데이터를 표시하고 있습니다.");
+        }
+
+        setOrders(nextOrders.length > 0 ? nextOrders : exampleOrders);
+        setExpandedId(null);
+      } catch (error) {
+        console.error("주문 목록 조회 실패", error);
+        setLoadError("주문 목록을 불러오지 못해 예시 데이터를 표시하고 있습니다.");
+        setOrders(exampleOrders);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadOrders();
+  }, []);
+
+  const handleToggleOrder = async (order: Order) => {
+    const nextExpandedId = expandedId === order.id ? null : order.id;
+    setExpandedId(nextExpandedId);
+    setOverviewError(null);
+
+    if (!nextExpandedId || !order.orderId || order.isExample) {
+      return;
+    }
+
+    try {
+      setLoadingOverviewId(order.id);
+      const overview = await api.get<BuyerOrderOverviewResponse>(`/orders/${order.orderId}`);
+
+      setOrders((previous) =>
+        previous.map((current) =>
+          current.id === order.id ? applyOrderOverview(current, overview) : current
+        )
+      );
+    } catch (error) {
+      console.error("주문 상세 요약 조회 실패", error);
+      setOverviewError("주문 상품 정보를 불러오지 못했습니다.");
+    } finally {
+      setLoadingOverviewId(null);
+    }
+  };
 
   const filteredOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -582,22 +652,24 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
 
       return filterMatched && keywordMatched;
     });
-  }, [activeFilter, search, searchType]);
+  }, [activeFilter, orders, search, searchType]);
 
   const stats = useMemo(() => {
     const inProgress = orders.filter((order) =>
-      ["CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "SAMPLE_RENEGOTIATING", "PREPARING"].includes(order.status)
+      ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "SAMPLE_RENEGOTIATING", "PREPARING"].includes(order.status)
     ).length;
     const shipping = orders.filter((order) => ["SHIPPED", "DELIVERED"].includes(order.status)).length;
+    const done = orders.filter((order) => order.status === "COMPLETED").length;
     const issues = orders.filter((order) => ["DISPUTE", "CANCELED", "REFUNDED"].includes(order.status)).length;
 
     return [
       { filter: "ALL", label: "전체 주문", value: `${orders.length}건`, icon: <ReceiptText size={18} />, tone: "bg-secondary text-primary" },
       { filter: "PROGRESS", label: "진행 중", value: `${inProgress}건`, icon: <Truck size={18} />, tone: "bg-sky-50 text-sky-700" },
       { filter: "SHIPPING", label: "배송 중", value: `${shipping}건`, icon: <Package size={18} />, tone: "bg-amber-50 text-amber-700" },
-      { filter: "ISSUE", label: "완료/이슈", value: `${issues}건`, icon: <AlertCircle size={18} />, tone: "bg-red-50 text-red-700" },
+      { filter: "DONE", label: "거래 완료", value: `${done}건`, icon: <CheckCircle size={18} />, tone: "bg-green-50 text-green-700" },
+      { filter: "ISSUE", label: "이슈", value: `${issues}건`, icon: <AlertCircle size={18} />, tone: "bg-red-50 text-red-700" },
     ];
-  }, []);
+  }, [orders]);
 
   const handleConfirmTrade = () => {
     setConfirmTarget(null);
@@ -641,7 +713,7 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
           </div>
         </header>
 
-        <section className="mb-5 grid gap-3 md:grid-cols-4">
+        <section className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {stats.map((stat) => (
             <button
               key={stat.label}
@@ -690,13 +762,21 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
           </div>
         </section>
 
+        {(isLoading || loadError) && (
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+            {isLoading ? "주문 목록을 불러오는 중입니다." : loadError}
+          </div>
+        )}
+
         <main className="space-y-4">
           {filteredOrders.map((order) => (
             <OrderCard
               key={order.id}
               order={order}
               expanded={expandedId === order.id}
-              onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
+              overviewLoading={loadingOverviewId === order.id}
+              overviewError={expandedId === order.id ? overviewError : null}
+              onToggle={() => handleToggleOrder(order)}
               onConfirm={setConfirmTarget}
               onDispute={setDisputeTarget}
               onCancel={setCancelTarget}
@@ -816,6 +896,8 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
 function OrderCard({
   order,
   expanded,
+  overviewLoading,
+  overviewError,
   onToggle,
   onConfirm,
   onDispute,
@@ -824,6 +906,8 @@ function OrderCard({
 }: {
   order: Order;
   expanded: boolean;
+  overviewLoading: boolean;
+  overviewError: string | null;
   onToggle: () => void;
   onConfirm: (order: Order) => void;
   onDispute: (order: Order) => void;
@@ -843,6 +927,9 @@ function OrderCard({
           <div className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-black text-slate-950">{order.id}</span>
+              {order.isExample && (
+                <Badge className="border-slate-200 bg-slate-100 text-slate-500">예시 데이터</Badge>
+              )}
               <Badge className={type.tone}>{type.label}</Badge>
             </div>
 
@@ -868,7 +955,6 @@ function OrderCard({
               <p className="text-xs font-bold text-slate-500">결제 금액</p>
               <p className="mt-1 whitespace-nowrap text-xl font-black text-primary">{formatPrice(getOrderTotal(order))}</p>
             </div>
-            <span className="text-slate-400">{expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
           </div>
         </div>
       </button>
@@ -907,6 +993,16 @@ function OrderCard({
 
       {expanded && (
         <div className="border-t border-slate-100 p-5">
+          {overviewLoading && (
+            <div className="mb-4 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-500">
+              주문 상품 정보를 불러오는 중입니다.
+            </div>
+          )}
+          {overviewError && (
+            <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+              {overviewError}
+            </div>
+          )}
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="space-y-5">
               <section>
@@ -972,10 +1068,12 @@ function OrderCard({
                   <SummaryRow label="최종 금액" value={formatPrice(getOrderTotal(order))} strong />
                 </div>
                 <SummaryRow label="결제 방식" value={order.paymentMethod} />
-                <SummaryRow label="수령인" value={order.receiver} />
+                <SummaryRow label="수령인" value={order.receiverName} />
                 <div>
                   <p className="text-xs font-bold text-slate-500">배송지</p>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">{order.receiverAddress}</p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">
+                    {[order.receiverAddress, order.receiverAddressDetail].filter(Boolean).join(" ")}
+                  </p>
                 </div>
                 {order.trackingNo && (
                   <SummaryRow label="송장번호" value={`${order.carrier ?? ""} ${order.trackingNo}`} />
@@ -1004,6 +1102,25 @@ function OrderActions({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {order.status === "PENDING" && (
+        <>
+          {order.orderId ? (
+            <LinkButton to={`/checkout?orderId=${order.orderId}`} icon={<Clock size={13} />}>결제하러 가기</LinkButton>
+          ) : (
+            <ActionButton tone="ghost" icon={<Clock size={13} />} onClick={() => undefined}>결제 대기</ActionButton>
+          )}
+          <ActionButton tone="ghost" icon={<XCircle size={13} />} onClick={() => onCancel(order)}>주문 취소</ActionButton>
+        </>
+      )}
+
+      {order.status === "CONFIRMED" && (
+        <ActionButton tone="ghost" icon={<CheckCircle size={13} />} onClick={() => undefined}>주문 확정</ActionButton>
+      )}
+
+      {order.status === "PREPARING" && (
+        <ActionButton tone="ghost" icon={<Package size={13} />} onClick={() => undefined}>출고 준비 중</ActionButton>
+      )}
+
       {order.status === "SAMPLE_DELIVERED" && (
         <>
           <ActionButton tone="ghost" icon={<XCircle size={13} />} onClick={() => onCancel(order)}>샘플 거절</ActionButton>
@@ -1036,6 +1153,10 @@ function OrderActions({
         </a>
       )}
 
+      {order.status === "SHIPPED" && !order.trackingNo && (
+        <ActionButton tone="ghost" icon={<Truck size={13} />} onClick={() => undefined}>배송 진행 중</ActionButton>
+      )}
+
       {order.status === "DELIVERED" && (
         <>
           <ActionButton icon={<CheckCircle size={13} />} onClick={() => onConfirm(order)}>거래 확정</ActionButton>
@@ -1045,6 +1166,10 @@ function OrderActions({
 
       {order.status === "CANCELED" && (
         <ActionButton tone="ghost" icon={<Eye size={13} />} onClick={() => onCancel(order)}>취소 사유</ActionButton>
+      )}
+
+      {order.status === "REFUNDED" && (
+        <ActionButton tone="ghost" icon={<RotateCcw size={13} />} onClick={() => undefined}>환불 완료</ActionButton>
       )}
 
       <Link

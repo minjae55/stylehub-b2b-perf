@@ -1,10 +1,8 @@
 package kr.remerge.stylehub.domain.tosspayment;
 
 import jakarta.transaction.Transactional;
-import kr.remerge.stylehub.domain.order.OrderRepository;
-import kr.remerge.stylehub.domain.order.entity.Order;
+import kr.remerge.stylehub.domain.order.repository.OrderRepository;
 import kr.remerge.stylehub.domain.tosspayment.entity.TossPayments;
-import kr.remerge.stylehub.domain.tosspayment.enumtype.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

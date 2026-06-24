@@ -49,6 +49,23 @@ type CheckoutPreviewResponse = {
   totalAmount: number;
 };
 
+type OrderCheckoutResponse = {
+  orderId: number;
+  orderNo: string;
+  items: Array<{
+    orderItemId: number;
+    productName: string;
+    optionSummary: string | null;
+    quantity: number;
+    unitPrice: number;
+    additionalPrice: number;
+    totalPrice: number;
+  }>;
+  productAmount: number;
+  shippingFee: number;
+  totalAmount: number;
+};
+
 type OrderCreateResponse = {
   orderNos: string[];
   totalAmount: number;
@@ -135,6 +152,7 @@ export function Checkout() {
   const orderId = searchParams.get("orderId") ?? "";
 
   const isCustom = orderType === "custom";
+  const isOrderCheckout = !isCustom && orderId.length > 0;
   const isSample = orderType === "sample";
   const isSigned = isCustom ? (isSignedMap[orderId] ?? false) : true;
 
@@ -156,7 +174,7 @@ export function Checkout() {
       return;
     }
 
-    if (!checkoutState?.cartItemIds.length) {
+    if (!isOrderCheckout && !checkoutState?.cartItemIds.length) {
       setPreviewError("선택한 장바구니 상품이 없습니다.");
       setIsPreviewLoading(false);
       return;
@@ -164,6 +182,27 @@ export function Checkout() {
 
     const loadCheckoutPreview = async () => {
       try {
+        if (isOrderCheckout) {
+          const response = await api.get<OrderCheckoutResponse>(`/checkout/preview/${orderId}`);
+
+          setCheckoutPreview({
+            cartType: "NORMAL",
+            items: response.items.map((item) => ({
+              cartItemId: item.orderItemId,
+              productName: item.productName,
+              optionLabel: item.optionSummary ?? "옵션 정보 없음",
+              unitPrice: item.unitPrice + item.additionalPrice,
+              quantity: item.quantity,
+              totalPrice: item.totalPrice,
+            })),
+            productAmount: response.productAmount,
+            shippingFee: response.shippingFee,
+            totalAmount: response.totalAmount,
+          });
+          setCheckoutOrderNo(response.orderNo);
+          return;
+        }
+
         const response = await api.post<CheckoutPreviewResponse>("/checkout/preview", {
           cartItemIds: checkoutState.cartItemIds,
           cartType: checkoutState.cartType,
@@ -183,7 +222,7 @@ export function Checkout() {
     };
 
     void loadCheckoutPreview();
-  }, [checkoutState, isCustom]);
+  }, [checkoutState, isCustom, isOrderCheckout, orderId]);
 
   useEffect(() => {
     const loadAddresses = async () => {
@@ -223,6 +262,7 @@ export function Checkout() {
   const [createdOrderTotal, setCreatedOrderTotal] = useState(0);
   const [isTestOrderLoading, setIsTestOrderLoading] = useState(false);
   const [testOrderError, setTestOrderError] = useState("");
+  const [checkoutOrderNo, setCheckoutOrderNo] = useState("");
 
   const subtotal = checkoutPreview?.productAmount
     ?? orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -347,7 +387,7 @@ export function Checkout() {
 };
 
   const handleTestOrder = async () => {
-    if (!checkoutState?.cartItemIds.length || !selectedAddress || isTestOrderLoading) return;
+    if (isOrderCheckout || !checkoutState?.cartItemIds.length || !selectedAddress || isTestOrderLoading) return;
 
     try {
       setIsTestOrderLoading(true);
@@ -368,6 +408,17 @@ export function Checkout() {
     } finally {
       setIsTestOrderLoading(false);
     }
+  };
+
+  const handleTestOrderPayment = () => {
+    if (!isOrderCheckout || !selectedAddress || isTestOrderLoading) return;
+
+    setIsTestOrderLoading(true);
+    setTestOrderError("");
+    setCreatedOrderNumbers([checkoutOrderNo || `ORDER-${orderId}`]);
+    setCreatedOrderTotal(total);
+    setShowSuccessModal(true);
+    setIsTestOrderLoading(false);
   };
 
   return (
@@ -576,7 +627,9 @@ export function Checkout() {
                       <Truck size={14} />
                       배송비
                     </div>
-                    <span className="text-sm font-black text-amber-900">{shippingText}</span>
+                    {shipping > 0 && (
+                      <span className="text-sm font-black text-amber-900">{shippingText}</span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs leading-5 text-amber-700">{shippingDescription}</p>
                 </div>
@@ -625,7 +678,7 @@ export function Checkout() {
                     : `${formatPrice(total)} 결제하기`}
               </button>
 
-              {import.meta.env.DEV && !isCustom && (
+              {import.meta.env.DEV && !isCustom && !isOrderCheckout && (
                 <div className="mt-3">
                   <button
                     type="button"
@@ -643,6 +696,20 @@ export function Checkout() {
                   {testOrderError && (
                     <p className="mt-2 text-center text-xs font-medium text-rose-600">{testOrderError}</p>
                   )}
+                </div>
+              )}
+
+              {import.meta.env.DEV && isOrderCheckout && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    disabled={!selectedAddress || isTestOrderLoading}
+                    onClick={handleTestOrderPayment}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 bg-secondary/50 px-4 py-2.5 text-xs font-bold text-primary transition hover:border-primary hover:bg-secondary disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
+                  >
+                    <ReceiptText size={14} />
+                    {isTestOrderLoading ? "임시 결제 처리 중..." : "개발용 임시 결제 완료"}
+                  </button>
                 </div>
               )}
 

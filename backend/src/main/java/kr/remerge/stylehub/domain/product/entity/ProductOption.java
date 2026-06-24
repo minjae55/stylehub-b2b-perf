@@ -1,7 +1,6 @@
 package kr.remerge.stylehub.domain.product.entity;
 
 import jakarta.persistence.*;
-import kr.remerge.stylehub.domain.cart.dto.CartOptionResponse;
 import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.*;
 
