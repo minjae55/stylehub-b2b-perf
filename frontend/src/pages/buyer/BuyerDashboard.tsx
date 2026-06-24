@@ -1,11 +1,22 @@
-import { Link, useNavigate } from "react-router";
+import {Link, useNavigate} from "react-router";
 import {
-  FileText, MessageSquare, CreditCard, Truck,
-  CheckSquare, ChevronRight, AlertCircle, Clock,
-  ArrowRight, Package, Plus, ShoppingBag, Bell, Settings,
-  Scale, Timer, Layers,
+  AlertCircle,
+  ArrowRight,
+  Bell,
+  CheckSquare,
+  ChevronRight,
+  CreditCard,
+  FileText,
+  Layers,
+  MessageSquare,
+  Plus,
+  Scale,
+  Settings,
+  ShoppingBag,
+  Timer,
+  Truck,
 } from "lucide-react";
-import { useState } from "react";
+import {useState} from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -780,7 +791,7 @@ export function BuyerDashboard() {
                 </div>
 
                 <Link
-                    to="/company-settings"
+                    to="/settings"
                     className="flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100"
                     aria-label="설정"
                 >

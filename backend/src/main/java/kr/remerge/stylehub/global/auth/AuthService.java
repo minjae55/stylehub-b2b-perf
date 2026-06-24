@@ -4,85 +4,58 @@ import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
 import kr.remerge.stylehub.global.auth.dto.LoginRequest;
 import kr.remerge.stylehub.global.auth.dto.TokenResponse;
+import kr.remerge.stylehub.global.auth.jwt.JwtProperties;
 import kr.remerge.stylehub.global.auth.jwt.JwtProvider;
-import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
+import kr.remerge.stylehub.global.common.RedisRepository;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-/*
-흐름 요약
-로그인 요청
-    → 유저 조회 → 상태 체크 → 실패 횟수 체크
-    → AuthenticationManager로 비밀번호 검증
-    → 성공 : 로그인 정보 업데이트 → JWT 발급
-    → 실패 : 실패 횟수 증가 → 예외 던지기
 
-토큰 재발급
-    → 리프레시 토큰 만료 확인
-    → userId 추출 → 유저 조회 → 상태 체크
-    → 새 액세스 토큰 발급
-*/
+import java.security.SecureRandom;
+import java.time.Duration;
 
-// 로그인, 로그아웃, 토큰 재발급 등 인증 관련 비즈니스 로직 담당
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final AuthenticationManager authenticationManager;
+    private final RedisRepository redisRepository;
     private final JwtProvider jwtProvider;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtProperties jwtProperties;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    // 💡 피드백 반영: yaml 파일 설정을 직접 읽어오도록 변경 (밀리초 단위)
+
 
     // ───────────────────────────────────────────
     // 일반 로그인
     // ───────────────────────────────────────────
-
     @Transactional
     public TokenResponse login(LoginRequest request, String clientIp) {
-
-        // 1. 이메일로 유저 조회
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // 2. 계정 상태 체크
         validateUserStatus(user);
-        boolean result = passwordEncoder.matches(request.password(), user.getPassword());
-        // 3. 로그인 실패 횟수 체크
+
         if (user.getFailedLoginAttempts() >= 5) {
             throw new BusinessException(ErrorCode.LOGIN_ATTEMPTS_EXCEEDED);
         }
-        //───────────────────────────────────────────
-        System.out.println("=================================================");
-        System.out.println("👉 내 서버가 만든 '1'의 해시값: " + passwordEncoder.encode("1"));
-        System.out.println("[백엔드] 1. 유저가 입력한 날것의 암호: " + request.password());
-        System.out.println("[백엔드] 2. 현재 DB에 저장된 해시값: " + user.getPassword());
 
-        boolean isMatch = passwordEncoder.matches(request.password(), user.getPassword());
-        System.out.println("[백엔드] 3. BCrypt 매치 결과 (일치여부): " + isMatch);
-        System.out.println("=================================================");
-        // ───────────────────────────────────────────────────────────────
-        // 4. 비밀번호 검증
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        boolean passwordMatched = passwordEncoder.matches(request.password(), user.getPassword());
+
+        if (!passwordMatched) {
             user.onLoginFailed();
             throw new BusinessException(ErrorCode.INVALID_PASSWORD);
         }
 
-        // 5. 인증 성공 처리
         user.onLoginSuccess(clientIp);
 
-        // 6. SecurityContext 등록 (필요 시)
-        CustomUserDetails userDetails = new CustomUserDetails(user);
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        // 7. JWT 발급 (이 부분을 꼭 추가하세요!)
         String accessToken = jwtProvider.generateAccessToken(
                 user.getUserId(),
                 user.getCompany().getCompanyId(),
@@ -90,33 +63,37 @@ public class AuthService {
                 user.getBusinessRole().name()
         );
         String refreshToken = jwtProvider.generateRefreshToken(user.getUserId());
+
+        redisRepository.save(
+                refreshTokenKey(user.getUserId()),
+                refreshToken,
+                Duration.ofMillis(jwtProperties.getRefreshTokenExpiration())
+        );
+
         return TokenResponse.of(accessToken, refreshToken);
     }
 
     // ───────────────────────────────────────────
-    // 액세스 토큰 재발급
+    // 액세스 토큰 재발급 (Refresh)
     // ───────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public TokenResponse refresh(String refreshToken) {
-
-        // 1. 리프레시 토큰 만료 여부 확인
         if (jwtProvider.isExpired(refreshToken)) {
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_EXPIRED);
         }
 
-        // 2. 리프레시 토큰에서 userId 추출
         Integer userId = jwtProvider.getUserId(refreshToken);
 
-        // 3. DB에서 유저 조회
+        String savedRefreshToken = redisRepository.get(refreshTokenKey(userId));
+        if (savedRefreshToken == null || !savedRefreshToken.equals(refreshToken)) {
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_EXPIRED);
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // 4. 계정 상태 재확인
         validateUserStatus(user);
 
-        // 5. 새 액세스 토큰 발급
-        //    리프레시 토큰은 그대로 유지
         String newAccessToken = jwtProvider.generateAccessToken(
                 user.getUserId(),
                 user.getCompany().getCompanyId(),
@@ -127,19 +104,92 @@ public class AuthService {
     }
 
     // ───────────────────────────────────────────
-    // 계정 상태 검증 (내부 공통 메서드)
+    // 로그아웃 (Logout)
     // ───────────────────────────────────────────
+    public void logout(Integer userId) {
+        redisRepository.delete(refreshTokenKey(userId));
+    }
 
     private void validateUserStatus(User user) {
         switch (user.getStatus()) {
-            case PENDING ->
-                    throw new BusinessException(ErrorCode.USER_PENDING);
-            case SUSPENDED ->
-                    throw new BusinessException(ErrorCode.USER_SUSPENDED);
-            case DELETED ->
-                    throw new BusinessException(ErrorCode.USER_DELETED);
-            default -> {} // APPROVED → 통과
+            case PENDING -> throw new BusinessException(ErrorCode.USER_PENDING);
+            case SUSPENDED -> throw new BusinessException(ErrorCode.USER_SUSPENDED);
+            case DELETED -> throw new BusinessException(ErrorCode.USER_DELETED);
+            default -> {}
         }
     }
 
+    // ───────────────────────────────────────────
+    // 정보 변경을 위한 인증 코드 발송 및 검증
+    // ───────────────────────────────────────────
+    public void sendChangeAuthCode(String target) {
+        String otpCode = String.format("%06d", SECURE_RANDOM.nextInt(1000000));
+        saveOtp(target, otpCode);
+    }
+
+    public void verifyChangeAuthCode(String target, String code) {
+        validateOtpCode(target, code);
+        redisRepository.save(verificationKey(target), "true", Duration.ofMinutes(10));
+        redisRepository.delete(target);
+    }
+
+    // ───────────────────────────────────────────
+    // 아이디 찾기 / 공통 OTP 검증 및 삭제
+    // ───────────────────────────────────────────
+    public void sendFindIdOtp(String phone, String otpCode) {
+        saveOtp(phone, otpCode);
+    }
+
+    public void verifyOtpAndClear(String phone, String code) {
+        validateOtpCode(phone, code);
+        redisRepository.delete(phone);
+    }
+
+    // ───────────────────────────────────────────
+    // 회원정보 수정 시 '이메일 인증 여부' 검증 정책
+    // ───────────────────────────────────────────
+    public void validateVerification(String target) {
+        if (isNotVerified(target)) {
+            throw new BusinessException(ErrorCode.UNVERIFIED_EMAIL);
+        }
+        invalidateVerification(target);
+    }
+
+    public boolean isNotVerified(String target) {
+        return !isVerified(target);
+    }
+
+    public boolean isVerified(String target) {
+        String authStatus = redisRepository.get(verificationKey(target));
+        return "true".equals(authStatus);
+    }
+
+    public void invalidateVerification(String target) {
+        redisRepository.delete(verificationKey(target));
+    }
+
+    // ───────────────────────────────────────────
+    // 내부 헬퍼 메서드 (Private Helpers)
+    // ───────────────────────────────────────────
+    private void validateOtpCode(String target, String code) {
+        String savedCode = redisRepository.get(target);
+        if (savedCode == null) {
+            throw new BusinessException(ErrorCode.OTP_EXPIRED);
+        }
+        if (!savedCode.equals(code)) {
+            throw new BusinessException(ErrorCode.INVALID_OTP_CODE);
+        }
+    }
+
+    private void saveOtp(String target, String code) {
+        redisRepository.save(target, code, Duration.ofMinutes(3));
+    }
+
+    private String verificationKey(String target) {
+        return "VERIFIED:" + target;
+    }
+
+    private String refreshTokenKey(Integer userId) {
+        return "REFRESH_TOKEN:" + userId;
+    }
 }

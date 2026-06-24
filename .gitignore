@@ -42,15 +42,15 @@ replay_pid*
 # ==========================================
 # Frontend (React + Vite)
 # ==========================================
-frontend/node_modules/
-frontend/dist/
+node_modules/
+dist/
 
 # 테스트
-frontend/coverage/
+coverage/
 
 # 캐시
-frontend/.vite/
-frontend/.cache/
+.vite/
+.cache/
 
 # ==========================================
 # Environment

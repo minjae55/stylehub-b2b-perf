@@ -1,11 +1,23 @@
-import { Link, useNavigate } from "react-router";
+import {Link, useNavigate} from "react-router";
 import {
-    Inbox, FileText, MessageSquare, Truck,
-    Banknote, ChevronRight, AlertCircle, Clock,
-    ArrowRight, Package, Plus, CheckCircle, Layers,
-    ShoppingBag, Bell, Settings, Scale,
+    AlertCircle,
+    ArrowRight,
+    Banknote,
+    Bell,
+    CheckCircle,
+    ChevronRight,
+    Clock,
+    FileText,
+    Inbox,
+    Layers,
+    MessageSquare,
+    Plus,
+    Scale,
+    Settings,
+    ShoppingBag,
+    Truck,
 } from "lucide-react";
-import { useState } from "react";
+import {useState} from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -767,7 +779,7 @@ export function SellerDashboard() {
                                 )}
                             </div>
                             <Link
-                                to="/company-settings"
+                                to="/settings"
                                 className="flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100"
                                 aria-label="설정"
                             >

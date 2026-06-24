@@ -76,14 +76,7 @@ export function FindPw() {
                             <br />링크 유효시간은 <span className="font-semibold">30분</span>입니다.
                         </p>
                     </div>
-                    <div className="flex gap-2 justify-center">
-                        <button
-                            type="button"
-                            onClick={handleReset}
-                            className="border border-border text-muted-foreground hover:border-primary hover:text-primary px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-                        >
-                            다시 찾기
-                        </button>
+                    <div className="flex justify-center">
                         <Link
                             to="/auth/login"
                             className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors"

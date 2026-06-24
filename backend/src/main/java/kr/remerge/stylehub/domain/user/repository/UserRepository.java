@@ -2,6 +2,8 @@ package kr.remerge.stylehub.domain.user.repository;
 
 import kr.remerge.stylehub.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
@@ -12,6 +14,10 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     // 이메일 중복 체크 (회원가입 시 사용)
     boolean existsByEmail(String email);
+
+    // User를 가져올 때 Company까지 한 번에 로딩
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.company WHERE u.userId = :userId")
+    Optional<User> findByIdWithCompany(@Param("userId") Integer userId);
 
     // ───────────────────────────────────────────
     // 아이디 / 비밀번호 찾기

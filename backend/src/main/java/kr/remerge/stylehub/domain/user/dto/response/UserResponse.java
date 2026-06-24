@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public record UserResponse(
         Integer userId,
         Integer companyId,
+        String companyName,
         String email,
         String name,
         String phone,
@@ -29,6 +30,7 @@ public record UserResponse(
         return UserResponse.builder()
                 .userId(user.getUserId())
                 .companyId(user.getCompany() != null ? user.getCompany().getCompanyId() : null)
+                .companyName(user.getCompany() != null ? user.getCompany().getName() : null)
                 .email(user.getEmail())
                 .name(user.getName())
                 .phone(user.getPhone())

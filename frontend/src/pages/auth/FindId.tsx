@@ -132,6 +132,7 @@ export function FindId() {
 
     return (
         <>
+
             <Link
                 to="/auth/login"
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors mb-4"
@@ -163,13 +164,6 @@ export function FindId() {
                         </div>
                     </div>
                     <div className="flex gap-2 justify-center">
-                        <button
-                            type="button"
-                            onClick={handleReset}
-                            className="border border-border text-muted-foreground hover:border-primary hover:text-primary px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-                        >
-                            다시 찾기
-                        </button>
                         <Link
                             to="/auth/login"
                             className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
