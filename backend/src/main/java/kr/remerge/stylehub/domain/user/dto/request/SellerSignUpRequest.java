@@ -64,15 +64,15 @@ public record SellerSignUpRequest(
                 .build();
     }
 
-    public User toUserEntity(Company company, String encodedPassword) {
+    public User toUserEntity(Company company, String encodedPassword, UserRole userRole, BusinessRole businessRole) {
         return User.builder()
                 .company(company)
                 .email(email)
                 .password(encodedPassword)
                 .name(name)
                 .phone(phone)
-                .role(UserRole.PRESIDENT)
-                .businessRole(BusinessRole.SELLER)
+                .role(userRole)
+                .businessRole(businessRole)
                 .status(UserStatus.PENDING)
                 .build();
     }

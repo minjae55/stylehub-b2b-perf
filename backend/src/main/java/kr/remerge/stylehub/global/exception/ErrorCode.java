@@ -22,6 +22,8 @@ public enum ErrorCode {
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "AUTH_005", "리프레시 토큰이 만료되었습니다."),
     OTP_EXPIRED(HttpStatus.BAD_REQUEST, "AUTH_006", "인증 시간이 만료되었습니다. 다시 시도해 주세요."),
     INVALID_OTP_CODE(HttpStatus.BAD_REQUEST, "AUTH_007", "인증번호가 일치하지 않습니다."),
+    UNVERIFIED_EMAIL(HttpStatus.BAD_REQUEST, "AUTH_008", "인증되지 않은 이메일입니다."),
+    UNVERIFIED_PHONE(HttpStatus.BAD_REQUEST, "AUTH_009", "인증되지 않은 휴대폰 번호입니다."),
 
     // ───────────────────────────────────────────
     // 유저 (USER)
@@ -33,12 +35,14 @@ public enum ErrorCode {
     USER_PENDING(HttpStatus.FORBIDDEN, "USER_005", "승인 대기 중인 계정입니다."),
     USER_SUSPENDED(HttpStatus.FORBIDDEN, "USER_006", "정지된 계정입니다."),
     USER_DELETED(HttpStatus.FORBIDDEN, "USER_007", "탈퇴한 계정입니다."),
+    INVALID_BUSINESS_ROLE(HttpStatus.BAD_REQUEST, "USER_008", "유효하지 않은 비즈니스 역할입니다."),
 
     // ───────────────────────────────────────────
     // 회사 (COMPANY)
     // ───────────────────────────────────────────
     COMPANY_NOT_FOUND(HttpStatus.NOT_FOUND, "COMPANY_001", "회사를 찾을 수 없습니다."),
     DUPLICATE_BUSINESS_NUMBER(HttpStatus.CONFLICT, "COMPANY_002", "이미 등록된 사업자등록번호입니다."),
+    COMPANY_NOT_APPROVED(HttpStatus.FORBIDDEN, "COMPANY_003", "승인되지 않은 공급업체입니다."),
 
     // ───────────────────────────────────────────
     // 상품 (PRODUCT)
@@ -46,6 +50,13 @@ public enum ErrorCode {
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_001", "상품을 찾을 수 없습니다."),
     PRODUCT_OPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_002", "상품 옵션을 찾을 수 없습니다."),
     OUT_OF_STOCK(HttpStatus.BAD_REQUEST, "PRODUCT_003", "재고가 부족합니다."),
+
+    // ───────────────────────────────────────────
+    // 장바구니 (CART)
+    // ───────────────────────────────────────────
+    CART_ITEM_EMPTY(HttpStatus.BAD_REQUEST, "CART_001", "선택된 장바구니 상품이 없습니다."),
+    INVALID_CART_TYPE(HttpStatus.BAD_REQUEST, "CART_002", "장바구니 타입이 올바르지 않습니다."),
+    CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CART_003", "주문할 수 없는 장바구니 상품이 포함되어 있습니다."),
 
     // ───────────────────────────────────────────
     // 주문 (ORDER)
@@ -79,13 +90,17 @@ public enum ErrorCode {
     INVALID_CATEGORY_COUNT(HttpStatus.BAD_REQUEST, "CATEGORY_002", "선호 카테고리는 3개에서 5개 사이여야 합니다."),
 
     // ───────────────────────────────────────────
+    // 주소 (ADDRESS)
+    // ───────────────────────────────────────────
+    ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "ADDRESS_001", "주소를 찾을 수 없습니다."),
+
+    // ───────────────────────────────────────────
     // 공통 (COMMON)
     // ───────────────────────────────────────────
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "잘못된 입력값입니다."),
     EMPTY_FILE(HttpStatus.BAD_REQUEST, "COMMON_002", "업로드한 파일이 비어있습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_003", "서버 오류가 발생했습니다."),
-    FILE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_004", "파일 업로드 중 오류가 발생했습니다."),
-    ADDRESS_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_004", "파일 업로드 중 오류가 발생했습니다.");
+    FILE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_004", "파일 업로드 중 오류가 발생했습니다.");
     private final HttpStatus httpStatus; // 💡 400, 500 대신 HttpStatus 객체로 명확히 관리
     private final String code;           // 💡 프론트엔드가 식별할 비즈니스 커스텀 에러 코드 (ex: COMPANY_002)
     private final String message;        // 에러 메시지

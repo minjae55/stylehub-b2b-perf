@@ -1,10 +1,7 @@
 package kr.remerge.stylehub.domain.user;
 
 import jakarta.validation.Valid;
-import kr.remerge.stylehub.domain.user.dto.request.BuyerSignUpRequest;
-import kr.remerge.stylehub.domain.user.dto.request.EmployeeSignUpRequest;
-import kr.remerge.stylehub.domain.user.dto.request.SellerSignUpRequest;
-import kr.remerge.stylehub.domain.user.dto.request.UpdateUserRequest;
+import kr.remerge.stylehub.domain.user.dto.request.*;
 import kr.remerge.stylehub.domain.user.dto.response.UserResponse;
 import kr.remerge.stylehub.global.auth.dto.AuthUser;
 import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
@@ -86,14 +83,24 @@ public class UserController {
     // 내 정보 수정
     // ───────────────────────────────────────────
 
+    @PostMapping("/me/verify-password")
+    public ResponseEntity<ApiResponse<Void>> verifyPassword(
+            @LoginUser AuthUser userDetails,
+            @Valid @RequestBody VerifyPasswordRequest request) {
+
+        userService.verifyPassword(userDetails.userId(), request);
+
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
     // PATCH /api/users/me
     // JWT 인증 필요
     @PatchMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> updateMe(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @LoginUser AuthUser userDetails,
             @Valid @RequestBody UpdateUserRequest request) {
 
-        UserResponse response = userService.updateMe(userDetails.getUserId(), request);
+        UserResponse response = userService.updateMe(userDetails.userId(), request);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

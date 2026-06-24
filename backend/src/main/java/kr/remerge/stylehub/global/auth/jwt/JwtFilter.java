@@ -1,12 +1,14 @@
 package kr.remerge.stylehub.global.auth.jwt;
 
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import kr.remerge.stylehub.global.auth.security.CustomUserDetailsService;
+import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -74,7 +76,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 // 4. 토큰에서 userId 추출
                 Integer userId = jwtProvider.getUserId(token);
 
-                // 5. email로 DB에서 유저 정보 로드
+                // 5. userId로 DB에서 유저 정보 로드
                 UserDetails userDetails = customUserDetailsService.loadUserByUserId(userId);
 
                 // 6. 인증 객체 생성
@@ -88,11 +90,23 @@ public class JwtFilter extends OncePerRequestFilter {
                 // 7. SecurityContext에 인증 정보 저장
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
-        } catch (ExpiredJwtException e) {
+        } catch (ExpiredJwtException e){
+            // 만료
+            SecurityContextHolder.clearContext();
             // 액세스 토큰 만료 → 클라이언트가 /api/auth/refresh 호출해야 함
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"message\": \"액세스 토큰이 만료되었습니다.\"}");
+
+            writeErrorResponse(
+                    response,
+                    ErrorCode.EXPIRED_ACCESS_TOKEN
+            );
+            return;
+        } catch (JwtException | IllegalArgumentException e) {
+            // 위조 서명 오류
+            SecurityContextHolder.clearContext();
+            writeErrorResponse(
+                    response,
+                    ErrorCode.INVALID_TOKEN
+            );
             return;
         }
 
@@ -112,10 +126,32 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         for (Cookie cookie : cookies) {
-            if (cookie.getName().equals("accessToken")) {
+            if ("accessToken".equals(cookie.getName())) {
                 return cookie.getValue();
             }
         }
         return null;
+    }
+
+    private void writeErrorResponse(
+            HttpServletResponse response,
+            ErrorCode errorCode
+    ) throws IOException {
+
+        response.setStatus(errorCode.getHttpStatus().value());
+        response.setContentType("application/json;charset=UTF-8");
+
+        response.getWriter().write(
+                """
+                {
+                  "success": false,
+                  "code": "%s",
+                  "message": "%s"
+                }
+                """.formatted(
+                        errorCode.getCode(),
+                        errorCode.getMessage()
+                )
+        );
     }
 }

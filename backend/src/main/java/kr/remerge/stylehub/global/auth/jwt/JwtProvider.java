@@ -52,7 +52,6 @@ public class JwtProvider {
     private String buildToken(Integer userId, Integer companyId, String role, String businessRole, long expiration) {
         JwtBuilder builder = Jwts.builder()
                 .subject(String.valueOf(userId))  // 토큰 주인 (userId)
-                .claim("companyId", companyId) // 회사 PK
                 .claim("role", role)                 // ADMIN / PRESIDENT / EMPLOYEE
                 .claim("businessRole", businessRole) // BUYER / SELLER / BOTH
                 .issuedAt(new Date())             // 발급 시각

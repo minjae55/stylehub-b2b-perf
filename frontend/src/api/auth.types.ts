@@ -53,6 +53,24 @@ export interface EmployeeSignUpRequest {
 }
 
 // ───────────────────────────────────────────
+// 응답 타입
+// ───────────────────────────────────────────
+
+export interface UserResponse {
+    userId: number;
+    companyId: number;
+    companyName: string;
+    email: string;
+    name: string;
+    phone: string | null;
+    role: "ADMIN" | "PRESIDENT" | "EMPLOYEE";
+    businessRole: "BUYER" | "SELLER" | "BOTH";
+    profileImageUrl: string | null;
+    status: "PENDING" | "APPROVED" | "SUSPENDED" | "DELETED";
+    createdAt: string;
+}
+
+// ───────────────────────────────────────────
 // 아이디 찾기 (휴대폰 본인인증)
 // ───────────────────────────────────────────
 
@@ -92,18 +110,23 @@ export interface FindPwRequest {
 }
 
 // ───────────────────────────────────────────
-// 응답 타입
+// 회원 정보 변경 인증 (Profile OTP)
 // ───────────────────────────────────────────
 
-export interface UserResponse {
-    userId: number
-    companyId: number
-    email: string;
-    name: string;
-    phone: string | null;
-    role: "ADMIN" | "PRESIDENT" | "EMPLOYEE";
-    businessRole: "BUYER" | "SELLER" | "BOTH";
-    profileImageUrl: string | null;
-    status: "PENDING" | "APPROVED" | "SUSPENDED" | "DELETED";
-    createdAt: string;
+export interface ChangeEmailOtpRequest {
+    targetValue: string; // 변경할 이메일 주소
+}
+
+export interface VerifyEmailOtpRequest {
+    targetValue: string;
+    otpCode: string; // 6자리 인증번호
+}
+
+export interface ChangePhoneOtpRequest {
+    targetValue: string; // 변경할 연락처
+}
+
+export interface VerifyPhoneOtpRequest {
+    targetValue: string;
+    otpCode: string; // 6자리 인증번호
 }

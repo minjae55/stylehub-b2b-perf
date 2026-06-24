@@ -97,11 +97,23 @@ public class User extends BaseEntity {
         this.failedLoginAttempts++;
     }
 
+    // 비밀번호 변경 메서드
+    public void updatePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
     // 정보 수정
-    public void update(String name, String phone, String profileImageUrl) {
-        this.name = name;
-        this.phone = phone;
-        this.profileImageUrl = profileImageUrl;
+    public void update(String email, String phone, String profileImageUrl) {
+        if (name != null) {
+            this.email = email;
+        }
+        if (phone != null) {
+            this.phone = phone;
+        }
+        // 이미지를 바꾸지 않았을 때(null일 때) 기존 값을 유지하기 위함
+        if (profileImageUrl != null) {
+            this.profileImageUrl = profileImageUrl;
+        }
     }
 
     // 회원 탈퇴 (소프트 삭제)
