@@ -12,5 +12,7 @@ public record LoginRequest(
         String email,
 
         @NotBlank(message = "비밀번호를 입력해주세요.")
-        String password
+        String password,
+
+        boolean rememberMe // 자동 로그인
 ) {}

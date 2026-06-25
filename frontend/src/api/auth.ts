@@ -1,16 +1,16 @@
 import api from "@/api/axios";
 import {
     BuyerSignUpRequest,
+    ChangeEmailOtpRequest,
+    ChangePhoneOtpRequest,
     EmployeeSignUpRequest,
+    FindIdResponse,
     FindIdSendOtpRequest,
     FindIdVerifyOtpRequest,
-    FindIdResponse,
     FindPwRequest,
     LoginRequest,
     SellerSignUpRequest,
-    ChangeEmailOtpRequest,
     VerifyEmailOtpRequest,
-    ChangePhoneOtpRequest,
     VerifyPhoneOtpRequest
 } from "@/api/auth.types";
 
@@ -93,7 +93,7 @@ export interface UpdateProfilePayload {
 export const uploadFile = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
-    return await api.post<string>("/common/upload", formData, {
+    return await api.post<string>("/upload/image", formData, {
         headers: {
             "Content-Type": "multipart/form-data",
         },

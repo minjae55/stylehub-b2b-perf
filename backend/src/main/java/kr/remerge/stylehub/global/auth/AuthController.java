@@ -17,7 +17,6 @@ import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -44,9 +43,13 @@ public class AuthController {
         String clientIp = resolveClientIp(httpRequest);
         TokenResponse tokenResponse = authService.login(request, clientIp);
 
-        // 💡 밀리초(ms)를 초(Seconds) 단위로 변환해서 쿠키 Max-Age에 주입
-        long accessTokenMaxAge = jwtProperties.getAccessTokenExpiration() / 1000;
-        long refreshTokenMaxAge = jwtProperties.getRefreshTokenExpiration() / 1000;
+        final long accessTokenMaxAge = request.rememberMe() // 사용자가 '로그인 상태 유지'를 체크한 경우에만 실제 수명(밀리초 -> 초)을 부여
+                ? jwtProperties.getAccessTokenExpiration() / 1000 // 밀리초(ms)를 초(Seconds) 단위로 변환해서 쿠키 Max-Age에 주입
+                : -1; // 기본 수명 설정 (자동로그인 미체크 시: 브라우저 닫으면 만료되도록 -1 세팅)
+
+        final long refreshTokenMaxAge = request.rememberMe()
+                ? jwtProperties.getRefreshTokenExpiration() / 1000
+                : -1;
 
         ResponseCookie accessTokenCookie = createCookie(
                 "accessToken", tokenResponse.accessToken(), accessTokenMaxAge);
