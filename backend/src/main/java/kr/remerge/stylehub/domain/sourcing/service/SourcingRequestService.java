@@ -5,10 +5,10 @@ import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequest;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequestFile;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequestItem;
 import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingStatus;
-import kr.remerge.stylehub.domain.sourcing.enumtype.SupplierSourcingType;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestFileRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestItemRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestRepository;
+import kr.remerge.stylehub.domain.sourcing.repository.SourcingSupplierRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
 import kr.remerge.stylehub.global.common.ImageUploadService;
@@ -17,8 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -32,6 +30,7 @@ public class SourcingRequestService {
     private final SourcingRequestRepository sourcingRequestRepository;
     private final SourcingRequestItemRepository sourcingRequestItemRepository;
     private final SourcingRequestFileRepository sourcingRequestFileRepository;
+    private final SourcingSupplierRepository sourcingSupplierRepository;
     private final UserRepository userRepository;
     private final SourcingAutoAssignService sourcingAutoAssignService;
     private final ImageUploadService imageUploadService;
@@ -54,7 +53,13 @@ public class SourcingRequestService {
                         .map(SourcingRequestDto.FileResponse::from)
                         .toList();
 
-        return SourcingRequestDto.DetailResponse.of(request, items, files);
+        List<SourcingRequestDto.BidResponse> bids =
+                sourcingSupplierRepository.findBySourcingRequest_SourcingRequestId(sourcingRequestId)
+                        .stream()
+                        .map(SourcingRequestDto.BidResponse::from)
+                        .toList();
+
+        return SourcingRequestDto.DetailResponse.of(request, items, files, bids);
     }
 
     // ── 1단계: JSON 데이터 저장 ─────────────────────────────────────
@@ -92,7 +97,7 @@ public class SourcingRequestService {
 
             SourcingRequest saved = sourcingRequestRepository.save(request);
             sourcingAutoAssignService.assign(saved);
-            // 옵션 items 저장
+
             if (itemDto.getOptions() != null) {
                 for (SourcingRequestDto.OptionRequest opt : itemDto.getOptions()) {
                     SourcingRequestItem item = SourcingRequestItem.builder()
@@ -111,7 +116,7 @@ public class SourcingRequestService {
         return new SourcingRequestDto.CreateResponse(savedIds);
     }
 
-    // ── 2단계: 파일 저장 (외부 스토리지 연동 전 로컬 임시 저장) ────
+    // ── 2단계: 파일 저장 ────────────────────────────────────────────
     @Transactional
     public void uploadFiles(Integer sourcingRequestId, String fileType, List<MultipartFile> files) {
         SourcingRequest sourcingRequest = sourcingRequestRepository.findById(sourcingRequestId)
@@ -134,5 +139,4 @@ public class SourcingRequestService {
             sourcingRequestFileRepository.save(fileEntity);
         }
     }
-
 }

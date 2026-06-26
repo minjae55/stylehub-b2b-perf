@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
     CheckCircle, Upload, Package, Plus,
     Trash2, FileText, ChevronRight, X,
@@ -235,6 +235,7 @@ interface PrefillState {
 }
 
 export function SourcingRequest() {
+    const navigate = useNavigate();
     const location = useLocation();
     const prefill = (location.state as PrefillState) ?? {};
 
@@ -246,7 +247,6 @@ export function SourcingRequest() {
     };
 
     const [item, setItem] = useState<SourcingItem>(makeInitialItem);
-    const [submitted, setSubmitted] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -269,7 +269,7 @@ export function SourcingRequest() {
                 await uploadFiles(sourcingRequestId, "WORK_FILE", item.workFiles);
             }
 
-            setSubmitted(true);
+            navigate(`/buyer/sourcing-detail/${sourcingRequestId}`);
         } catch (e) {
             setError(e instanceof Error ? e.message : "요청 중 오류가 발생했습니다.");
         } finally {
@@ -344,40 +344,6 @@ export function SourcingRequest() {
     const totalReadySampleQty = sumReadySampleQty(item.readyOptions);
     const totalCustomQty = sumCustomQty(item.customOptions);
     const totalCustomSampleQty = sumCustomSampleQty(item.customOptions);
-
-    if (submitted) {
-        return (
-            <div className="max-w-[600px] mx-auto px-4 py-20 text-center font-[Inter,sans-serif]">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                    <CheckCircle size={32} className="text-green-500" />
-                </div>
-                <h2 className="text-2xl font-bold text-foreground mb-2">소싱 요청 완료!</h2>
-                <p className="text-muted-foreground text-sm leading-relaxed mb-8">
-                    소싱 요청서가 접수되었습니다.<br />
-                    스타일허브 소싱팀이 검토 후 영업일 <strong className="text-foreground">2~3일</strong> 이내로 연락드립니다.
-                </p>
-                <div className="bg-secondary border border-primary/20 rounded-lg p-5 text-left text-sm mb-8 space-y-2">
-                    <div className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <Package size={15} className="text-primary" /> 요청 내역
-                    </div>
-                    <div className="flex gap-3 text-muted-foreground">
-                        <span className="text-primary font-mono">1.</span>
-                        <span>
-                            {item.productName} · {item.type === "READY" ? "기성품" : "주문제작"} · {getTotalQty(item).toLocaleString()}개
-                        </span>
-                    </div>
-                </div>
-                <div className="flex gap-3 justify-center">
-                    <Link to="/suppliers" className="px-6 py-2.5 border border-border rounded font-medium text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors">
-                        공급업체 목록
-                    </Link>
-                    <Link to="/" className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-white rounded font-semibold text-sm transition-colors">
-                        홈으로
-                    </Link>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="max-w-[760px] mx-auto px-4 py-8 font-[Inter,sans-serif]">

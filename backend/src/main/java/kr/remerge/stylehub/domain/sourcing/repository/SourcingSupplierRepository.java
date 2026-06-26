@@ -59,4 +59,5 @@ public interface SourcingSupplierRepository extends JpaRepository<SourcingSuppli
 
     // 특정 소싱 요청의 전체 supplier 조회 (CANCELLED 체크용)
     List<SourcingSupplier> findAllBySourcingRequest_SourcingRequestId(Integer sourcingRequestId);
+    List<SourcingSupplier> findBySourcingRequest_SourcingRequestId(Integer sourcingRequestId);
 }

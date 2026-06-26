@@ -1,6 +1,7 @@
 package kr.remerge.stylehub.domain.sourcing.entity;
 
 import jakarta.persistence.*;
+import kr.remerge.stylehub.domain.quote.entity.Quote;
 import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.global.entity.BaseEntity;
@@ -57,7 +58,10 @@ public class SourcingSupplier extends BaseEntity {
     @Column(name = "responded_at")
     private LocalDateTime respondedAt;
 
-    // 비즈니스 메서드
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "quote_id")
+    private Quote quote;
+
     public void approve(User admin) {
         this.assignedBy = admin;
         this.status = SourcingSupplierStatus.RECOMMENDED;
@@ -70,8 +74,9 @@ public class SourcingSupplier extends BaseEntity {
         this.respondedAt = LocalDateTime.now();
     }
 
-    public void quote(String feedback) {
+    public void quote(String feedback, Quote quote) {
         this.sellerFeedback = feedback;
+        this.quote = quote;
         this.status = SourcingSupplierStatus.QUOTED;
         this.respondedAt = LocalDateTime.now();
     }
