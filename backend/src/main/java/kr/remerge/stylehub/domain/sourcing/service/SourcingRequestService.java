@@ -5,11 +5,13 @@ import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequest;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequestFile;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequestItem;
 import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingStatus;
+import kr.remerge.stylehub.domain.sourcing.enumtype.SupplierSourcingType;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestFileRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestItemRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.global.common.ImageUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class SourcingRequestService {
     private final SourcingRequestFileRepository sourcingRequestFileRepository;
     private final UserRepository userRepository;
     private final SourcingAutoAssignService sourcingAutoAssignService;
+    private final ImageUploadService imageUploadService;
 
     // ── 상세 조회 ────────────────────────────────────────────────────
     @Transactional(readOnly = true)
@@ -114,9 +117,12 @@ public class SourcingRequestService {
         SourcingRequest sourcingRequest = sourcingRequestRepository.findById(sourcingRequestId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 소싱 요청: " + sourcingRequestId));
 
+        boolean isCustom = sourcingRequest.getType().equals("CUSTOM");
+
         for (MultipartFile file : files) {
-            // TODO: 외부 스토리지(S3 등) 연동 시 이 부분을 스토리지 업로드로 교체
-            String savedUrl = saveToLocal(file);
+            String savedUrl = isCustom
+                    ? imageUploadService.uploadPdf(file, "sourcing/" + sourcingRequestId)
+                    : imageUploadService.upload(file, "sourcing/" + sourcingRequestId);
 
             SourcingRequestFile fileEntity = SourcingRequestFile.builder()
                     .sourcingRequest(sourcingRequest)
@@ -126,24 +132,7 @@ public class SourcingRequestService {
                     .build();
 
             sourcingRequestFileRepository.save(fileEntity);
-
         }
     }
 
-    // 로컬 임시 저장 (외부 스토리지 연동 전)
-    private String saveToLocal(MultipartFile file) {
-        String uploadDir = System.getProperty("java.io.tmpdir") + "/stylehub-uploads/";
-        new File(uploadDir).mkdirs();
-
-        String uniqueName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-        String fullPath = uploadDir + uniqueName;
-
-        try {
-            file.transferTo(new File(fullPath));
-        } catch (IOException e) {
-            throw new RuntimeException("파일 저장 실패: " + file.getOriginalFilename(), e);
-        }
-
-        return fullPath; // TODO: S3 연동 시 → S3 URL 반환으로 교체
-    }
 }
