@@ -10,7 +10,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
 
     Optional<Order> findByOrderNo(String orderNo);
 
-    List<Order> findByBuyer_UserId(Integer userId);
+    List<Order> findByBuyer_UserIdOrderByCreatedAtDesc(Integer userId);
 
     Optional<Order> findByOrderIdAndBuyer_UserId(Integer orderId, Integer userId);
 }

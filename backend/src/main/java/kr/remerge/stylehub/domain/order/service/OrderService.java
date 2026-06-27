@@ -175,15 +175,11 @@ public class OrderService {
     private List<CartItem> getCartItems(Integer userId, OrderCreateRequest request) {
 
         if (request.cartItemIds() == null || request.cartItemIds().isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT);
-//            throw new BusinessException(ErrorCode.CART_ITEM_EMPTY);
-            //민재 추가해달라고 해
+            throw new BusinessException(ErrorCode.CART_ITEM_EMPTY);
         }
 
         if (request.cartType() == null) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT);
-//            throw new BusinessException(ErrorCode.INVALID_CART_TYPE);
-            //민재 추가해달라고 해
+            throw new BusinessException(ErrorCode.INVALID_CART_TYPE);
         }
 
         List<CartItem> cartItems = cartRepository.findByCartItemIdInAndUser_UserIdAndCartType(
@@ -193,8 +189,7 @@ public class OrderService {
         );
 
         if (cartItems.size() != request.cartItemIds().size()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT);
-//            민재 : throw new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND);
+             throw new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND);
         }
 
         return cartItems;
@@ -232,9 +227,26 @@ public class OrderService {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
-        return orderRepository.findByBuyer_UserId(userId)
+        List<Order> orders = orderRepository.findByBuyer_UserIdOrderByCreatedAtDesc(userId);
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+
+        List<Integer> orderIds = orders.stream()
+                .map(Order::getOrderId)
+                .toList();
+
+        Map<Integer, List<OrderItem>> itemsByOrderId =
+                orderItemRepository.findByOrder_OrderIdInOrderByOrderItemIdAsc(orderIds)
+                        .stream()
+                        .collect(groupingBy(orderItem -> orderItem.getOrder().getOrderId()));
+
+        return orders
                 .stream()
-                .map(BuyerOrderListResponse::from)
+                .map(order -> BuyerOrderListResponse.from(
+                        order,
+                        itemsByOrderId.getOrDefault(order.getOrderId(), List.of())
+                ))
                 .toList();
     }
 

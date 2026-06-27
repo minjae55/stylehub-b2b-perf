@@ -97,6 +97,7 @@ public class CheckoutService {
     }
 
     private List<CheckoutInvalidItemResponse> validateCartItem(CartItem cartItem) {
+
         List<CheckoutInvalidItemResponse> invalidItems = new ArrayList<>();
 
         ProductOption option = cartItem.getProductOption();
