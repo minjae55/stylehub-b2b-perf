@@ -66,6 +66,18 @@ type OrderCheckoutResponse = {
   totalAmount: number;
 };
 
+type MultiOrderCheckoutResponse = {
+  orders: OrderCheckoutResponse[];
+  productAmount: number;
+  shippingFee: number;
+  totalAmount: number;
+};
+
+type DevOrderPaymentResponse = {
+  orderNos: string[];
+  totalAmount: number;
+};
+
 type CheckoutInvalidItem = {
   cartItemId: number;
   productName: string;
@@ -215,16 +227,15 @@ export function Checkout() {
       try {
         setCheckoutInvalidItems([]);
         if (isOrderCheckout) {
-          const responses = await Promise.all(
-            orderIds.map((selectedOrderId) =>
-              api.get<OrderCheckoutResponse>(`/checkout/preview/${selectedOrderId}`)
-            )
+          const response = await api.post<MultiOrderCheckoutResponse>(
+            "/checkout/orders/preview",
+            { orderIds }
           );
 
           setCheckoutPreview({
             cartType: "NORMAL",
-            items: responses.flatMap((response) =>
-              response.items.map((item) => ({
+            items: response.orders.flatMap((order) =>
+              order.items.map((item) => ({
                 cartItemId: item.orderItemId,
                 productName: item.productName,
                 optionLabel: item.optionSummary ?? "옵션 정보 없음",
@@ -233,11 +244,10 @@ export function Checkout() {
                 totalPrice: item.totalPrice,
               }))
             ),
-            productAmount: responses.reduce((total, response) => total + response.productAmount, 0),
-            shippingFee: responses.reduce((total, response) => total + response.shippingFee, 0),
-            totalAmount: responses.reduce((total, response) => total + response.totalAmount, 0),
+            productAmount: response.productAmount,
+            shippingFee: response.shippingFee,
+            totalAmount: response.totalAmount,
           });
-          setCheckoutOrderNos(responses.map((response) => response.orderNo));
           return;
         }
 
@@ -268,7 +278,11 @@ export function Checkout() {
           return;
         }
 
-        setPreviewError("주문 정보를 불러오지 못했습니다. 장바구니에서 다시 시도해주세요.");
+        setPreviewError(
+          isOrderCheckout
+            ? "선택한 주문 정보를 불러오지 못했습니다. 주문 목록에서 다시 시도해주세요."
+            : "주문 정보를 불러오지 못했습니다. 장바구니에서 다시 시도해주세요."
+        );
       } finally {
         setIsPreviewLoading(false);
       }
@@ -315,7 +329,6 @@ export function Checkout() {
   const [createdOrderTotal, setCreatedOrderTotal] = useState(0);
   const [isTestOrderLoading, setIsTestOrderLoading] = useState(false);
   const [testOrderError, setTestOrderError] = useState("");
-  const [checkoutOrderNos, setCheckoutOrderNos] = useState<string[]>([]);
 
   const subtotal = checkoutPreview?.productAmount
     ?? orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -511,19 +524,27 @@ export function Checkout() {
     }
   };
 
-  const handleTestOrderPayment = () => {
+  const handleTestOrderPayment = async () => {
     if (!isOrderCheckout || !selectedAddress || isTestOrderLoading) return;
 
-    setIsTestOrderLoading(true);
-    setTestOrderError("");
-    setCreatedOrderNumbers(
-      checkoutOrderNos.length > 0
-        ? checkoutOrderNos
-        : orderIds.map((selectedOrderId) => `ORDER-${selectedOrderId}`)
-    );
-    setCreatedOrderTotal(total);
-    setShowSuccessModal(true);
-    setIsTestOrderLoading(false);
+    try {
+      setIsTestOrderLoading(true);
+      setTestOrderError("");
+
+      const response = await api.post<DevOrderPaymentResponse>(
+        "/checkout/orders/dev-payment",
+        { orderIds }
+      );
+
+      setCreatedOrderNumbers(response.orderNos);
+      setCreatedOrderTotal(response.totalAmount);
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error("개발용 임시 결제 처리 실패", error);
+      setTestOrderError("임시 결제 처리에 실패했습니다. 주문 상태를 확인해 주세요.");
+    } finally {
+      setIsTestOrderLoading(false);
+    }
   };
 
   return (

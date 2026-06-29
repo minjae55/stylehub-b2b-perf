@@ -1293,7 +1293,7 @@ function OrderActions({
       )}
 
       <Link
-        to={`/orders/${order.id}`}
+        to={order.orderId ? `/orders/${order.orderId}` : `/orders/${order.id}`}
         className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-white hover:text-primary"
       >
         <Eye size={13} />
