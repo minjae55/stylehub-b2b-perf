@@ -28,21 +28,23 @@ function mapApiUser(u: ApiUser): User {
     'BUYER_EMPOLYEE': 'BUYER/직원',
     'SELLER_PRESIDENT': 'SELLER/대표',
     'SELLER_EMPLOYEE': 'SELLER/직원',
+    'ADMIN_ADMIN': 'ADMIN'
   };
   const statusMap: Record<string, User['status']> = {
     'APPROVED': 'ACTIVE',
     'PENDING': 'PENDING',
     'SUSPENDED': 'SUSPENDED',
   };
+  const combinedRoleKey = `${u.businessRole}_${u.role}`;
 
   return {
     id: String(u.userId),
     name: u.name,
     email: u.email,
     companyName: u.companyName,
-    role: roleMap[`${u.businessRole}_${u.role}`] ?? 'ADMIN',
+    role: roleMap[combinedRoleKey] ?? (u.role === 'ADMIN' ? 'ADMIN' : 'BUYER/직원'),
     status: statusMap[u.status] ?? 'PENDING',
-    createdAt: u.createdAt?.slice(0,10) ?? '',
+    createdAt: u.createdAt?.slice(0, 10) ?? '',
   };
 }
 
@@ -54,7 +56,7 @@ export const AdminUsers: React.FC = () => {
   const [searchFilter, setSearchFilter] = useState<"all" | "name" | "company" | "email">("all");
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 14;
 
   // 💡 왼쪽 사이드바용 상태 카테고리 추가 ('ALL': 전체, 'REQUEST': 등록요청)
   const [activeSubCategory, setActiveSubCategory] = useState<'ALL' | 'REQUEST' | 'SUSPENDED'>('ALL');
@@ -81,19 +83,55 @@ export const AdminUsers: React.FC = () => {
   }, []);
 
   // 계정 상태 변경 및 가입 승인 토글 액션
-  const handleToggleStatus = (userId: string) => {
-    setUsers(prevUsers =>
-      prevUsers.map(user => {
-        if (user.id === userId) {
-          // 대기 중(PENDING)일 때 누르면 바로 'ACTIVE(정상)' 승인 처리, 그 외에는 정지/해제 토글
-          const nextStatus: User['status'] = 
-            user.status === 'PENDING' ? 'ACTIVE' : 
-            user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
-          return { ...user, status: nextStatus };
-        }
-        return user;
-      })
-    );
+  const handleToggleStatus = async (userId: string) => {
+    // 1. 상태를 바꿀 대상을 기존 메모리(State)에서 탐색
+    const targetUser = users.find(user => user.id === userId);
+    if (!targetUser) return;
+
+    // 2. 현재 상태 기준 다음으로 변환할 백엔드 규격(ApiUser.status) 매핑 연산
+    let nextApiStatus: ApiUser['status'] = 'APPROVED'; // 기본값 ACTIVE 매칭용
+    if (targetUser.status === 'PENDING') {
+      nextApiStatus = 'APPROVED';   // 승인대기 -> 정상 승인
+    } else if (targetUser.status === 'ACTIVE') {
+      nextApiStatus = 'SUSPENDED';  // 정상 -> 계정정지
+    } else if (targetUser.status === 'SUSPENDED') {
+      nextApiStatus = 'APPROVED';   // 계정정지 -> 정지 해제(정상)
+    }
+
+    try {
+      // 3. 백엔드 API에 상태 업데이트 요청 전송
+      const res = await fetch(`/api/admin/users/${userId}/status`, {
+        method: 'PATCH', // 💡 부분 수정을 위해 PATCH 메서드 사용
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+        body: JSON.stringify({ status: nextApiStatus }), // 백엔드 DTO 규격에 맞춤
+      });
+
+      if (!res.ok) {
+        throw new Error(`상태 변경 실패 (서버 에러: ${res.status})`);
+      }
+
+      // 4. 백엔드 DB 저장이 확실히 완료된 경우에만 프론트 화면 상태를 실시간 업데이트
+      setUsers(prevUsers =>
+          prevUsers.map(user => {
+            if (user.id === userId) {
+              let nextStatus: User['status'] = 'ACTIVE';
+
+              if (targetUser.status === 'PENDING') nextStatus = 'ACTIVE';      // PENDING -> 승인완료(ACTIVE)
+              else if (targetUser.status === 'ACTIVE') nextStatus = 'SUSPENDED'; // ACTIVE -> 정지(SUSPENDED)
+              else if (targetUser.status === 'SUSPENDED') nextStatus = 'ACTIVE'; // SUSPENDED -> 해제(ACTIVE)
+
+              return { ...user, status: nextStatus };
+            }
+            return user;
+          })
+      );
+    } catch (error) {
+      console.error("유저 상태 갱신 실패:", error);
+      alert(error instanceof Error ? error.message : "상태를 변경하는 도중 오류가 발생했습니다.");
+    }
   };
 
   // 데이터 필터링 결합 (텍스트 검색 + 상단 롤 필터 + 왼쪽 사이드바 메뉴)
@@ -106,9 +144,24 @@ export const AdminUsers: React.FC = () => {
     return false;
     }
 
-    if (searchTerm) {
+    // 역할군 조건 검증
+    let matchesRole = false;
+    if (roleFilter === 'ALL') {
+      matchesRole = true;
+    } else if (roleFilter === 'BUYER') {
+      matchesRole = user.role.startsWith('BUYER');
+    } else if (roleFilter === 'SELLER') {
+      matchesRole = user.role.startsWith('SELLER');
+    } else {
+      matchesRole = user.role === roleFilter;
+    }
+
+    if (!matchesRole) return false;
+
+    if (!searchTerm) return true; // 검색어가 없으면 위 조건(사이드바, 역할) 패스 시 무조건 노출
+
     const targetTerm = searchTerm.toLowerCase();
-    
+
     if (searchFilter === 'name') {
       return user.name.toLowerCase().includes(targetTerm);
     }
@@ -118,34 +171,22 @@ export const AdminUsers: React.FC = () => {
     if (searchFilter === 'email') {
       return user.email.toLowerCase().includes(targetTerm);
     }
-    if (searchFilter === 'all') { // 통합 검색일 때
-      return (
+
+    // 통합 검색 ('all') 일 때
+    return (
         user.name.toLowerCase().includes(targetTerm) ||
         user.companyName.toLowerCase().includes(targetTerm) ||
         user.email.toLowerCase().includes(targetTerm)
-      );
-    }
-  }
+    );
+
+
 
     // 2. 검색 조건 검증
-    const matchesSearch = 
+    const matchesSearch =
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.companyName.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // 3. 역할군 조건 검증
-    let matchesRole = false;
-    if (roleFilter === 'ALL') {
-      matchesRole = true;
-    } else if (roleFilter === 'BUYER') {
-      matchesRole = user.role.startsWith('BUYER'); 
-    } else if (roleFilter === 'SELLER') {
-      matchesRole = user.role.startsWith('SELLER');
-    } else {
-      matchesRole = user.role === roleFilter;
-    }
 
-    return matchesSearch && matchesRole;
   });
 
   // 페이지네이션 가공

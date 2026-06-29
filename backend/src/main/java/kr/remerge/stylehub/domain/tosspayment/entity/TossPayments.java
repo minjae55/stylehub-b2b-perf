@@ -3,6 +3,8 @@ package kr.remerge.stylehub.domain.tosspayment.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "toss_payments")
@@ -34,5 +36,12 @@ public class TossPayments {
     @Column(name = "toss_order_id", nullable = false, length = 64)
     private String tossOrderId; // 👈 올려주신 이미지의 7번 빨간 열쇠(유니크 키) 마크와 매핑
 
-    // ❌ @ManyToOne 이나 @JoinColumn(name = "order_id") 관련 코드는 완전히 삭제되어 있어야 합니다!
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "toss_payment_orders",
+            joinColumns = @JoinColumn(name = "toss_payment_id")
+    )
+    @Column(name = "order_id")
+    @Builder.Default
+    private List<Long> orderIds = new ArrayList<>();
 }

@@ -1,5 +1,6 @@
 package kr.remerge.stylehub.domain.settlement;
 
+import kr.remerge.stylehub.domain.settlement.dto.SettlementDashboard;
 import kr.remerge.stylehub.domain.settlement.dto.SettlementDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,12 @@ import lombok.*;
 public class SettlementController {
 
     private final SettlementService settlementService;
+
+    @GetMapping
+    public ResponseEntity<SettlementDashboard> getSettlementDashboard() {
+        SettlementDashboard dashboard = settlementService.getSettlementDashboard();
+        return ResponseEntity.ok(dashboard);
+    }
 
     @PostMapping
     public ResponseEntity<Void> createSettlement(@RequestBody SettlementDto settlementDto) {

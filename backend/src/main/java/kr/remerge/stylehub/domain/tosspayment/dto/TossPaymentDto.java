@@ -5,7 +5,7 @@ public class TossPaymentDto {
     // 결제 승인 요청
     public record ConfirmRequest(
             String paymentKey,
-            Long orderId,
+            Long integrationPaymentId,
             Long amount
     ) {}
 

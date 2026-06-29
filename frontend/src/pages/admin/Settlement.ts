@@ -12,17 +12,17 @@ export interface SettlementResponse {
   final_amount: number;
   settled_at: Date;
   created_at: Date;
-  status: '대기' | '완료' | '환불요청'; // 백엔드 코드값에 맞춰 매핑
+  status: 'CANCELED'|'COMPLETED'|'CONFIRMED'|'DELIVERED'|'DISPUTE'|'PENDING'|'PREPARING'|'REFUNDED'|'SHIPPED'; // 백엔드 코드값에 맞춰 매핑
 }
 
-const API_BASE_URL = 'http://localhost:5173/settlements';
+const API_BASE_URL = 'http://localhost:5173/api/settlements';
 
 export const settlementApi = {
   // 1. 정산 데이터 목록 조회
-  getSettlements: async (): Promise<SettlementResponse[]> => {
-    const response = await axios.get<SettlementResponse[]>(API_BASE_URL);
-    return response.data;
-  },
+    getSettlements: async () => {
+      const response = await axios.get('/api/settlements');
+      return response.data; // { summary: {...}, rows: [...] } 형태로 반환됨
+    },
 
   // 2. 정산 상태 변경 (승인 또는 환불 등)
   // 백엔드 구현에 따라 PATCH /api/settlements/{id}/status 형태를 주로 사용합니다.
