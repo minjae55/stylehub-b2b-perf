@@ -20,6 +20,7 @@ import {useEffect, useRef, useState} from "react";
 import {useAuthStore} from "@/store/useAuthStore";
 import {logout as apiLogout} from "@/api/auth";
 import logoSvg from "@/assets/style_hub_logo.svg";
+import {useNotification} from "@/api/useNotification";
 
 const hotKeywords = ["여성 린넨 블라우스", "와이드 슬랙스", "플로럴 원피스", "오버핏 자켓", "스포츠 레깅스"];
 
@@ -261,7 +262,6 @@ export function Root() {
     const [readIds, setReadIds] = useState<number[]>([]);
     const [, setDismissedIds] = useState<number[]>([]);
     const notifRef = useRef<HTMLDivElement>(null);
-    // [추가] 탭 드롭다운과 검색결과 드롭다운 state 분리
     const [searchTab, setSearchTab] = useState<"product" | "category" | "brand">("product");
     const [tabDropOpen, setTabDropOpen] = useState(false);
     const [resultDropOpen, setResultDropOpen] = useState(false);
@@ -272,8 +272,9 @@ export function Root() {
     const user = useAuthStore((state) => state.user);
     const clearUser = useAuthStore((state) => state.clearUser);
 
-    // 💡 유저의 비즈니스 권한에 따라 대시보드 경로를 동적으로 결정
-    // 기본값은 '/' 또는 메인으로 잡고, 권한별 분기 처리
+    // TODO: JWT 연동 후 user.id로 교체
+    useNotification(1);
+
     let dashboardPath = "/";
 
     if (user?.businessRole === "BUYER") {
@@ -281,24 +282,17 @@ export function Root() {
     } else if (user?.businessRole === "SELLER") {
         dashboardPath = "/seller";
     } else if (user?.businessRole === "BOTH") {
-        // BOTH(통합 관리자)일 경우, 기본적으로 어디를 먼저 보여줄지 기획에 따라 결정하시면 됩니다.
-        // 여기서는 기본값을 '/buyer'로 가되, 필요하면 판매자 대시보드로 전환하는 버튼을 화면에 따로 주는 게 정석입니다.
         dashboardPath = "/buyer";
     }
 
-    // 유저가 존재하고, 역할이 PRESIDENT이면서, BusinessRole이 BUYER인 경우에만 true
     const isBuyerPresident = user?.role === "PRESIDENT" && user?.businessRole === "BUYER";
     const handleLogout = async () => {
         try {
-            // 1. 백엔드 호출해서 토큰 쿠키 만료시키기
             await apiLogout();
         } catch (error) {
             console.error("로그아웃 API 요청 실패:", error);
         } finally {
-            // 2. 💡 쿠키 삭제가 성공하든 에러가 나든 프론트엔드 상태와 로컬스토리지는 무조건 청소!
             clearUser();
-
-            // 3. 로그인 페이지로 튕구기
             navigate("/auth/login");
         }
     };
@@ -323,13 +317,11 @@ export function Root() {
         return () => document.removeEventListener("mousedown", handler);
     }, []);
 
-    // [추가] 검색 결과 계산
     const searchResults = searchQuery.trim().length < 1 ? [] : (() => {
         const q = searchQuery.trim().toLowerCase();
         if (searchTab === "product") {
             return searchDummyProducts.filter(p => p.name.toLowerCase().includes(q)).slice(0, 6);
         }
-        // [수정] alias 포함 필터링
         if (searchTab === "category") {
             return searchDummyCategories.filter(c =>
                 c.name.toLowerCase().includes(q) ||
@@ -337,29 +329,25 @@ export function Root() {
                 (c.alias ?? []).some(a => a.toLowerCase().includes(q))
             ).slice(0, 6);
         }
-        // [수정] 객체 배열로 변경된 브랜드 필터링
         if (searchTab === "brand") {
             return searchDummyBrands.filter(b => b.name.toLowerCase().includes(q)).slice(0, 6);
         }
         return [];
     })();
 
-    return ( //폰트변경
+    return (
         <div className="min-h-screen bg-background font-[Pretendard,sans-serif] flex flex-col">
-            {/* [추가] 셀러 등록 상단 바 */}
             {isBuyerPresident && (<div
-                className="bg-primary/10 border-b border-primary/20 py-1.5 text-center text-xs text-primary flex items-center justify-center gap-3">
-                <span>🏷️ {user?.name}님! 셀러로 등록하고 전국 바이어와 연결되세요!</span>
-                <Link to="/auth?tab=signup&role=seller"
-                      className="bg-primary text-white text-[11px] font-semibold px-3 py-0.5 rounded-full hover:bg-primary/80 transition-colors">
-                    셀러 등록하기 →
-                </Link>
-            </div>
+                    className="bg-primary/10 border-b border-primary/20 py-1.5 text-center text-xs text-primary flex items-center justify-center gap-3">
+                    <span>🏷️ {user?.name}님! 셀러로 등록하고 전국 바이어와 연결되세요!</span>
+                    <Link to="/auth?tab=signup&role=seller"
+                          className="bg-primary text-white text-[11px] font-semibold px-3 py-0.5 rounded-full hover:bg-primary/80 transition-colors">
+                        셀러 등록하기 →
+                    </Link>
+                </div>
             )}
-            {/* Main Header */}
             <header className="bg-white shadow-sm sticky top-0 z-50 flex-shrink-0 py-2">
                 <div className="max-w-[1280px] mx-auto px-4 py-3 flex justify-between items-center">
-                    {/* Logo */}
                     <Link to="/">
                         <img
                             src={logoSvg}
@@ -367,11 +355,8 @@ export function Root() {
                             className="h-18 w-auto object-contain transform translate-y-[5px]"
                         />
                     </Link>
-                    {/* Search Bar */}
                     <div className="flex-1 max-w-[700px] transform translate-y-[8px]">
-                        {/* [수정] overflow-hidden 제거 (드롭다운 잘림 방지) */}
                         <div className="flex border-2 border-primary rounded">
-                            {/* [수정] 탭 드롭다운 - 별도 ref로 분리 */}
                             <div className="relative" ref={tabDropRef}>
                                 <button
                                     onClick={() => setTabDropOpen((v) => !v)}
@@ -424,7 +409,6 @@ export function Root() {
                             </button>
                         </div>
 
-                        {/* [추가] 검색 결과 드롭다운 */}
                         {resultDropOpen && searchQuery.trim().length > 0 && (
                             <div ref={resultDropRef}
                                  className="absolute mt-1 bg-white border border-border rounded shadow-xl z-[100] w-full max-w-[700px] max-h-72 overflow-y-auto">
@@ -453,7 +437,6 @@ export function Root() {
                                         </Link>
                                     ))
                                 ) : searchTab === "category" ? (
-                                    // [수정] 이모지 → iconImg로 교체
                                     (searchResults as typeof searchDummyCategories).map((c) => (
                                         <Link
                                             key={c.id}
@@ -474,7 +457,6 @@ export function Root() {
                                         </Link>
                                     ))
                                 ) : (
-                                    // [수정] 이모지 → 빈 박스 + 로고 이미지로 교체 (이미지 없으면 빈 박스)
                                     (searchResults as typeof searchDummyBrands).map((b) => (
                                         <Link
                                             key={b.name}
@@ -517,9 +499,7 @@ export function Root() {
                         </div>
                     </div>
 
-                    {/* Right Actions */}
                     <div className="flex items-center gap-5.5 flex-shrink-0 text-sm">
-                        {/* 알림 */}
                         <div className="relative" ref={notifRef}>
                             <button
                                 onClick={() => setNotifOpen((v) => !v)}
@@ -609,14 +589,12 @@ export function Root() {
                             )}
                         </div>
 
-                        {/* 즐겨찾기 */}
                         <Link to="/products/wishlist"
                               className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors relative">
                             <Star size={25}/>
                             <span className="text-[11px]">즐겨찾기</span>
                         </Link>
 
-                        {/* 장바구니 */}
                         <Link to="/cart"
                               className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors relative">
                             <ShoppingCart size={25}/>
@@ -627,7 +605,6 @@ export function Root() {
               </span>
                         </Link>
 
-                        {/* 대시보드 */}
                         <Link
                             to={dashboardPath}
                             className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors"
@@ -636,14 +613,12 @@ export function Root() {
                             <span className="text-[11px]">대시보드</span>
                         </Link>
 
-                        {/* 마이 페이지 */}
                         <Link to="/mypage"
                               className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors">
                             <User size={25}/>
                             <span className="text-[11px]">{user?.name}</span>
                         </Link>
 
-                        {/* 마이 페이지 */}
                         <Link to="/support"
                               className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors">
                             <Info size={25}/>
@@ -661,12 +636,10 @@ export function Root() {
                 </div>
             </header>
 
-            {/* Page Content */}
             <main className="flex-1">
                 <Outlet/>
             </main>
 
-            {/* Footer */}
             <footer className="bg-[#1a1a1a] text-[#aaa] mt-4 flex-shrink-0">
                 <div className="max-w-[1280px] mx-auto px-4 py-10">
                     <div className="grid grid-cols-4 gap-8 mb-8">
