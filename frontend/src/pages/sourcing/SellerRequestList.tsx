@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import {
   Package, X, Zap, AlertTriangle, Calendar,
   Search, Filter, FileText, FlaskConical, Truck,
@@ -31,9 +31,6 @@ interface SellerSourcingResponse {
   sourcingStatus: SourcingStatus;
 }
 
-interface ReadyBidForm { unitPrice: string; availableDate: string; expiryDate: string; comment: string; }
-interface CustomBidForm { totalBudget: string; samplePrice: string; availableDate: string; expiryDate: string; quoteFile: File | null; comment: string; }
-
 type BidSubmitStatus = "제출됨" | "샘플결제됨" | "샘플출고완료" | "승인" | "거절";
 
 interface MyBid {
@@ -63,6 +60,7 @@ async function declineRequest(sourcingSupplierId: number, feedback: string): Pro
   const res = await fetch(`${BASE_URL}/suppliers/${sourcingSupplierId}/decline`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ feedback }),
   });
   if (!res.ok) throw new Error("거절 처리 실패");
@@ -244,7 +242,7 @@ function SellerSourcingDetailModal({ req, onClose }: { req: SellerSourcingRespon
           <div className="px-6 py-4 border-t border-border flex gap-2 flex-shrink-0">
             <button onClick={onClose} className="flex-1 py-2.5 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors font-medium">닫기</button>
             <button
-                onClick={() => { onClose(); navigate(`/sourcing/${req.sourcingRequestId}/quote`, { state: { request: req } }); }}
+                onClick={() => { onClose(); navigate(`/seller/sourcing/${req.sourcingRequestId}/quote`, { state: { request: req } }); }}
                 className="flex-1 py-2.5 bg-primary hover:bg-primary/90 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-2"
             >
               <Zap size={14} /> 견적 제출하기
@@ -394,217 +392,15 @@ function BidDetailModal({ bid, requestName, onClose, onShip }: {
   );
 }
 
-// ── 기성품 견적 제출 모달 ─────────────────────────────────────────────
-function ReadyBidModal({ req, onClose, onSubmit }: { req: SellerSourcingResponse; onClose: () => void; onSubmit: (bid: MyBid) => void }) {
-  const [step, setStep] = useState<"detail" | "bid" | "done">("detail");
-  const [form, setForm] = useState<ReadyBidForm>({ unitPrice: "", availableDate: "", expiryDate: "", comment: "" });
-  const inputCls = "w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors bg-white";
-  const canSubmit = !!(form.unitPrice && form.availableDate);
-  const handleSubmit = () => {
-    onSubmit({ bidId: `MY-${req.sourcingRequestId}-${Date.now()}`, requestId: req.sourcingRequestId, type: "READY", unitPrice: form.unitPrice, availableDate: form.availableDate, expiryDate: form.expiryDate, comment: form.comment, status: "제출됨", submittedAt: new Date().toISOString().split("T")[0] });
-    setStep("done");
-  };
-  return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[480px] overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <div>
-              <div className="text-xs text-muted-foreground font-mono mb-0.5">{req.sourcingNo}</div>
-              <h3 className="font-bold text-foreground">{req.productName}</h3>
-            </div>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1"><X size={18} /></button>
-          </div>
-          {step === "done" ? (
-              <div className="px-6 py-10 text-center">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"><Zap size={22} className="text-green-500" /></div>
-                <div className="font-bold text-foreground mb-1">견적 제출 완료!</div>
-                <div className="text-sm text-muted-foreground mb-6">관리자 검토 후 바이어에게 전달됩니다.</div>
-                <button onClick={onClose} className="px-6 py-2 bg-primary text-white rounded font-semibold text-sm hover:bg-primary/90 transition-colors">확인</button>
-              </div>
-          ) : step === "detail" ? (
-              <div className="px-6 py-5 space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: "희망 단가", value: req.unitPrice ? `${req.unitPrice.toLocaleString()}원` : "-" },
-                    { label: "납기일", value: req.deliveryDate },
-                  ].map(({ label, value }) => (
-                      <div key={label} className="bg-secondary rounded-lg p-3 text-center">
-                        <div className="text-xs text-muted-foreground mb-0.5">{label}</div>
-                        <div className="font-semibold text-sm text-foreground">{value}</div>
-                      </div>
-                  ))}
-                </div>
-                {req.detail && (
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground mb-1.5">세부 요구사항</div>
-                      <div className="bg-secondary rounded-lg px-4 py-3 text-sm text-foreground whitespace-pre-line leading-relaxed">{req.detail}</div>
-                    </div>
-                )}
-                <div className="flex gap-2 pt-1">
-                  <button onClick={onClose} className="flex-1 py-2.5 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors font-medium">닫기</button>
-                  <button onClick={() => setStep("bid")} className="flex-1 py-2.5 bg-primary hover:bg-primary/90 text-white rounded text-sm font-bold transition-colors flex items-center justify-center gap-2"><Zap size={14} /> 견적 제출하기</button>
-                </div>
-              </div>
-          ) : (
-              <div className="px-6 py-5 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">제시 단가 <span className="text-primary">*</span></label>
-                  <div className="relative">
-                    <input type="number" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="예: 16,500" className={`${inputCls} pr-8`} />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">원</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">출고 가능일 <span className="text-primary">*</span></label>
-                    <input type="date" value={form.availableDate} onChange={(e) => setForm({ ...form, availableDate: e.target.value })} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">견적 유효기간 <span className="text-muted-foreground font-normal text-xs">(선택)</span></label>
-                    <input type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className={inputCls} />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">공급사 한마디 <span className="text-muted-foreground font-normal text-xs">(선택)</span></label>
-                  <textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} rows={3} placeholder="예: 인증서 보유, 당일 퀵 가능합니다." className={`${inputCls} resize-none`} />
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setStep("detail")} className="flex-1 py-2.5 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors font-medium">이전</button>
-                  <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2.5 rounded font-bold text-sm transition-colors flex items-center justify-center gap-2 ${canSubmit ? "bg-primary hover:bg-primary/90 text-white" : "bg-muted text-muted-foreground cursor-not-allowed"}`}><Zap size={14} /> 견적 제출</button>
-                </div>
-              </div>
-          )}
-        </div>
-      </div>
-  );
-}
-
-// ── 주문제작 견적 제출 모달 ───────────────────────────────────────────
-function CustomBidModal({ req, onClose, onSubmit }: { req: SellerSourcingResponse; onClose: () => void; onSubmit: (bid: MyBid) => void }) {
-  const [step, setStep] = useState<"detail" | "bid" | "done">("detail");
-  const [form, setForm] = useState<CustomBidForm>({ totalBudget: "", samplePrice: "", availableDate: "", expiryDate: "", quoteFile: null, comment: "" });
-  const inputCls = "w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors bg-white";
-  const canSubmit = !!(form.totalBudget && form.availableDate && form.quoteFile);
-  const handleSubmit = () => {
-    onSubmit({ bidId: `MY-${req.sourcingRequestId}-${Date.now()}`, requestId: req.sourcingRequestId, type: "CUSTOM", totalBudget: form.totalBudget, samplePrice: form.samplePrice, availableDate: form.availableDate, expiryDate: form.expiryDate, quoteFile: form.quoteFile, comment: form.comment, status: "제출됨", submittedAt: new Date().toISOString().split("T")[0] });
-    setStep("done");
-  };
-  return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[480px] max-h-[90vh] flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
-            <div>
-              <div className="text-xs text-muted-foreground font-mono mb-0.5">{req.sourcingNo}</div>
-              <h3 className="font-bold text-foreground">{req.productName}</h3>
-            </div>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1"><X size={18} /></button>
-          </div>
-          {step === "done" ? (
-              <div className="px-6 py-10 text-center">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"><Zap size={22} className="text-green-500" /></div>
-                <div className="font-bold text-foreground mb-1">견적 제출 완료!</div>
-                <div className="text-sm text-muted-foreground mb-6">관리자 검토 후 바이어에게 전달됩니다.</div>
-                <button onClick={onClose} className="px-6 py-2 bg-primary text-white rounded font-semibold text-sm hover:bg-primary/90 transition-colors">확인</button>
-              </div>
-          ) : step === "detail" ? (
-              <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: "전체 예산", value: req.totalBudget ? `${(req.totalBudget / 10000).toLocaleString()}만원` : "-" },
-                    { label: "납기일", value: req.deliveryDate },
-                  ].map(({ label, value }) => (
-                      <div key={label} className="bg-secondary rounded-lg p-3 text-center">
-                        <div className="text-xs text-muted-foreground mb-0.5">{label}</div>
-                        <div className="font-semibold text-sm text-foreground">{value}</div>
-                      </div>
-                  ))}
-                </div>
-                <span className={`text-xs px-2.5 py-1 rounded-full border font-medium inline-block ${req.needSample === "Y" ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-secondary text-muted-foreground border-border"}`}>
-              샘플 {req.needSample === "Y" ? "필요" : "불필요"}
-            </span>
-                {req.detail && (
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground mb-1.5">바이어 강조사항</div>
-                      <div className="bg-secondary rounded-lg px-4 py-3 text-sm text-foreground leading-relaxed">{req.detail}</div>
-                    </div>
-                )}
-                <div className="flex gap-2 pt-1">
-                  <button onClick={onClose} className="flex-1 py-2.5 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors font-medium">닫기</button>
-                  <button onClick={() => setStep("bid")} className="flex-1 py-2.5 bg-primary hover:bg-primary/90 text-white rounded text-sm font-bold transition-colors flex items-center justify-center gap-2"><Zap size={14} /> 견적 제출하기</button>
-                </div>
-              </div>
-          ) : (
-              <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">총 예산 제시 <span className="text-primary">*</span></label>
-                    <div className="relative">
-                      <input type="number" value={form.totalBudget} onChange={(e) => setForm({ ...form, totalBudget: e.target.value })} placeholder="예: 11,000,000" className={`${inputCls} pr-8`} />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">원</span>
-                    </div>
-                  </div>
-                  {req.needSample === "Y" && (
-                      <div>
-                        <label className="block text-sm font-medium text-foreground mb-1.5">샘플비 <span className="text-amber-500">*</span></label>
-                        <div className="relative">
-                          <input type="number" value={form.samplePrice} onChange={(e) => setForm({ ...form, samplePrice: e.target.value })} placeholder="예: 80,000" className={`${inputCls} pr-8 border-amber-200 focus:border-amber-400`} />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">원</span>
-                        </div>
-                      </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">납품 가능일 <span className="text-primary">*</span></label>
-                    <input type="date" value={form.availableDate} onChange={(e) => setForm({ ...form, availableDate: e.target.value })} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">견적 유효기간 <span className="text-muted-foreground font-normal text-xs">(선택)</span></label>
-                    <input type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className={inputCls} />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">견적서 PDF <span className="text-primary">*</span></label>
-                  {form.quoteFile ? (
-                      <div className="flex items-center gap-3 border border-primary/40 bg-primary/5 rounded px-3 py-2">
-                        <FileText size={15} className="text-primary flex-shrink-0" />
-                        <span className="text-sm flex-1 truncate">{form.quoteFile.name}</span>
-                        <button onClick={() => setForm({ ...form, quoteFile: null })} className="text-muted-foreground hover:text-red-500 transition-colors"><X size={14} /></button>
-                      </div>
-                  ) : (
-                      <label className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer group flex flex-col items-center gap-1">
-                        <FileText size={18} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                        <div className="text-xs text-muted-foreground">클릭하여 PDF 첨부 <span className="text-primary font-medium">파일 선택</span></div>
-                        <input type="file" accept=".pdf" className="hidden" onChange={(e) => setForm({ ...form, quoteFile: e.target.files?.[0] ?? null })} />
-                      </label>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">메모 <span className="text-muted-foreground font-normal text-xs">(선택)</span></label>
-                  <textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} rows={3} placeholder="예: 동일 소재 납품 경력 5년, 샘플 1주일 내 가능합니다." className={`${inputCls} resize-none`} />
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setStep("detail")} className="flex-1 py-2.5 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors font-medium">이전</button>
-                  <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2.5 rounded font-bold text-sm transition-colors flex items-center justify-center gap-2 ${canSubmit ? "bg-primary hover:bg-primary/90 text-white" : "bg-muted text-muted-foreground cursor-not-allowed"}`}><Zap size={14} /> 견적 제출</button>
-                </div>
-              </div>
-          )}
-        </div>
-      </div>
-  );
-}
-
-// ── 요청 행 (READY / CUSTOM 공통) ────────────────────────────────────
-function RequestRow({ req, myBids, onBid, onDecline, onViewBid, onShip, onDetail }: {
+// ── 요청 행 ──────────────────────────────────────────────────────────
+function RequestRow({ req, myBids, onDecline, onViewBid, onShip, onDetail }: {
   req: SellerSourcingResponse; myBids: MyBid[];
-  onBid: (r: SellerSourcingResponse) => void;
   onDecline: (r: SellerSourcingResponse) => void;
   onViewBid: (bid: MyBid) => void;
   onShip?: (bid: MyBid) => void;
   onDetail: (r: SellerSourcingResponse) => void;
 }) {
+  const navigate = useNavigate();
   const isCustom = req.type === "CUSTOM";
   const dday = getDday(req.deliveryDate);
   const [expanded, setExpanded] = useState(myBids.length > 0);
@@ -640,11 +436,22 @@ function RequestRow({ req, myBids, onBid, onDecline, onViewBid, onShip, onDetail
             {isCustom && <div className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${req.needSample === "Y" ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-secondary text-muted-foreground border-border"}`}>샘플 {req.needSample === "Y" ? "필요" : "불필요"}</div>}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => onDecline(req)} className="flex items-center gap-1 px-3 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded text-xs font-semibold transition-colors"><XCircle size={12} /> 거절</button>
-            <button onClick={() => onBid(req)} className="flex items-center gap-1 px-3 py-2 bg-primary hover:bg-primary/90 text-white rounded text-xs font-semibold transition-colors">
-              {isCustom ? <><Plus size={12} /> 견적 추가</> : latestBid ? <><Plus size={12} /> 추가 견적</> : <><Zap size={12} /> 단가 제시</>}
+            <button
+                onClick={() => onDecline(req)}
+                className="flex items-center gap-1 px-3 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded text-xs font-semibold transition-colors"
+            >
+              <XCircle size={12} /> 거절
             </button>
-            <button onClick={() => setExpanded(!expanded)} className={`flex items-center gap-1 px-3 py-2 border rounded text-xs font-semibold transition-colors ${myBids.length > 0 ? "border-primary text-primary hover:bg-primary/5" : "border-border text-muted-foreground hover:border-primary hover:text-primary"}`}>
+            <button
+                onClick={() => navigate(`/seller/sourcing/${req.sourcingRequestId}/quote`, { state: { request: req } })}
+                className="flex items-center gap-1 px-3 py-2 bg-primary hover:bg-primary/90 text-white rounded text-xs font-semibold transition-colors"
+            >
+              <Zap size={12} /> 견적 제출
+            </button>
+            <button
+                onClick={() => setExpanded(!expanded)}
+                className={`flex items-center gap-1 px-3 py-2 border rounded text-xs font-semibold transition-colors ${myBids.length > 0 ? "border-primary text-primary hover:bg-primary/5" : "border-border text-muted-foreground hover:border-primary hover:text-primary"}`}
+            >
               {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} 내 견적 {myBids.length > 0 ? `${myBids.length}건` : "없음"}
             </button>
           </div>
@@ -697,6 +504,7 @@ function PastRow({ req }: { req: SellerSourcingResponse }) {
 
 // ── 메인 ─────────────────────────────────────────────────────────────
 export function SellerRequestList() {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<SourcingType>("READY");
   const [subTab, setSubTab] = useState<"current" | "my" | "past">("current");
   const [search, setSearch] = useState("");
@@ -707,7 +515,6 @@ export function SellerRequestList() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [myBids, setMyBids] = useState<Record<number, MyBid[]>>({});
-  const [selectedBidReq, setSelectedBidReq] = useState<SellerSourcingResponse | null>(null);
   const [declineReq, setDeclineReq] = useState<SellerSourcingResponse | null>(null);
   const [viewBid, setViewBid] = useState<{ bid: MyBid; requestName: string } | null>(null);
   const [shipBid, setShipBid] = useState<{ bid: MyBid; requestName: string } | null>(null);
@@ -733,11 +540,8 @@ export function SellerRequestList() {
     }
   };
 
-  useEffect(() => { loadRequests(); }, [activeTab, subTab]);
-
-  const handleBidSubmit = (bid: MyBid) => {
-    setMyBids((prev) => ({ ...prev, [bid.requestId]: [bid, ...(prev[bid.requestId] ?? [])] }));
-  };
+  // location.key가 바뀔 때마다 (navigate로 돌아올 때) 재조회
+  useEffect(() => { loadRequests(); }, [activeTab, subTab, location.key]);
 
   const handleDeclineConfirm = async (sourcingSupplierId: number, feedback: string) => {
     await declineRequest(sourcingSupplierId, feedback);
@@ -856,7 +660,6 @@ export function SellerRequestList() {
                           <RequestRow
                               key={req.sourcingRequestId} req={req}
                               myBids={myBids[req.sourcingRequestId] ?? []}
-                              onBid={setSelectedBidReq}
                               onDecline={setDeclineReq}
                               onViewBid={(bid) => setViewBid({ bid, requestName: req.productName })}
                               onShip={(bid) => setShipBid({ bid, requestName: req.productName })}
@@ -878,8 +681,6 @@ export function SellerRequestList() {
         </div>
 
         {selectedDetail && <SellerSourcingDetailModal req={selectedDetail} onClose={() => setSelectedDetail(null)} />}
-        {selectedBidReq && selectedBidReq.type === "READY" && <ReadyBidModal req={selectedBidReq} onClose={() => setSelectedBidReq(null)} onSubmit={(bid) => { handleBidSubmit(bid); setSelectedBidReq(null); }} />}
-        {selectedBidReq && selectedBidReq.type === "CUSTOM" && <CustomBidModal req={selectedBidReq} onClose={() => setSelectedBidReq(null)} onSubmit={(bid) => { handleBidSubmit(bid); setSelectedBidReq(null); }} />}
         {declineReq && <DeclineModal req={declineReq} onClose={() => setDeclineReq(null)} onConfirm={handleDeclineConfirm} />}
         {viewBid && <BidDetailModal bid={viewBid.bid} requestName={viewBid.requestName} onClose={() => setViewBid(null)} onShip={(bid) => { setViewBid(null); setShipBid({ bid, requestName: viewBid.requestName }); }} />}
         {shipBid && <ShipmentModal bid={shipBid.bid} requestName={shipBid.requestName} onClose={() => setShipBid(null)} onConfirm={handleShipConfirm} />}

@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
 import api from "../../api/axios";
-import { Heart, ShoppingCart, Search, Grid3x3, List, ChevronDown } from "lucide-react";
+import {
+  Heart, ShoppingCart, Search, Grid3x3, List, ChevronDown,
+  FolderOpen, FolderPlus, Pencil, Trash2, Check, X, ChevronLeft
+} from "lucide-react";
 
 interface ProductSummary {
   productId: number;
@@ -18,6 +21,66 @@ interface ProductSummary {
   mainImageUrl: string | null;
   createdAt: string;
 }
+
+interface WishFolder {
+  id: string;
+  name: string;
+  productIds: number[];
+}
+
+// ─── 폴더 미리보기 이미지 그리드 ───────────────────────────────────────────
+function FolderPreview({ images }: { images: (string | null)[] }) {
+  const count = images.length;
+
+  if (count === 0) {
+    return (
+        <div className="w-full h-full flex items-center justify-center bg-muted">
+          <Heart size={32} className="text-muted-foreground opacity-30" />
+        </div>
+    );
+  }
+
+  if (count === 1) {
+    return (
+        <img
+            src={images[0]!}
+            alt=""
+            className="w-full h-full object-cover"
+        />
+    );
+  }
+
+  if (count < 4) {
+    // 2개: 좌우 분할
+    return (
+        <div className="w-full h-full grid grid-cols-2 gap-0.5">
+          {images.slice(0, 2).map((img, i) =>
+              img ? (
+                  <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+              ) : (
+                  <div key={i} className="w-full h-full bg-muted" />
+              )
+          )}
+        </div>
+    );
+  }
+
+  // 4개: 2×2
+  return (
+      <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
+        {images.slice(0, 4).map((img, i) =>
+            img ? (
+                <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+            ) : (
+                <div key={i} className="w-full h-full bg-muted" />
+            )
+        )}
+      </div>
+  );
+}
+
+// ─── 상수 ──────────────────────────────────────────────────────────────────
+const DEFAULT_FOLDER_ID = "default";
 
 const categories = [
   { id: "all", name: "전체", subCategories: [] },
@@ -74,93 +137,61 @@ function getChosung(str: string): string {
   return ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"][Math.floor(code / (21 * 28))];
 }
 
-const brandPanelCategories = [
-  { id: "all", name: "전체" }, { id: "tops", name: "상의" }, { id: "bottoms", name: "하의" },
-  { id: "dresses", name: "원피스/세트" }, { id: "outerwear", name: "아우터" },
-  { id: "innerwear", name: "이너/언더웨어" }, { id: "sports", name: "스포츠/애슬레저" },
-  { id: "accessories", name: "액세서리" }, { id: "shoes", name: "신발" },
-];
 
-const brandsByCategory: Record<string, string[]> = {
-  all: [], tops: ["동대문패션", "스타일컴퍼니", "캐주얼하우스", "엘레강스모드", "코지니트", "내추럴보이", "트렌드하우스"],
-  bottoms: ["스타일컴퍼니", "트렌드하우스", "진워크스", "페미닌스타일"],
-  dresses: ["트렌드하우스", "내추럴보이", "세트스타일"],
-  outerwear: ["프리미엄어패럴", "진워크스", "코지니트"],
-  innerwear: ["베이직이너", "코지홈"], sports: ["액티브웨어코리아", "스포츠라이프"],
-  accessories: ["패션액세서리몰"], shoes: ["슈즈마켓"],
-};
 
-function BrandPanel({ allBrands, selectedBrand, onSelect, onClear }: {
-  allBrands: { name: string; logo: string }[];
-  selectedBrand: string;
-  onSelect: (name: string) => void;
-  onClear: () => void;
-}) {
-  const [chosung, setChosung] = useState("전체");
-  const [panelCat, setPanelCat] = useState("all");
-  const [visibleCount, setVisibleCount] = useState(10);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const catFiltered = panelCat === "all" ? allBrands : allBrands.filter(b => (brandsByCategory[panelCat] ?? []).includes(b.name));
-  const chosungFiltered = chosung === "전체" ? catFiltered : catFiltered.filter(b => getChosung(b.name) === chosung);
-  const visible = chosungFiltered.slice(0, visibleCount);
-
-  return (
-      <div className="absolute left-full top-0 ml-2 bg-white border border-border rounded-lg shadow-xl z-30 flex flex-col" style={{ width: "420px" }}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
-          <span className="text-sm font-bold text-foreground">브랜드 선택</span>
-          {selectedBrand && <button onClick={onClear} className="text-xs text-primary hover:underline">선택 해제</button>}
-        </div>
-        <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border flex-shrink-0">
-          {CHOSUNG.map((c) => (
-              <button key={c} onClick={() => { setChosung(c); setVisibleCount(10); }}
-                      className={`text-xs px-2 py-1 rounded transition-colors ${chosung === c ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-primary"}`}>
-                {c}
-              </button>
-          ))}
-        </div>
-        <div className="flex flex-1 min-h-0" style={{ maxHeight: "360px" }}>
-          <div className="w-28 border-r border-border flex-shrink-0 overflow-y-auto">
-            {brandPanelCategories.map((cat) => (
-                <button key={cat.id} onClick={() => { setPanelCat(cat.id); setVisibleCount(10); }}
-                        className={`w-full text-left px-3 py-2.5 text-xs transition-colors border-b border-border ${panelCat === cat.id ? "bg-primary text-white font-semibold" : "text-foreground hover:bg-secondary"}`}>
-                  {cat.name}
-                </button>
-            ))}
-          </div>
-          <div ref={scrollRef} onScroll={() => { const el = scrollRef.current; if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 10) setVisibleCount(v => v + 10); }} className="flex-1 overflow-y-auto">
-            {visible.length === 0 ? (
-                <div className="text-center py-8 text-sm text-muted-foreground">해당 브랜드가 없습니다</div>
-            ) : visible.map((brand) => (
-                <button key={brand.name} onClick={() => onSelect(selectedBrand === brand.name ? "" : brand.name)}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 border-b border-border transition-colors text-left ${selectedBrand === brand.name ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground"}`}>
-                  <div className="w-8 h-8 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    <img src={brand.logo} alt={brand.name} className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                  </div>
-                  <span className="text-sm">{brand.name}</span>
-                  {selectedBrand === brand.name && <span className="ml-auto text-primary font-bold text-xs">✓</span>}
-                </button>
-            ))}
-          </div>
-        </div>
-      </div>
-  );
+// ─── localStorage 헬퍼 ──────────────────────────────────────────────────────
+function loadFolders(): WishFolder[] {
+  try {
+    const raw = localStorage.getItem("wishlistFolders");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  // 기존 wishlist 마이그레이션
+  try {
+    const old = localStorage.getItem("wishlist");
+    if (old) {
+      const ids: number[] = JSON.parse(old);
+      const folders: WishFolder[] = [{ id: DEFAULT_FOLDER_ID, name: "전체 찜", productIds: ids }];
+      localStorage.setItem("wishlistFolders", JSON.stringify(folders));
+      localStorage.removeItem("wishlist");
+      return folders;
+    }
+  } catch {}
+  return [{ id: DEFAULT_FOLDER_ID, name: "전체 찜", productIds: [] }];
 }
 
+function saveFolders(folders: WishFolder[]) {
+  localStorage.setItem("wishlistFolders", JSON.stringify(folders));
+}
+
+function genId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+// ─── 메인 컴포넌트 ───────────────────────────────────────────────────────────
 export function Wishlist() {
-  const [favorites, setFavorites] = useState<number[]>(() => {
-    const saved = localStorage.getItem("wishlist");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [folders, setFolders] = useState<WishFolder[]>(loadFolders);
   const [allProducts, setAllProducts] = useState<ProductSummary[]>([]);
+
+  // 뷰: "folder" | "products"
+  const [viewType, setViewType] = useState<"folder" | "grid" | "list">("folder");
+  // 현재 열려있는 폴더 id (null이면 폴더 목록)
+  const [openFolderId, setOpenFolderId] = useState<string | null>(null);
+
+  // 폴더 이름 편집
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  // 새 폴더 생성 모드
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedSubCategory, setSelectedSubCategory] = useState("");
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
+  const [brandChosung, setBrandChosung] = useState("전체");
   const [brandPanelOpen, setBrandPanelOpen] = useState(false);
+  const brandScrollRef = useRef<HTMLDivElement>(null);
   const brandPanelRef = useRef<HTMLDivElement>(null);
+  const [brandVisibleCount, setBrandVisibleCount] = useState(10);
   const [searchTab, setSearchTab] = useState<"product" | "category" | "brand">("product");
   const [tabDropOpen, setTabDropOpen] = useState(false);
   const [resultDropOpen, setResultDropOpen] = useState(false);
@@ -172,14 +203,31 @@ export function Wishlist() {
   }, []);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const mousedownHandler = (e: MouseEvent) => {
       if (tabDropRef.current && !tabDropRef.current.contains(e.target as Node)) setTabDropOpen(false);
       if (resultDropRef.current && !resultDropRef.current.contains(e.target as Node)) setResultDropOpen(false);
+    };
+    const clickHandler = (e: MouseEvent) => {
       if (brandPanelRef.current && !brandPanelRef.current.contains(e.target as Node)) setBrandPanelOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("mousedown", mousedownHandler);
+    document.addEventListener("click", clickHandler);
+    return () => {
+      document.removeEventListener("mousedown", mousedownHandler);
+      document.removeEventListener("click", clickHandler);
+    };
   }, []);
+
+  // 폴더 저장 동기화
+  useEffect(() => { saveFolders(folders); }, [folders]);
+
+  // 전체 찜 상품 ID 목록 (모든 폴더 합산 중복제거)
+  const allFavIds = [...new Set(folders.flatMap(f => f.productIds))];
+
+  // 현재 열린 폴더의 상품 ID
+  const currentFolderIds = openFolderId
+      ? (folders.find(f => f.id === openFolderId)?.productIds ?? [])
+      : allFavIds;
 
   const searchResults = searchQuery.trim().length < 1 ? [] : (() => {
     const q = searchQuery.trim().toLowerCase();
@@ -190,36 +238,299 @@ export function Wishlist() {
   })();
 
   const wishlistProducts = allProducts.filter((p) => {
-    const isFav = favorites.includes(p.productId);
+    const inFolder = currentFolderIds.includes(p.productId);
     const matchCategory = selectedCategory === "all" || p.categoryName === categoryIdMap[selectedCategory];
     const matchBrand = !selectedBrand || p.brandName === selectedBrand;
     const matchSearch = !searchQuery || p.productName.toLowerCase().includes(searchQuery.toLowerCase()) || p.brandName.toLowerCase().includes(searchQuery.toLowerCase());
-    return isFav && matchCategory && matchBrand && matchSearch;
+    return inFolder && matchCategory && matchBrand && matchSearch;
   });
 
-  const removeFromWishlist = (productId: number) => {
-    setFavorites((prev) => {
-      const next = prev.filter((id) => id !== productId);
-      localStorage.setItem("wishlist", JSON.stringify(next));
-      return next;
-    });
+  // 찜 해제 (모든 폴더에서 제거)
+  const removeFromAll = (productId: number) => {
+    setFolders(prev => prev.map(f => ({ ...f, productIds: f.productIds.filter(id => id !== productId) })));
+  };
+
+  // 폴더에서만 제거
+  const removeFromFolder = (folderId: string, productId: number) => {
+    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, productIds: f.productIds.filter(id => id !== productId) } : f));
   };
 
   const handleCategoryChange = (catId: string) => {
-    if (catId === "all") { setExpandedCategory(null); setSelectedSubCategory(""); setSelectedCategory("all"); return; }
-    if (expandedCategory === catId) setExpandedCategory(null);
-    else setExpandedCategory(catId);
     setSelectedCategory(catId);
-    setSelectedSubCategory("");
+    if (viewType === "folder") { setViewType("grid"); setOpenFolderId(DEFAULT_FOLDER_ID); }
   };
+
+  // 폴더 생성 모달 ref
+  const newFolderInputRef = useRef<HTMLInputElement>(null);
+  const editingInputRef = useRef<HTMLInputElement>(null);
+
+  // 폴더 생성 (ref 방식)
+  const createFolder = () => {
+    const name = (newFolderInputRef.current?.value ?? "").trim();
+    if (!name) return;
+    const folder: WishFolder = { id: genId(), name, productIds: [] };
+    setFolders(prev => [...prev, folder]);
+    setCreatingFolder(false);
+  };
+
+  // 폴더 이름 수정 (ref 방식)
+  const renameFolder = (id: string) => {
+    const name = (editingInputRef.current?.value ?? "").trim();
+    if (!name) return;
+    setFolders(prev => prev.map(f => f.id === id ? { ...f, name } : f));
+    setEditingFolderId(null);
+  };
+
+  // 폴더 삭제 (기본 폴더 불가)
+  const deleteFolder = (id: string) => {
+    if (id === DEFAULT_FOLDER_ID) return;
+    setFolders(prev => prev.filter(f => f.id !== id));
+    if (openFolderId === id) setOpenFolderId(null);
+  };
+
+  // 폴더 썸네일 이미지 추출
+  const getFolderImages = (folder: WishFolder) => {
+    const count = folder.productIds.length;
+    if (count === 0) return [];
+    const needed = count === 1 ? 1 : count < 4 ? 2 : 4;
+    return folder.productIds.slice(0, needed).map(id => allProducts.find(p => p.productId === id)?.mainImageUrl ?? null);
+  };
+
+  // 현재 폴더 정보
+  const currentFolder = openFolderId ? folders.find(f => f.id === openFolderId) : null;
+
+  // ── 폴더 목록 뷰 ─────────────────────────────────────────────────────────
+  const FolderListView = () => (
+      <div>
+        <div className="flex items-center justify-between mb-5">
+          <p className="text-sm text-muted-foreground">
+            폴더 <span className="font-bold text-foreground">{folders.length}</span>개
+          </p>
+          <button
+              onClick={() => setCreatingFolder(true)}
+              className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+          >
+            <FolderPlus size={16} /> 새 폴더
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {folders.map((folder) => {
+            const images = getFolderImages(folder);
+            const isEditing = editingFolderId === folder.id;
+            return (
+                <div key={folder.id} className="group bg-white border border-border rounded-xl overflow-hidden hover:shadow-md hover:border-primary/40 transition-all">
+                  {/* 썸네일 */}
+                  <button
+                      onClick={() => { if (!isEditing) { setOpenFolderId(folder.id); setViewType("grid"); } }}
+                      className="w-full aspect-square overflow-hidden bg-muted block relative"
+                  >
+                    <FolderPreview images={images} />
+                    {/* 상품 수 뱃지 */}
+                    <span className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full backdrop-blur-sm">
+                  {folder.productIds.length}개
+                </span>
+                  </button>
+
+                  {/* 폴더 이름 + 액션 */}
+                  <div className="px-3 py-2.5 flex items-center gap-1.5">
+                    {isEditing ? (
+                        <>
+                          <input
+                              ref={editingInputRef}
+                              autoFocus
+                              defaultValue={editingName}
+                              onKeyDown={e => { if (e.nativeEvent.isComposing) return; if (e.key === "Enter") renameFolder(folder.id); if (e.key === "Escape") setEditingFolderId(null); }}
+                              className="flex-1 text-sm outline-none border-b border-primary text-foreground bg-transparent"
+                          />
+                          <button onClick={() => renameFolder(folder.id)} className="text-primary"><Check size={13} /></button>
+                          <button onClick={() => setEditingFolderId(null)} className="text-muted-foreground"><X size={13} /></button>
+                        </>
+                    ) : (
+                        <>
+                    <span
+                        onClick={() => { setOpenFolderId(folder.id); setViewType("grid"); }}
+                        className="flex-1 text-sm font-medium text-foreground truncate cursor-pointer hover:text-primary transition-colors"
+                    >
+                      {folder.name}
+                    </span>
+                          <button
+                              onClick={() => { setEditingFolderId(folder.id); setEditingName(folder.name); }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          {folder.id !== DEFAULT_FOLDER_ID && (
+                              <button
+                                  onClick={() => deleteFolder(folder.id)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                          )}
+                        </>
+                    )}
+                  </div>
+                </div>
+            );
+          })}
+        </div>
+      </div>
+  );
+
+  // ── 상품 목록 뷰 (그리드/리스트) ─────────────────────────────────────────
+  const ProductListView = () => (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm text-muted-foreground">
+            총 <span className="font-bold text-foreground">{wishlistProducts.length}</span>개 상품
+            {selectedBrand && <span className="ml-2 text-primary font-medium">· {selectedBrand}</span>}
+          </p>
+        </div>
+
+        {wishlistProducts.length === 0 ? (
+            <div className="text-center py-20">
+              <Heart size={48} className="mx-auto mb-4 text-muted-foreground opacity-30" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">찜한 상품이 없습니다</h3>
+              <p className="text-sm text-muted-foreground mb-6">마음에 드는 상품을 찜해보세요</p>
+              <Link to="/products" className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors">상품 둘러보기</Link>
+            </div>
+        ) : viewType === "grid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {wishlistProducts.map((product) => (
+                  <div key={product.productId} className="bg-white border border-border rounded-lg overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all group">
+                    <Link to={`/products/${product.productId}`} className="block relative">
+                      <div className="aspect-square overflow-hidden bg-muted">
+                        {product.mainImageUrl
+                            ? <img src={product.mainImageUrl} alt={product.productName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            : <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">이미지 없음</div>
+                        }
+                      </div>
+                      <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            openFolderId ? removeFromFolder(openFolderId, product.productId) : removeFromAll(product.productId);
+                          }}
+                          className="absolute top-3 right-3 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm"
+                      >
+                        <Heart size={15} className="fill-red-500 text-red-500" />
+                      </button>
+                    </Link>
+                    <div className="p-4">
+                      <div className="text-xs text-muted-foreground mb-1">{product.brandName}</div>
+                      <Link to={`/products/${product.productId}`} className="block">
+                        <h3 className="font-semibold text-foreground mb-2 line-clamp-2 hover:text-primary transition-colors">{product.productName}</h3>
+                      </Link>
+                      <div className="flex items-baseline gap-1 mb-3">
+                        <span className="text-xl font-bold text-primary">₩{product.unitPrice.toLocaleString()}</span>
+                        <span className="text-xs text-muted-foreground">/벌</span>
+                      </div>
+                      <button className="w-full bg-primary hover:bg-primary/90 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+                        <ShoppingCart size={16} /> 장바구니
+                      </button>
+                    </div>
+                  </div>
+              ))}
+            </div>
+        ) : (
+            <div className="space-y-3">
+              {wishlistProducts.map((product) => (
+                  <div key={product.productId} className="bg-white border border-border rounded-lg p-4 hover:shadow-md hover:border-primary/50 transition-all">
+                    <div className="flex gap-4">
+                      <Link to={`/products/${product.productId}`} className="flex-shrink-0">
+                        <div className="w-32 h-32 rounded-lg overflow-hidden bg-muted">
+                          {product.mainImageUrl
+                              ? <img src={product.mainImageUrl} alt={product.productName} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                              : <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">이미지 없음</div>
+                          }
+                        </div>
+                      </Link>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4 mb-2">
+                          <div className="flex-1">
+                            <div className="text-xs text-muted-foreground mb-1">{product.brandName} · {product.categoryName}</div>
+                            <Link to={`/products/${product.productId}`}>
+                              <h3 className="font-semibold text-foreground text-lg mb-1 hover:text-primary transition-colors">{product.productName}</h3>
+                            </Link>
+                            <div className="flex items-baseline gap-1 mb-2">
+                              <span className="text-2xl font-bold text-primary">₩{product.unitPrice.toLocaleString()}</span>
+                              <span className="text-xs text-muted-foreground">/벌</span>
+                            </div>
+                          </div>
+                          <button
+                              onClick={() => openFolderId ? removeFromFolder(openFolderId, product.productId) : removeFromAll(product.productId)}
+                              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"
+                          >
+                            <Heart size={16} className="fill-red-500 text-red-500" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
+                            <ShoppingCart size={16} /> 장바구니
+                          </button>
+                          <Link to={`/products/${product.productId}`} className="border border-border text-foreground hover:border-primary hover:text-primary px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors">
+                            상세보기
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+              ))}
+            </div>
+        )}
+      </div>
+  );
+
+  const isProductView = viewType === "grid" || viewType === "list";
 
   return (
       <div className="max-w-[1480px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
+
+        {/* 새 폴더 생성 모달 */}
+        {creatingFolder && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setCreatingFolder(false)}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <FolderOpen size={20} className="text-primary" />
+                  </div>
+                  <h2 className="text-lg font-bold text-foreground">새 폴더 만들기</h2>
+                </div>
+                <input
+                    ref={newFolderInputRef}
+                    autoFocus
+                    placeholder="폴더 이름을 입력하세요"
+                    onKeyDown={e => { if (e.nativeEvent.isComposing) return; if (e.key === "Enter") createFolder(); if (e.key === "Escape") setCreatingFolder(false); }}
+                    className="w-full border border-border rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors text-foreground placeholder:text-muted-foreground mb-5"
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => setCreatingFolder(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors">취소</button>
+                  <button onClick={createFolder} className="flex-1 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors">만들기</button>
+                </div>
+              </div>
+            </div>
+        )}
+        {/* 헤더 */}
         <div className="mb-8 flex items-center gap-3">
+          {openFolderId && (
+              <button
+                  onClick={() => { setOpenFolderId(null); setViewType("folder"); }}
+                  className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <ChevronLeft size={20} />
+              </button>
+          )}
           <Heart size={24} className="text-primary fill-primary" />
           <div>
-            <h1 className="text-2xl font-bold text-foreground">찜 목록</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">총 <span className="font-bold text-foreground">{wishlistProducts.length}</span>개 상품</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              {currentFolder ? currentFolder.name : "찜 목록"}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {isProductView
+                  ? <>총 <span className="font-bold text-foreground">{wishlistProducts.length}</span>개 상품</>
+                  : <>폴더 <span className="font-bold text-foreground">{folders.length}</span>개 · 찜 상품 <span className="font-bold text-foreground">{allFavIds.length}</span>개</>
+              }
+            </p>
           </div>
         </div>
 
@@ -228,8 +539,10 @@ export function Wishlist() {
           <div className="flex-1 relative">
             <div className="flex border border-border rounded-lg">
               <div className="relative" ref={tabDropRef}>
-                <button onClick={() => setTabDropOpen((v) => !v)}
-                        className="flex items-center border-r border-border bg-muted px-3 gap-1 cursor-pointer hover:bg-muted/80 transition-colors text-sm text-foreground whitespace-nowrap h-full w-24 justify-between rounded-l-lg">
+                <button
+                    onClick={() => setTabDropOpen((v) => !v)}
+                    className="flex items-center border-r border-border bg-muted px-3 gap-1 cursor-pointer hover:bg-muted/80 transition-colors text-sm text-foreground whitespace-nowrap h-full w-24 justify-between rounded-l-lg"
+                >
                   {searchTab === "product" ? "상품명" : searchTab === "category" ? "카테고리" : "브랜드"}
                   <ChevronDown size={14} />
                 </button>
@@ -246,12 +559,13 @@ export function Wishlist() {
               </div>
               <div className="flex-1 relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input type="text"
-                       placeholder={searchTab === "product" ? "찜한 상품명으로 검색" : searchTab === "category" ? "카테고리명으로 검색" : "브랜드명으로 검색"}
-                       value={searchQuery}
-                       onChange={(e) => { setSearchQuery(e.target.value); setResultDropOpen(true); setTabDropOpen(false); }}
-                       onFocus={() => { if (searchQuery.trim().length > 0) setResultDropOpen(true); }}
-                       className="w-full pl-9 pr-4 py-2.5 text-sm outline-none bg-white rounded-r-lg"
+                <input
+                    type="text"
+                    placeholder={searchTab === "product" ? "찜한 상품명으로 검색" : searchTab === "category" ? "카테고리명으로 검색" : "브랜드명으로 검색"}
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setResultDropOpen(true); setTabDropOpen(false); }}
+                    onFocus={() => { if (searchQuery.trim().length > 0) setResultDropOpen(true); }}
+                    className="w-full pl-9 pr-4 py-2.5 text-sm outline-none bg-white rounded-r-lg"
                 />
               </div>
             </div>
@@ -298,148 +612,118 @@ export function Wishlist() {
                 </div>
             )}
           </div>
+
+          {/* 뷰 전환 버튼 */}
           <div className="flex items-center gap-2">
-            <button onClick={() => setViewMode("grid")} className={`p-2.5 rounded-lg transition-colors ${viewMode === "grid" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}><Grid3x3 size={18} /></button>
-            <button onClick={() => setViewMode("list")} className={`p-2.5 rounded-lg transition-colors ${viewMode === "list" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}><List size={18} /></button>
+            <button
+                onClick={() => { setViewType("folder"); setOpenFolderId(null); }}
+                className={`p-2.5 rounded-lg transition-colors ${viewType === "folder" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                title="폴더 보기"
+            >
+              <FolderOpen size={18} />
+            </button>
+            <button
+                onClick={() => { setViewType("grid"); if (!openFolderId) setOpenFolderId(DEFAULT_FOLDER_ID); }}
+                className={`p-2.5 rounded-lg transition-colors ${viewType === "grid" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                title="그리드 보기"
+            >
+              <Grid3x3 size={18} />
+            </button>
+            <button
+                onClick={() => { setViewType("list"); if (!openFolderId) setOpenFolderId(DEFAULT_FOLDER_ID); }}
+                className={`p-2.5 rounded-lg transition-colors ${viewType === "list" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                title="리스트 보기"
+            >
+              <List size={18} />
+            </button>
           </div>
         </div>
 
+        {/* 본문 - 항상 사이드바 + 컨텐츠 2컬럼 */}
         <div className="grid grid-cols-[240px_1fr] gap-6">
           {/* Sidebar */}
-          <div className="relative" ref={brandPanelRef}>
-            <div className="flex gap-2 mb-4">
-              <button onClick={() => { if (selectedCategory !== "all" || selectedSubCategory) { setSelectedCategory("all"); setSelectedSubCategory(""); setExpandedCategory(null); } else setBrandPanelOpen(false); }}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all border ${selectedCategory !== "all" || selectedSubCategory ? "bg-primary text-white border-primary" : "bg-white text-foreground border-border hover:border-primary hover:text-primary"}`}>
-                카테고리
-              </button>
-              <button onClick={() => { if (selectedBrand) setSelectedBrand(""); else setBrandPanelOpen((v) => !v); }}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all border ${selectedBrand ? "bg-primary text-white border-primary" : "bg-white text-foreground border-border hover:border-primary hover:text-primary"}`}>
-                {selectedBrand ? `${selectedBrand}` : "브랜드"}
-              </button>
-            </div>
-            <div className="space-y-1">
-              {categories.map((cat) => (
-                  <div key={cat.id}>
-                    <button onClick={() => handleCategoryChange(cat.id)}
-                            className={`w-full text-left px-4 py-2.5 rounded-lg transition-all text-sm ${selectedCategory === cat.id && !selectedSubCategory ? "bg-primary text-white font-semibold shadow-sm" : selectedCategory === cat.id ? "bg-primary/10 text-primary font-semibold" : "bg-white border border-border text-foreground hover:border-primary hover:text-primary"}`}>
-                      <div className="flex items-center justify-between">
-                        <span>{cat.name}</span>
-                        {cat.subCategories.length > 0 && <ChevronDown size={13} className={`transition-transform ${expandedCategory === cat.id ? "rotate-180" : ""} ${selectedCategory === cat.id && !selectedSubCategory ? "text-white/80" : "text-muted-foreground"}`} />}
-                      </div>
-                    </button>
-                    {expandedCategory === cat.id && cat.subCategories.length > 0 && (
-                        <div className="ml-3 mt-1 space-y-0.5 border-l-2 border-primary/20 pl-3">
-                          {cat.subCategories.map((sub) => (
-                              <button key={sub} onClick={() => setSelectedSubCategory(sub)}
-                                      className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${selectedSubCategory === sub ? "bg-primary text-white font-semibold" : "text-muted-foreground hover:text-primary hover:bg-primary/5"}`}>
-                                {sub}
-                              </button>
-                          ))}
-                        </div>
-                    )}
-                  </div>
-              ))}
-            </div>
-            {brandPanelOpen && (
-                <BrandPanel allBrands={searchDummyBrands} selectedBrand={selectedBrand}
-                            onSelect={(name) => { setSelectedBrand(name); setBrandPanelOpen(false); }}
-                            onClear={() => setSelectedBrand("")} />
-            )}
-          </div>
+          <div className="space-y-6">
 
-          {/* Product Grid/List */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-muted-foreground">
-                총 <span className="font-bold text-foreground">{wishlistProducts.length}</span>개 상품
-                {selectedSubCategory && <span className="ml-2 text-primary font-medium">· {selectedSubCategory}</span>}
-                {selectedBrand && <span className="ml-2 text-primary font-medium">· {selectedBrand}</span>}
-              </p>
+            {/* ── 카테고리 섹션 ── */}
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">카테고리</p>
+              <div className="space-y-1">
+                {categories.map((cat) => (
+                    <div key={cat.id}>
+                      <button
+                          onClick={() => handleCategoryChange(cat.id)}
+                          className={`w-full text-left px-4 py-2.5 rounded-lg transition-all text-sm ${selectedCategory === cat.id ? "bg-primary text-white font-semibold shadow-sm" : "bg-white border border-border text-foreground hover:border-primary hover:text-primary"}`}
+                      >
+                        {cat.name}
+                      </button>
+                    </div>
+                ))}
+              </div>
             </div>
 
-            {wishlistProducts.length === 0 ? (
-                <div className="text-center py-20">
-                  <Heart size={48} className="mx-auto mb-4 text-muted-foreground opacity-30" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">찜한 상품이 없습니다</h3>
-                  <p className="text-sm text-muted-foreground mb-6">마음에 드는 상품을 찜해보세요</p>
-                  <Link to="/products" className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors">상품 둘러보기</Link>
-                </div>
-            ) : viewMode === "grid" ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                  {wishlistProducts.map((product) => (
-                      <div key={product.productId} className="bg-white border border-border rounded-lg overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all group">
-                        <Link to={`/products/${product.productId}`} className="block relative">
-                          <div className="aspect-square overflow-hidden bg-muted">
-                            {product.mainImageUrl
-                                ? <img src={product.mainImageUrl} alt={product.productName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                : <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">이미지 없음</div>
-                            }
-                          </div>
-                          <button onClick={(e) => { e.preventDefault(); removeFromWishlist(product.productId); }}
-                                  className="absolute top-3 right-3 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm">
-                            <Heart size={15} className="fill-red-500 text-red-500" />
+            {/* ── 브랜드 섹션 ── */}
+            <div className="relative" ref={brandPanelRef}>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">브랜드</p>
+              <button
+                  onClick={() => { if (selectedBrand) { setSelectedBrand(""); } else { setBrandPanelOpen(v => !v); } }}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-sm font-semibold transition-all border ${selectedBrand ? "bg-primary text-white border-primary" : "bg-white text-foreground border-border hover:border-primary hover:text-primary"}`}
+              >
+                <span>{selectedBrand || "브랜드 선택"}</span>
+                {selectedBrand ? <X size={14} /> : <ChevronDown size={14} className={`transition-transform ${brandPanelOpen ? "rotate-180" : ""}`} />}
+              </button>
+
+              {/* 브랜드 드롭다운 패널 */}
+              {brandPanelOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border rounded-lg shadow-xl z-30">
+                    {/* 초성 필터 */}
+                    <div className="flex flex-wrap gap-1 p-2.5 border-b border-border">
+                      {CHOSUNG.map((c) => (
+                          <button key={c} onClick={() => { setBrandChosung(c); setBrandVisibleCount(10); }}
+                                  className={`text-xs px-1.5 py-0.5 rounded transition-colors ${brandChosung === c ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-primary"}`}>
+                            {c}
                           </button>
-                        </Link>
-                        <div className="p-4">
-                          <div className="text-xs text-muted-foreground mb-1">{product.brandName}</div>
-                          <Link to={`/products/${product.productId}`} className="block">
-                            <h3 className="font-semibold text-foreground mb-2 line-clamp-2 hover:text-primary transition-colors">{product.productName}</h3>
-                          </Link>
-                          <div className="flex items-baseline gap-1 mb-3">
-                            <span className="text-xl font-bold text-primary">₩{product.unitPrice.toLocaleString()}</span>
-                            <span className="text-xs text-muted-foreground">/벌</span>
-                          </div>
-                          <button className="w-full bg-primary hover:bg-primary/90 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2">
-                            <ShoppingCart size={16} /> 장바구니
-                          </button>
-                        </div>
-                      </div>
-                  ))}
-                </div>
-            ) : (
-                <div className="space-y-3">
-                  {wishlistProducts.map((product) => (
-                      <div key={product.productId} className="bg-white border border-border rounded-lg p-4 hover:shadow-md hover:border-primary/50 transition-all">
-                        <div className="flex gap-4">
-                          <Link to={`/products/${product.productId}`} className="flex-shrink-0">
-                            <div className="w-32 h-32 rounded-lg overflow-hidden bg-muted">
-                              {product.mainImageUrl
-                                  ? <img src={product.mainImageUrl} alt={product.productName} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
-                                  : <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">이미지 없음</div>
-                              }
-                            </div>
-                          </Link>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-4 mb-2">
-                              <div className="flex-1">
-                                <div className="text-xs text-muted-foreground mb-1">{product.brandName} · {product.categoryName}</div>
-                                <Link to={`/products/${product.productId}`}>
-                                  <h3 className="font-semibold text-foreground text-lg mb-1 hover:text-primary transition-colors">{product.productName}</h3>
-                                </Link>
-                                <div className="flex items-baseline gap-1 mb-2">
-                                  <span className="text-2xl font-bold text-primary">₩{product.unitPrice.toLocaleString()}</span>
-                                  <span className="text-xs text-muted-foreground">/벌</span>
-                                </div>
+                      ))}
+                    </div>
+                    {/* 브랜드 목록 */}
+                    <div
+                        ref={brandScrollRef}
+                        onScroll={() => {
+                          const el = brandScrollRef.current;
+                          if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 10)
+                            setBrandVisibleCount(v => v + 10);
+                        }}
+                        className="max-h-56 overflow-y-auto"
+                    >
+                      {(() => {
+                        const filtered = brandChosung === "전체"
+                            ? searchDummyBrands
+                            : searchDummyBrands.filter(b => getChosung(b.name) === brandChosung);
+                        const visible = filtered.slice(0, brandVisibleCount);
+                        if (visible.length === 0)
+                          return <div className="text-center py-6 text-xs text-muted-foreground">해당 브랜드가 없습니다</div>;
+                        return visible.map((brand) => (
+                            <button
+                                key={brand.name}
+                                onClick={() => { setSelectedBrand(brand.name); setBrandPanelOpen(false); if (viewType === "folder") { setViewType("grid"); setOpenFolderId(DEFAULT_FOLDER_ID); } }}
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 border-b border-border last:border-0 transition-colors text-left ${selectedBrand === brand.name ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground"}`}
+                            >
+                              <div className="w-7 h-7 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                <img src={brand.logo} alt={brand.name} className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                               </div>
-                              <button onClick={() => removeFromWishlist(product.productId)} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
-                                <Heart size={16} className="fill-red-500 text-red-500" />
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
-                                <ShoppingCart size={16} /> 장바구니
-                              </button>
-                              <Link to={`/products/${product.productId}`} className="border border-border text-foreground hover:border-primary hover:text-primary px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors">
-                                상세보기
-                              </Link>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                  ))}
-                </div>
-            )}
+                              <span className="text-xs flex-1 truncate">{brand.name}</span>
+                              {selectedBrand === brand.name && <span className="text-primary font-bold text-xs">✓</span>}
+                            </button>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+              )}
+            </div>
+
           </div>
+
+          {/* 컨텐츠 영역 */}
+          {viewType === "folder" ? <FolderListView /> : <ProductListView />}
         </div>
       </div>
   );
