@@ -1,11 +1,7 @@
 package kr.remerge.stylehub.domain.order.checkout;
 
 import jakarta.validation.Valid;
-import kr.remerge.stylehub.domain.order.checkout.dto.AddressCreateRequest;
-import kr.remerge.stylehub.domain.order.checkout.dto.AddressResponse;
-import kr.remerge.stylehub.domain.order.checkout.dto.CartCheckoutRequest;
-import kr.remerge.stylehub.domain.order.checkout.dto.CartCheckoutResponse;
-import kr.remerge.stylehub.domain.order.checkout.dto.OrderCheckoutResponse;
+import kr.remerge.stylehub.domain.order.checkout.dto.*;
 import kr.remerge.stylehub.domain.order.checkout.service.CheckoutService;
 import kr.remerge.stylehub.global.auth.dto.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
@@ -48,6 +44,36 @@ public class CheckoutController {
 
     }
 
+    @PostMapping("/orders/preview")
+    public ResponseEntity<ApiResponse<MultiOrderCheckoutResponse>> getOrderCheckoutPreview(
+            @LoginUser AuthUser authUser,
+            @Valid @RequestBody OrderCheckoutRequest request
+            ) {
+
+        MultiOrderCheckoutResponse response
+                = checkoutService.getMultiOrderCheckout(
+                        authUser.userId(),request.orderIds()
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+
+    }
+
+    @PostMapping("/orders/dev-payment")
+    public ResponseEntity<ApiResponse<DevOrderPaymentResponse>> completeDevOrderPayment(
+            @LoginUser AuthUser authUser,
+            @Valid @RequestBody OrderCheckoutRequest request
+    ) {
+        DevOrderPaymentResponse response =
+                checkoutService.completeDevOrderPayment(
+                        authUser.userId(),
+                        request.orderIds()
+                );
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+
     @GetMapping("/address")
     public ResponseEntity<ApiResponse<List<AddressResponse>>> address(
             @LoginUser AuthUser authUser
@@ -69,4 +95,5 @@ public class CheckoutController {
 
         return ResponseEntity.ok(ApiResponse.success(addressResponse));
     }
+
 }

@@ -66,7 +66,7 @@ public class CartService {
         }
 
         if (request.quantity() > option.getSampleMaxQuantity()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT);
+            throw new BusinessException(ErrorCode.SAMPLE_OPTION_NOT_CONFIGURED);
         }
 
     }
@@ -96,14 +96,14 @@ public class CartService {
 
     private ProductOption findProductOption(CartAddRequest request) {
         return productOptionRepository.findById(request.productOptionId())
-                .orElseThrow(() -> new IllegalArgumentException("상품을 조회할 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
     }
 
     private User findUser(Integer userId) {
         validateUserId(userId);
 
         return userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 
     private CartItem getOwnedCartItem(Integer userId, Integer cartItemId) {

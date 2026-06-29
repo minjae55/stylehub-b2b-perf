@@ -90,3 +90,6 @@ docker-compose.local.yml
 
 /npm
 application.yaml
+
+.codex-pdf-tools/
+frontend/src/pages.zip

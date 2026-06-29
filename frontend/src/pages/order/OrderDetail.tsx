@@ -1,5 +1,6 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
+import api from "@/api/axios";
 import {
   AlertCircle,
   ArrowLeft,
@@ -10,6 +11,7 @@ import {
   FileText,
   FlaskConical,
   MapPin,
+  Loader2,
   Package,
   PenLine,
   ReceiptText,
@@ -21,6 +23,7 @@ import {
 } from "lucide-react";
 
 type OrderStatus =
+  | "PENDING"
   | "CONFIRMED"
   | "SAMPLE_PREPARING"
   | "SAMPLE_SHIPPED"
@@ -56,6 +59,12 @@ type StatusLog = {
   createdAt: string;
 };
 
+type TimelineStep = {
+  status: OrderStatus;
+  state: "completed" | "current" | "upcoming";
+  log?: StatusLog;
+};
+
 type Order = {
   id: string;
   orderNo: string;
@@ -64,19 +73,19 @@ type Order = {
   createdAt: string;
   agreedAt?: string;
   buyerName: string;
-  sellerName: string;
+  sellerName?: string;
   contractNo?: string;
   quoteNo?: string;
   paymentMethod: string;
-  paidAt: string;
+  paidAt?: string;
   receiverName: string;
   receiverPhone: string;
   receiverZipcode: string;
   receiverAddress: string;
   receiverAddressDetail: string;
   receiverMemo?: string;
-  senderName: string;
-  senderPhone: string;
+  senderName?: string;
+  senderPhone?: string;
   carrier?: string;
   trackingNo?: string;
   subtotalAmount: number;
@@ -88,7 +97,46 @@ type Order = {
   issueMemo?: string;
 };
 
+type BuyerOrderDetailResponse = {
+  orderId: number;
+  orderNo: string;
+  orderType: "NORMAL" | "READY" | "CUSTOM";
+  isSample: boolean;
+  orderStatus: OrderStatus;
+  createdAt: string;
+  buyerName: string;
+  paymentMethod: "CORP_CARD" | "TRANSFER" | null;
+  receiverName: string;
+  receiverPhone: string;
+  receiverZipcode: string | null;
+  receiverAddress: string;
+  receiverAddressDetail: string | null;
+  receiverMemo: string | null;
+  carrier: string | null;
+  trackingNumber: string | null;
+  subtotalAmount: number;
+  platformFee: number;
+  shippingFee: number;
+  totalAmount: number;
+  items: Array<{
+    orderItemId: number;
+    productName: string;
+    optionSummary: string | null;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+  }>;
+  logs: Array<{
+    previousStatus: OrderStatus | null;
+    newStatus: OrderStatus;
+    memo: string;
+    changedBy: string;
+    createdAt: string;
+  }>;
+};
+
 const statusConfig: Record<OrderStatus, { label: string; tone: string; icon: ReactNode }> = {
+  PENDING: { label: "결제 대기", tone: "border-slate-200 bg-slate-50 text-slate-600", icon: <Clock size={14} /> },
   CONFIRMED: { label: "주문 확정", tone: "border-blue-200 bg-blue-50 text-blue-700", icon: <CheckCircle size={14} /> },
   SAMPLE_PREPARING: { label: "샘플 준비", tone: "border-amber-200 bg-amber-50 text-amber-700", icon: <FlaskConical size={14} /> },
   SAMPLE_SHIPPED: { label: "샘플 배송", tone: "border-amber-200 bg-amber-50 text-amber-700", icon: <Truck size={14} /> },
@@ -102,6 +150,21 @@ const statusConfig: Record<OrderStatus, { label: string; tone: string; icon: Rea
   DISPUTE: { label: "이의 제기", tone: "border-rose-200 bg-rose-50 text-rose-700", icon: <AlertCircle size={14} /> },
   REFUNDED: { label: "환불 완료", tone: "border-slate-300 bg-slate-100 text-slate-600", icon: <RotateCcw size={14} /> },
 };
+
+const ORDER_PROGRESS_STATUSES: OrderStatus[] = [
+  "PENDING",
+  "CONFIRMED",
+  "PREPARING",
+  "SHIPPED",
+  "DELIVERED",
+  "COMPLETED",
+];
+
+const EXCEPTION_STATUSES: OrderStatus[] = [
+  "DISPUTE",
+  "CANCELED",
+  "REFUNDED",
+];
 
 const typeConfig: Record<OrderType, { label: string; tone: string }> = {
   GENERAL: { label: "일반 주문", tone: "border-blue-200 bg-blue-50 text-blue-700" },
@@ -391,6 +454,105 @@ function formatPrice(value: number) {
   return `${value.toLocaleString()}원`;
 }
 
+function formatOrderDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value.replace("T", " ").slice(0, 16)
+    : date.toLocaleString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+}
+
+function mapOrderType(response: BuyerOrderDetailResponse): OrderType {
+  if (response.isSample) return "SAMPLE";
+  if (response.orderType === "CUSTOM") return "SOURCING";
+  return "GENERAL";
+}
+
+function mapPaymentMethod(paymentMethod: BuyerOrderDetailResponse["paymentMethod"]) {
+  if (paymentMethod === "CORP_CARD") return "법인카드";
+  if (paymentMethod === "TRANSFER") return "무통장 입금";
+  return "결제 정보 없음";
+}
+
+function mapOrderDetailResponse(response: BuyerOrderDetailResponse): Order {
+  return {
+    id: String(response.orderId),
+    orderNo: response.orderNo,
+    orderType: mapOrderType(response),
+    status: response.orderStatus,
+    createdAt: formatOrderDate(response.createdAt),
+    buyerName: response.buyerName,
+    paymentMethod: mapPaymentMethod(response.paymentMethod),
+    receiverName: response.receiverName,
+    receiverPhone: response.receiverPhone,
+    receiverZipcode: response.receiverZipcode ?? "-",
+    receiverAddress: response.receiverAddress,
+    receiverAddressDetail: response.receiverAddressDetail ?? "",
+    receiverMemo: response.receiverMemo ?? undefined,
+    carrier: response.carrier ?? undefined,
+    trackingNo: response.trackingNumber ?? undefined,
+    subtotalAmount: response.subtotalAmount,
+    platformFee: response.platformFee,
+    shippingFee: response.shippingFee,
+    totalAmount: response.totalAmount,
+    items: response.items.map((item) => ({
+      id: item.orderItemId,
+      productId: 0,
+      name: item.productName,
+      optionSummary: item.optionSummary ?? "옵션 정보 없음",
+      material: "",
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      image: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=240&h=240&fit=crop&auto=format",
+    })),
+    logs: response.logs.map((log) => ({
+      previousStatus: log.previousStatus ?? undefined,
+      newStatus: log.newStatus,
+      memo: log.memo,
+      changedBy: log.changedBy,
+      createdAt: formatOrderDate(log.createdAt),
+    })),
+  };
+}
+
+function buildTimeline(order: Order): TimelineStep[] {
+  const currentProgressIndex = ORDER_PROGRESS_STATUSES.indexOf(order.status);
+  const loggedProgressIndex = order.logs.reduce((latestIndex, log) => {
+    const index = ORDER_PROGRESS_STATUSES.indexOf(log.newStatus);
+    return Math.max(latestIndex, index);
+  }, -1);
+  const reachedIndex = Math.max(currentProgressIndex, loggedProgressIndex);
+
+  const steps = ORDER_PROGRESS_STATUSES.map((status, index): TimelineStep => {
+    const log = [...order.logs].reverse().find((item) => item.newStatus === status);
+
+    if (status === order.status) {
+      return { status, state: "current", log };
+    }
+
+    return {
+      status,
+      state: index <= reachedIndex ? "completed" : "upcoming",
+      log,
+    };
+  });
+
+  if (EXCEPTION_STATUSES.includes(order.status)) {
+    const log = [...order.logs].reverse().find(
+      (item) => item.newStatus === order.status
+    );
+    steps.push({ status: order.status, state: "current", log });
+  }
+
+  return steps;
+}
+
 function getTrackingUrl(carrier: string | undefined, trackingNo: string) {
   if (!carrier || !CARRIER_TRACKING[carrier]) return CARRIER_TRACKING.CJ대한통운(trackingNo);
   return CARRIER_TRACKING[carrier](trackingNo);
@@ -419,15 +581,60 @@ function getNextAction(order: Order) {
 
 export function OrderDetail() {
   const { id } = useParams<{ id: string }>();
-  const order = id ? orders[id] : undefined;
+  const [order, setOrder] = useState<Order | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [showDispute, setShowDispute] = useState(false);
 
-  if (!order) {
+  useEffect(() => {
+    const orderId = Number(id);
+
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      setError("올바르지 않은 주문 번호입니다.");
+      setIsLoading(false);
+      return;
+    }
+
+    const loadOrderDetail = async () => {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        const response = await api.get<BuyerOrderDetailResponse>(
+          `/orders/${orderId}/detail`
+        );
+
+        setOrder(mapOrderDetailResponse(response));
+      } catch (loadError) {
+        console.error("주문 상세 조회 실패", loadError);
+        setError("주문 상세 정보를 불러오지 못했습니다.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadOrderDetail();
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-slate-50">
+        <div className="flex items-center gap-3 text-sm font-semibold text-slate-500">
+          <Loader2 size={20} className="animate-spin text-primary" />
+          주문 상세 정보를 불러오는 중입니다.
+        </div>
+      </div>
+    );
+  }
+
+  if (!order || error) {
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-16 text-center">
         <Package size={44} className="mx-auto mb-4 text-slate-300" />
-        <h1 className="text-xl font-black text-slate-950">주문을 찾을 수 없습니다</h1>
+        <h1 className="text-xl font-black text-slate-950">
+          {error || "주문을 찾을 수 없습니다"}
+        </h1>
         <Link to="/orders" className="mt-5 inline-flex rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white">
           주문 목록으로
         </Link>
@@ -456,14 +663,16 @@ export function OrderDetail() {
             </div>
             <h1 className="font-mono text-2xl font-black text-slate-950">{order.orderNo}</h1>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              {order.buyerName}와 {order.sellerName} 사이의 주문 상세 정보입니다.
+              {order.sellerName
+                ? `${order.buyerName}와 ${order.sellerName} 사이의 주문 상세 정보입니다.`
+                : `${order.buyerName}의 주문 상세 정보입니다.`}
             </p>
           </div>
         </header>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-stretch">
-          <main className="contents">
-            <section className="h-full rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:order-1 lg:col-start-1">
+        <div className="space-y-5">
+          <div>
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <SectionTitle icon={<Package size={16} />} title="주문 상품" />
               <div className="space-y-5">
                 {order.items.map((item) => (
@@ -472,15 +681,25 @@ export function OrderDetail() {
                     <div className="min-w-0">
                       <p className="text-base font-black text-slate-950">{item.name}</p>
                       <p className="mt-1 text-sm leading-6 text-slate-500">{item.optionSummary}</p>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                        <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">product_id {item.productId}</span>
-                        {item.productOptionId && (
+                      {(item.productId > 0 || item.productOptionId || item.material) && (
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                          {item.productId > 0 && (
+                            <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                              product_id {item.productId}
+                            </span>
+                          )}
+                          {item.productOptionId && (
                           <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
                             option_id {item.productOptionId}
                           </span>
-                        )}
-                        <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">{item.material}</span>
-                      </div>
+                          )}
+                          {item.material && (
+                            <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                              {item.material}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-semibold text-slate-500">
@@ -494,26 +713,70 @@ export function OrderDetail() {
                 ))}
               </div>
             </section>
+          </div>
 
-            <section className="h-full rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:order-3 lg:col-start-1">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+            <main className="space-y-5">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <SectionTitle icon={<Truck size={16} />} title="상태 이력" />
               <div className="relative">
                 <div className="absolute left-[15px] top-2 bottom-2 w-px bg-slate-200" />
                 <div className="space-y-4">
-                  {order.logs.map((log, index) => {
-                    const logStatus = statusConfig[log.newStatus];
+                  {buildTimeline(order).map((step) => {
+                    const stepConfig = statusConfig[step.status];
+                    const isUpcoming = step.state === "upcoming";
+                    const isCurrent = step.state === "current";
+
                     return (
-                      <div key={`${log.createdAt}-${index}`} className="relative flex gap-4">
-                        <span className={`z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${logStatus.tone}`}>
-                          {logStatus.icon}
+                      <div key={step.status} className="relative flex gap-4">
+                        <span
+                          className={`z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+                            isUpcoming
+                              ? "border-slate-200 bg-white text-slate-300"
+                              : stepConfig.tone
+                          } ${isCurrent ? "ring-4 ring-primary/10" : ""}`}
+                        >
+                          {isUpcoming ? <Clock size={14} /> : stepConfig.icon}
                         </span>
-                        <div className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div
+                          className={`flex-1 rounded-lg border px-4 py-3 ${
+                            isUpcoming
+                              ? "border-slate-200 bg-slate-50/60 text-slate-400"
+                              : isCurrent
+                                ? "border-primary/25 bg-secondary/50"
+                                : "border-slate-200 bg-white"
+                          }`}
+                        >
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="font-black text-slate-950">{logStatus.label}</p>
-                            <p className="font-mono text-xs text-slate-500">{log.createdAt}</p>
+                            <p className={`font-black ${isUpcoming ? "text-slate-400" : "text-slate-950"}`}>
+                              {stepConfig.label}
+                              <span className="ml-2 text-xs font-bold">
+                                {step.state === "completed"
+                                  ? "완료"
+                                  : isCurrent
+                                    ? "현재 단계"
+                                    : "예정"}
+                              </span>
+                            </p>
+                            {step.log && (
+                              <p className="font-mono text-xs text-slate-500">
+                                {step.log.createdAt}
+                              </p>
+                            )}
                           </div>
-                          <p className="mt-1 text-sm leading-6 text-slate-600">{log.memo}</p>
-                          <p className="mt-1 text-xs font-semibold text-slate-400">changed_by: {log.changedBy}</p>
+                          <p className={`mt-1 text-sm leading-6 ${isUpcoming ? "text-slate-400" : "text-slate-600"}`}>
+                            {step.log?.memo ??
+                              (step.state === "completed"
+                                ? "처리 완료된 단계입니다."
+                                : isCurrent
+                                  ? "현재 진행 중인 단계입니다."
+                                  : "이전 단계 완료 후 진행됩니다.")}
+                          </p>
+                          {step.log && (
+                            <p className="mt-1 text-xs font-semibold text-slate-400">
+                              처리자: {step.log.changedBy}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
@@ -523,7 +786,7 @@ export function OrderDetail() {
             </section>
 
             {order.issueMemo && (
-              <section className={`rounded-xl border p-5 shadow-sm lg:order-5 lg:col-span-2 ${order.status === "DISPUTE" ? "border-rose-200 bg-rose-50" : "border-orange-200 bg-orange-50"}`}>
+              <section className={`rounded-xl border p-5 shadow-sm ${order.status === "DISPUTE" ? "border-rose-200 bg-rose-50" : "border-orange-200 bg-orange-50"}`}>
                 <SectionTitle icon={<AlertCircle size={16} />} title={order.status === "DISPUTE" ? "이의제기 내용" : "처리 메모"} />
                 <p className={`text-sm font-semibold leading-6 ${order.status === "DISPUTE" ? "text-rose-800" : "text-orange-800"}`}>
                   {order.issueMemo}
@@ -532,8 +795,8 @@ export function OrderDetail() {
             )}
           </main>
 
-          <aside className="contents">
-            <section className="h-full rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:order-2 lg:col-start-2">
+          <aside className="space-y-5">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <SectionTitle icon={<ReceiptText size={16} />} title="결제 요약" />
               <div className="space-y-3 text-sm">
                 <SummaryRow label="상품 금액" value={formatPrice(order.subtotalAmount)} />
@@ -543,7 +806,7 @@ export function OrderDetail() {
                   <SummaryRow label="최종 결제 금액" value={formatPrice(order.totalAmount)} strong />
                 </div>
                 <SummaryRow label="결제 방식" value={order.paymentMethod} />
-                <SummaryRow label="결제 일시" value={order.paidAt} />
+                <SummaryRow label="결제 일시" value={order.paidAt ?? "결제 일시 정보 없음"} />
               </div>
               <div className="mt-4 rounded-lg border border-primary/15 bg-secondary/60 px-3 py-3 text-xs leading-5 text-slate-600">
                 결제 대금은 거래 확정 전까지 안전하게 보관되며, 완료 후 셀러 정산 대상으로 전환됩니다.
@@ -554,14 +817,16 @@ export function OrderDetail() {
               </button>
             </section>
 
-            <section className="h-full rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:order-4 lg:col-start-2">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <SectionTitle icon={<MapPin size={16} />} title="배송 정보" />
               <div className="space-y-3 text-sm">
                 <SummaryRow label="수령인" value={`${order.receiverName} / ${order.receiverPhone}`} />
                 <SummaryRow label="우편번호" value={order.receiverZipcode} />
                 <InfoBlock label="배송지" value={`${order.receiverAddress} ${order.receiverAddressDetail}`} />
                 {order.receiverMemo && <InfoBlock label="배송 요청사항" value={order.receiverMemo} />}
-                <SummaryRow label="발송인" value={`${order.senderName} / ${order.senderPhone}`} />
+                {order.senderName && order.senderPhone && (
+                  <SummaryRow label="발송인" value={`${order.senderName} / ${order.senderPhone}`} />
+                )}
                 {order.trackingNo && (
                   <>
                     <SummaryRow label="택배사" value={order.carrier ?? "-"} />
@@ -580,6 +845,7 @@ export function OrderDetail() {
               </div>
             </section>
           </aside>
+          </div>
         </div>
 
         {showConfirm && (

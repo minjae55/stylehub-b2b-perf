@@ -1,9 +1,6 @@
 package kr.remerge.stylehub.domain.order;
 
-import kr.remerge.stylehub.domain.order.dto.BuyerOrderOverviewResponse;
-import kr.remerge.stylehub.domain.order.dto.OrderCreateRequest;
-import kr.remerge.stylehub.domain.order.dto.OrderCreateResponse;
-import kr.remerge.stylehub.domain.order.dto.BuyerOrderListResponse;
+import kr.remerge.stylehub.domain.order.dto.*;
 import kr.remerge.stylehub.domain.order.service.OrderService;
 import kr.remerge.stylehub.global.auth.dto.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
@@ -54,6 +51,17 @@ public class OrderController {
                 orderService.createOrder(authUser.userId(), request);
 
         return ResponseEntity.ok(ApiResponse.success(orderCreateResponse));
+    }
+
+    @GetMapping("/{orderId}/detail")
+    public ResponseEntity<ApiResponse<BuyerOrderDetailResponse>> getOrderDetail(
+            @LoginUser AuthUser authUser,
+            @PathVariable Integer orderId
+    ) {
+        BuyerOrderDetailResponse response =
+                orderService.getOrderDetail(authUser.userId(), orderId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
 }

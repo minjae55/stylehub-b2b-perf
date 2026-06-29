@@ -23,6 +23,7 @@ public record CartResponse(
         Long unitPrice,
         Integer moq,
         Integer quantity,
+        Integer stockQuantity,
         Long totalPrice,
 
         Long baseShippingFee,
@@ -61,6 +62,7 @@ public record CartResponse(
                 unitPrice,
                 product.getMoq(),
                 cartItem.getQuantity(),
+                productOption.getStockQuantity(),
                 totalPrice,
 
                 company.getBaseShippingFee(),

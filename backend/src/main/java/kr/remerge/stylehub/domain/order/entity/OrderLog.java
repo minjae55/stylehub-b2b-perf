@@ -1,6 +1,7 @@
 package kr.remerge.stylehub.domain.order.entity;
 
 import jakarta.persistence.*;
+import kr.remerge.stylehub.domain.order.enumtype.OrderLogMemo;
 import kr.remerge.stylehub.domain.order.enumtype.OrderLogType;
 import kr.remerge.stylehub.domain.order.enumtype.OrderProcessStep;
 import kr.remerge.stylehub.domain.order.enumtype.OrderStatus;
@@ -54,4 +55,21 @@ public class OrderLog extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String memo;
+
+    public static OrderLog createStatusLog(
+            Order order,
+            OrderStatus previousStatus,
+            OrderStatus newStatus,
+            User actor,
+            OrderLogMemo memo
+    ) {
+        return OrderLog.builder()
+                .order(order)
+                .logType(OrderLogType.STATUS)
+                .previousStatus(previousStatus)
+                .newStatus(newStatus)
+                .actorUser(actor)
+                .memo(memo.getMessage())
+                .build();
+    }
 }

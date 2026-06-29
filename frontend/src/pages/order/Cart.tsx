@@ -29,6 +29,7 @@ type CartItem = {
   unitPrice: number;
   moq: number;
   quantity: number;
+  stockQuantity: number;
   totalPrice: number;
   isChecked: boolean;
   sampleAvailable: boolean;
@@ -54,6 +55,18 @@ function formatPrice(value: number) {
 
 function getSampleMaxQuantity(item: CartItem) {
   return Math.max(1, item.sampleMaxQuantity ?? 5);
+}
+
+function isOutOfStock(item: CartItem) {
+  return item.quantity > item.stockQuantity;
+}
+
+function isBulkOrderable(item: CartItem) {
+  return item.quantity >= item.moq && !isOutOfStock(item);
+}
+
+function isSampleOrderable(item: CartItem) {
+  return !isOutOfStock(item) && item.quantity <= getSampleMaxQuantity(item);
 }
 
 function mapCartApiItems(apiItems: CartApiItem[]): CartItem[] {
@@ -99,6 +112,7 @@ const demoCartItems: CartItem[] = [
     unitPrice: 5500,
     moq: 100,
     quantity: 100,
+    stockQuantity: 240,
     totalPrice: 550000,
     isChecked: true,
     sampleAvailable: true,
@@ -119,6 +133,7 @@ const demoCartItems: CartItem[] = [
     unitPrice: 12800,
     moq: 20,
     quantity: 20,
+    stockQuantity: 80,
     totalPrice: 256000,
     isChecked: true,
     sampleAvailable: true,
@@ -139,6 +154,7 @@ const demoCartItems: CartItem[] = [
     unitPrice: 9200,
     moq: 50,
     quantity: 50,
+    stockQuantity: 120,
     totalPrice: 460000,
     isChecked: true,
     sampleAvailable: false,
@@ -158,6 +174,7 @@ const demoCartItems: CartItem[] = [
     unitPrice: 10500,
     moq: 10,
     quantity: 10,
+    stockQuantity: 60,
     totalPrice: 105000,
     isChecked: true,
     sampleAvailable: true,
@@ -178,6 +195,7 @@ const demoCartItems: CartItem[] = [
     unitPrice: 24800,
     moq: 10,
     quantity: 10,
+    stockQuantity: 20,
     totalPrice: 248000,
     isChecked: true,
     sampleAvailable: true,
@@ -213,7 +231,7 @@ export function Cart() {
           return;
         }
 
-        const response = await api.get<CartApiItem[]>("/cart");
+        const response = await api.get<CartApiItem[]>("/carts");
         const cartItems = mapCartApiItems(response);
         setItems(cartItems);
         setSelected(
@@ -245,23 +263,27 @@ export function Cart() {
   const bulkItems = items.filter((item) => item.cartType === "NORMAL");
   const sampleItems = items.filter((item) => item.cartType === "SAMPLE");
   const sampleOptionIds = new Set(sampleItems.map((item) => item.productOptionId));
-  const bulkSelected = bulkItems.filter((item) => selected.includes(item.cartItemId));
-  const sampleSelected = sampleItems.filter((item) => selectedSample.includes(item.cartItemId));
+  const bulkSelected = bulkItems.filter((item) => selected.includes(item.cartItemId) && isBulkOrderable(item));
+  const sampleSelected = sampleItems.filter((item) => selectedSample.includes(item.cartItemId) && isSampleOrderable(item));
   const bulkSubtotal = bulkSelected.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const sampleSubtotal = sampleSelected.reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
     0
   );
   const bulkValidIds = bulkItems
-    .filter((item) => item.quantity >= item.moq)
+    .filter(isBulkOrderable)
     .map((item) => item.cartItemId);
-  const sampleValidIds = sampleItems.map((item) => item.cartItemId);
-  const allBulkSelected = bulkValidIds.length > 0 && selected.length === bulkValidIds.length;
+  const sampleValidIds = sampleItems
+    .filter(isSampleOrderable)
+    .map((item) => item.cartItemId);
+  const bulkSelectedCount = selected.filter((id) => bulkValidIds.includes(id)).length;
+  const sampleSelectedCount = selectedSample.filter((id) => sampleValidIds.includes(id)).length;
+  const allBulkSelected = bulkValidIds.length > 0 && bulkSelectedCount === bulkValidIds.length;
   const allSampleSelected =
-    sampleValidIds.length > 0 && selectedSample.length === sampleValidIds.length;
+    sampleValidIds.length > 0 && sampleSelectedCount === sampleValidIds.length;
   const sortedBulkItems = [...bulkItems].sort((a, b) => {
-    const aBlocked = a.quantity < a.moq;
-    const bBlocked = b.quantity < b.moq;
+    const aBlocked = !isBulkOrderable(a);
+    const bBlocked = !isBulkOrderable(b);
     return Number(aBlocked) - Number(bBlocked);
   });
   const sellerGroups = Object.values(
@@ -278,14 +300,11 @@ export function Cart() {
     )
   );
 
-  const updateQty = async (id: number, delta: number, type: "bulk" | "sample") => {
+  const updateQtyTo = async (id: number, nextQuantity: number, type: "bulk" | "sample") => {
     const item = items.find((cartItem) => cartItem.cartItemId === id);
     if (!item || updatingQuantityIds.has(id)) return;
 
-    const nextQuantity = item.quantity + delta;
-    const minimum = type === "bulk" ? item.moq : 1;
-    const maximum = type === "sample" ? getSampleMaxQuantity(item) : Number.MAX_SAFE_INTEGER;
-    if (nextQuantity < minimum || nextQuantity > maximum) return;
+    if (nextQuantity < 1) return;
 
     if (isSellerDemo) {
       setItems((prev) =>
@@ -312,7 +331,7 @@ export function Cart() {
         )
       );
 
-      const response = await api.patch<CartItem>(`/cart/${id}/quantity`, {
+      const response = await api.patch<CartItem>(`/carts/${id}/quantity`, {
         quantity: nextQuantity,
       });
       if (response?.cartItemId === id) {
@@ -338,6 +357,13 @@ export function Cart() {
     }
   };
 
+  const updateQty = async (id: number, delta: number, type: "bulk" | "sample") => {
+    const item = items.find((cartItem) => cartItem.cartItemId === id);
+    if (!item) return;
+
+    await updateQtyTo(id, Math.max(1, item.quantity + delta), type);
+  };
+
   const removeItemFromState = (id: number) => {
     setItems((prev) => prev.filter((item) => item.cartItemId !== id));
     setSelected((prev) => prev.filter((selectedId) => selectedId !== id));
@@ -351,7 +377,7 @@ export function Cart() {
     }
 
     try {
-      await api.delete(`/cart/${id}`);
+      await api.delete(`/carts/${id}`);
       removeItemFromState(id);
     } catch (error) {
       const apiError = error as { response?: { status?: number; data?: unknown } };
@@ -388,13 +414,13 @@ export function Cart() {
     try {
       setAddingSampleOptionId(item.productOptionId);
 
-      await api.post("/cart", {
+      await api.post("/carts", {
         productOptionId: item.productOptionId,
         quantity: 1,
         cartType: "SAMPLE",
       });
 
-      const response = await api.get<CartApiItem[]>("/cart");
+      const response = await api.get<CartApiItem[]>("/carts");
       const cartItems = mapCartApiItems(response);
       setItems(cartItems);
       setSelectedSample(
@@ -481,7 +507,9 @@ export function Cart() {
   const currentCount = tab === "SAMPLE" ? sampleSelected.length : bulkSelected.length;
 
   const handleCheckout = () => {
-    const cartItemIds = tab === "SAMPLE" ? selectedSample : selected;
+    const cartItemIds = tab === "SAMPLE"
+      ? sampleSelected.map((item) => item.cartItemId)
+      : bulkSelected.map((item) => item.cartItemId);
     if (cartItemIds.length === 0) return;
 
     navigate("/checkout", {
@@ -535,7 +563,7 @@ export function Cart() {
                 <SelectBar
                   checked={allBulkSelected}
                   onClick={() => toggleSelectAll("BULK")}
-                  label={`전체 선택 (${selected.length}/${bulkValidIds.length})`}
+                  label={`전체 선택 (${bulkSelectedCount}/${bulkValidIds.length})`}
                 />
                 {sellerGroups.map((group, groupIndex) => {
                   const groupLabel = String.fromCharCode(65 + groupIndex);
@@ -549,7 +577,7 @@ export function Cart() {
                   const qualifiesForFreeShipping =
                     freeShippingThreshold > 0 && sellerSubtotal >= freeShippingThreshold;
                   const amountUntilFreeShipping = Math.max(0, freeShippingThreshold - sellerSubtotal);
-                  const showSellerGroup = isSellerDemo || group.items.some((item) => item.sellerName);
+                  const showSellerGroup = group.sellerId != null;
 
                   return (
                     <section
@@ -605,6 +633,7 @@ export function Cart() {
                             onToggle={() => toggleSelect(item.cartItemId, "BULK")}
                             onRemove={() => removeItem(item.cartItemId)}
                             onQtyChange={(delta) => updateQty(item.cartItemId, delta, "bulk")}
+                            onQuantityInput={(quantity) => updateQtyTo(item.cartItemId, quantity, "bulk")}
                             onAddSample={() => handleAddSample(item)}
                             sampleAdded={sampleOptionIds.has(item.productOptionId)}
                             isAddingSample={addingSampleOptionId === item.productOptionId}
@@ -621,12 +650,15 @@ export function Cart() {
               <SampleCart
                 sampleItems={sampleItems}
                 selectedSample={selectedSample}
+                selectedCount={sampleSelectedCount}
+                selectableCount={sampleValidIds.length}
                 allSelected={allSampleSelected}
                 onSelectAll={() => toggleSelectAll("SAMPLE")}
                 onGoBulk={() => setTab("BULK")}
                 onToggle={(id) => toggleSelect(id, "SAMPLE")}
                 onRemove={(id) => removeItem(id)}
                 onQtyChange={(id, delta) => updateQty(id, delta, "sample")}
+                onQuantityChange={(id, quantity) => updateQtyTo(id, quantity, "sample")}
                 updatingQuantityIds={updatingQuantityIds}
               />
             )}
@@ -742,6 +774,7 @@ function CartProductCard({
   onToggle,
   onRemove,
   onQtyChange,
+  onQuantityInput,
   onAddSample,
   sampleAdded = false,
   isAddingSample = false,
@@ -754,6 +787,7 @@ function CartProductCard({
   onToggle: () => void;
   onRemove: () => void;
   onQtyChange: (delta: number) => void;
+  onQuantityInput: (quantity: number) => void;
   onAddSample?: () => void;
   sampleAdded?: boolean;
   isAddingSample?: boolean;
@@ -764,15 +798,19 @@ function CartProductCard({
   const unitPrice = item.unitPrice;
   const quantity = item.quantity;
   const amount = unitPrice * quantity;
-  const moqShortfall = !isSample && item.quantity < item.moq;
   const sampleMaxQuantity = getSampleMaxQuantity(item);
+  const minimumQuantity = 1;
+  const moqShortfall = !isSample && item.quantity < item.moq;
+  const stockShortfall = isOutOfStock(item);
+  const sampleLimitExceeded = isSample && item.quantity > sampleMaxQuantity;
+  const blocked = moqShortfall || stockShortfall || sampleLimitExceeded;
 
   return (
     <article
       className={grouped
         ? `overflow-hidden bg-white ${selected ? "bg-primary/[0.015]" : ""}`
         : `overflow-hidden rounded-xl border bg-white shadow-sm ${
-            moqShortfall ? "border-amber-300" : selected ? "border-primary/30" : "border-slate-200"
+            blocked ? "border-amber-300" : selected ? "border-primary/30" : "border-slate-200"
           }`}
     >
       {isSample && (
@@ -787,7 +825,7 @@ function CartProductCard({
 
       <div className="flex gap-4 p-5">
         <div className="pt-8">
-          <Checkbox checked={selected} onClick={onToggle} disabled={moqShortfall} />
+          <Checkbox checked={selected} onClick={onToggle} disabled={blocked} />
         </div>
         <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-300">
           <Package size={32} />
@@ -852,8 +890,10 @@ function CartProductCard({
                 stepLabel={isSample ? `최대 ${sampleMaxQuantity.toLocaleString()}개` : "10벌 단위"}
                 onMinus={() => onQtyChange(isSample ? -1 : -10)}
                 onPlus={() => onQtyChange(isSample ? 1 : 10)}
-                minusDisabled={isUpdatingQuantity || (isSample ? quantity <= 1 : quantity <= item.moq)}
-                plusDisabled={isUpdatingQuantity || (isSample && quantity >= sampleMaxQuantity)}
+                onValueCommit={onQuantityInput}
+                min={minimumQuantity}
+                minusDisabled={isUpdatingQuantity || quantity <= minimumQuantity}
+                plusDisabled={isUpdatingQuantity}
               />
             </div>
             <div className="text-right">
@@ -866,6 +906,21 @@ function CartProductCard({
             <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
               <AlertCircle size={12} />
               최소 주문 수량 {item.moq.toLocaleString()}벌 이상부터 주문할 수 있습니다.
+            </div>
+          )}
+
+          {stockShortfall && (
+            <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+              <AlertCircle size={12} />
+              현재 재고보다 {(item.quantity - item.stockQuantity).toLocaleString()}개 더 담았습니다.
+              재고는 {item.stockQuantity.toLocaleString()}개이며, 수량을 조정하기 전에는 주문할 수 없습니다.
+            </div>
+          )}
+
+          {sampleLimitExceeded && (
+            <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              <AlertCircle size={12} />
+              샘플은 최대 {sampleMaxQuantity.toLocaleString()}개까지 주문할 수 있습니다.
             </div>
           )}
 
@@ -886,6 +941,9 @@ function QuantityControl({
   stepLabel,
   onMinus,
   onPlus,
+  onValueCommit,
+  min,
+  max,
   minusDisabled = false,
   plusDisabled = false,
 }: {
@@ -894,9 +952,36 @@ function QuantityControl({
   stepLabel: string;
   onMinus: () => void;
   onPlus: () => void;
+  onValueCommit: (value: number) => void;
+  min: number;
+  max?: number;
   minusDisabled?: boolean;
   plusDisabled?: boolean;
 }) {
+  const [draftValue, setDraftValue] = useState(String(value));
+
+  useEffect(() => {
+    setDraftValue(String(value));
+  }, [value]);
+
+  const commitValue = () => {
+    const numericValue = Number(draftValue);
+
+    if (!Number.isFinite(numericValue)) {
+      setDraftValue(String(value));
+      return;
+    }
+
+    const integerValue = Math.floor(numericValue);
+    const clampedValue = Math.min(Math.max(integerValue, min), max ?? Number.MAX_SAFE_INTEGER);
+
+    setDraftValue(String(clampedValue));
+
+    if (clampedValue !== value) {
+      onValueCommit(clampedValue);
+    }
+  };
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button
@@ -907,9 +992,20 @@ function QuantityControl({
       >
         <Minus size={13} />
       </button>
-      <span className="min-w-20 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-center text-sm font-bold text-slate-950">
-        {value.toLocaleString()}
-      </span>
+      <input
+        type="number"
+        value={draftValue}
+        min={min}
+        max={max}
+        onChange={(event) => setDraftValue(event.target.value)}
+        onBlur={commitValue}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+        }}
+        className="h-8 w-24 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold text-slate-950 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+      />
       <button
         type="button"
         onClick={onPlus}
@@ -928,22 +1024,28 @@ function QuantityControl({
 function SampleCart({
   sampleItems,
   selectedSample,
+  selectedCount,
+  selectableCount,
   allSelected,
   onSelectAll,
   onGoBulk,
   onToggle,
   onRemove,
   onQtyChange,
+  onQuantityChange,
   updatingQuantityIds,
 }: {
   sampleItems: CartItem[];
   selectedSample: number[];
+  selectedCount: number;
+  selectableCount: number;
   allSelected: boolean;
   onSelectAll: () => void;
   onGoBulk: () => void;
   onToggle: (id: number) => void;
   onRemove: (id: number) => void;
   onQtyChange: (id: number, delta: number) => void;
+  onQuantityChange: (id: number, quantity: number) => void;
   updatingQuantityIds: Set<number>;
 }) {
   if (sampleItems.length === 0) {
@@ -975,7 +1077,7 @@ function SampleCart({
       <SelectBar
         checked={allSelected}
         onClick={onSelectAll}
-        label={`전체 선택 (${selectedSample.length}/${sampleItems.length})`}
+        label={`전체 선택 (${selectedCount}/${selectableCount})`}
       />
       {sampleItems.map((item) => (
         <CartProductCard
@@ -983,11 +1085,12 @@ function SampleCart({
           item={item}
           selected={selectedSample.includes(item.cartItemId)}
           mode="sample"
-          onToggle={() => onToggle(item.cartItemId)}
-          onRemove={() => onRemove(item.cartItemId)}
-          onQtyChange={(delta) => onQtyChange(item.cartItemId, delta)}
-          isUpdatingQuantity={updatingQuantityIds.has(item.cartItemId)}
-        />
+        onToggle={() => onToggle(item.cartItemId)}
+        onRemove={() => onRemove(item.cartItemId)}
+        onQtyChange={(delta) => onQtyChange(item.cartItemId, delta)}
+        onQuantityInput={(quantity) => onQuantityChange(item.cartItemId, quantity)}
+        isUpdatingQuantity={updatingQuantityIds.has(item.cartItemId)}
+      />
       ))}
     </>
   );

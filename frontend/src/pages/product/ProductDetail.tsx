@@ -146,7 +146,7 @@ export function ProductDetail() {
     if (isAddingToCart || !selectedOption) return;
     try {
       setIsAddingToCart(true);
-      await api.post("/cart", {
+      await api.post("/carts", {
         productOptionId: selectedOption.productOptionId,
         quantity,
         cartType: "NORMAL",

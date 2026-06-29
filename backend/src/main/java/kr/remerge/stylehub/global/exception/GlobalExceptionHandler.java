@@ -1,5 +1,7 @@
 package kr.remerge.stylehub.global.exception;
 
+import kr.remerge.stylehub.domain.order.checkout.dto.CheckoutValidationErrorResponse;
+import kr.remerge.stylehub.domain.order.checkout.exception.CheckoutValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -45,6 +47,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
                 .body(ApiResponse.fail(errorCode));
+    }
+
+    @ExceptionHandler(CheckoutValidationException.class)
+    public ResponseEntity<ApiResponse<CheckoutValidationErrorResponse>> handleCheckoutValidationException(
+            CheckoutValidationException e
+    ) {
+        ErrorCode errorCode = e.getErrorCode();
+
+        log.warn("[CheckoutValidationException] {} : {}", errorCode.name(), errorCode.getMessage());
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(ApiResponse.fail(errorCode, e.getResponse()));
     }
 
     // ───────────────────────────────────────────
