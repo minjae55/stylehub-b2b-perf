@@ -105,9 +105,35 @@ export interface FindIdResponse {
 // 비밀번호 찾기
 // ───────────────────────────────────────────
 
-export interface FindPwRequest {
+/**
+ * 1단계: 이메일 인증번호 발송 요청
+ */
+export interface FindPwSendOtpRequest {
     email: string;
     name: string;
+}
+
+/**
+ * 2단계: 인증번호 검증 요청
+ */
+export interface FindPwVerifyOtpRequest {
+    email: string;
+    code: string; // 6자리 인증번호
+}
+
+/**
+ * 2단계 성공 시 백엔드가 내려주는 일회성 비밀번호 재설정 토큰
+ */
+export interface ResetPasswordTokenResponse {
+    resetToken: string;
+}
+
+/**
+ * 3단계: 최종 비밀번호 재설정 요청
+ */
+export interface ResetPasswordRequest {
+    resetToken: string;
+    newPassword: string;
 }
 
 // ───────────────────────────────────────────

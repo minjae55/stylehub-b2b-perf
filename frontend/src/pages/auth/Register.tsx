@@ -448,7 +448,7 @@ function StepAccount({
                         type={showPw ? "text" : "password"}
                         value={form.password}
                         onChange={(e) => set({password: e.target.value})}
-                        placeholder="8자 이상"
+                        placeholder="비밀번호는 영문, 숫자, 특수문자를 포함하여 8자 이상"
                         className={`${inputCls} pr-10`}
                     />
                     <button type="button" onClick={() => setShowPw(!showPw)}

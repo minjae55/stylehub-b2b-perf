@@ -8,9 +8,12 @@ import {
     FindIdResponse,
     FindIdSendOtpRequest,
     FindIdVerifyOtpRequest,
-    FindPwRequest,
+    FindPwSendOtpRequest,
+    FindPwVerifyOtpRequest,
     LoginRequest,
     OcrResultResponse,
+    ResetPasswordRequest,
+    ResetPasswordTokenResponse,
     SellerSignUpRequest,
     VerifyEmailOtpRequest,
     VerifyPhoneOtpRequest
@@ -68,8 +71,28 @@ export const verifyFindIdOtp = async (request: FindIdVerifyOtpRequest): Promise<
     return await api.post<FindIdResponse>("/auth/find-id/verify-otp", request);
 };
 
-export const requestFindPassword = async (request: FindPwRequest): Promise<void> => {
-    await api.post<void>("/auth/find-pw", request);
+/**
+ * 1단계: 비밀번호 찾기용 이메일 인증번호 발송
+ * POST /api/auth/find-pw/send-otp
+ */
+export const sendFindPwOtp = async (request: FindPwSendOtpRequest): Promise<void> => {
+    await api.post<void>("/auth/find-pw/send-otp", request);
+};
+
+/**
+ * 2단계: 이메일 인증번호 확인 (성공 시 1회성 resetToken 반환)
+ * POST /api/auth/find-pw/verify-otp
+ */
+export const verifyFindPwOtp = async (request: FindPwVerifyOtpRequest): Promise<ResetPasswordTokenResponse> => {
+    return await api.post<ResetPasswordTokenResponse>("/auth/find-pw/verify-otp", request);
+};
+
+/**
+ * 3단계: 인증 토큰을 검증하고 새 비밀번호로 최종 변경
+ * POST /api/auth/find-pw/reset
+ */
+export const resetPassword = async (request: ResetPasswordRequest): Promise<void> => {
+    await api.post<void>("/auth/find-pw/reset", request);
 };
 
 // ───────────────────────────────────────────
