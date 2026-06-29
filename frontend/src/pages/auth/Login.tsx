@@ -2,8 +2,8 @@ import React, {useRef, useState} from "react";
 import {Link, useNavigate} from "react-router";
 import {ArrowRight, Eye, EyeOff, ShoppingBag, TrendingUp, Users} from "lucide-react";
 import {useAuthStore} from "@/store/useAuthStore";
-import {getMe} from "@/api/user";
-import {login} from "@/api/auth";
+import {getMe} from "@/api/user/user.service";
+import {login} from "@/api/auth/auth.service";
 
 const STATS = [
     {icon: <ShoppingBag size={16}/>, value: "2,400+", label: "입점 브랜드"},
@@ -69,7 +69,7 @@ export function Login() {
 
         setLoading(true);
         try {
-            await login({email: form.email, password: form.password});
+            await login({email: form.email, password: form.password, rememberMe: form.remember});
             const user = await getMe();
             setUser(user);
 
