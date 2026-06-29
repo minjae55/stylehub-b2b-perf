@@ -13,4 +13,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     Optional<Order> findByOrderIdAndBuyer_UserId(Integer orderId, Integer userId);
 
     List<Order> findByOrderIdInAndBuyer_UserId(List<Integer> orderIds, Integer userId);
+
+    List<Order> findBySellerCompany_CompanyIdOrderByCreatedAtDesc(Integer companyId);
+
 }

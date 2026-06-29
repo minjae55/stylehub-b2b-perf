@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.domain.order.dto;
+package kr.remerge.stylehub.domain.order.dto.buyer;
 
 import kr.remerge.stylehub.domain.order.entity.Order;
 import kr.remerge.stylehub.domain.order.entity.OrderItem;

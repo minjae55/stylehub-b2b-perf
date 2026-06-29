@@ -159,4 +159,7 @@ public class Order extends BaseEntity {
         this.status = OrderStatus.CONFIRMED;
     }
 
+    public void changeStatus(OrderStatus newStatus) {
+        this.status = newStatus;
+    }
 }

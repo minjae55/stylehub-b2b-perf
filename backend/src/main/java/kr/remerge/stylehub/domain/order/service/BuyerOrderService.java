@@ -6,9 +6,7 @@ import kr.remerge.stylehub.domain.cart.repository.CartRepository;
 import kr.remerge.stylehub.domain.company.entity.Address;
 import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.company.repository.AddressRepository;
-import kr.remerge.stylehub.domain.order.dto.BuyerOrderDetailItemResponse;
-import kr.remerge.stylehub.domain.order.dto.BuyerOrderDetailResponse;
-import kr.remerge.stylehub.domain.order.dto.BuyerOrderLogResponse;
+import kr.remerge.stylehub.domain.order.dto.buyer.*;
 import kr.remerge.stylehub.domain.order.dto.*;
 import kr.remerge.stylehub.domain.order.enumtype.PaymentMethod;
 import kr.remerge.stylehub.domain.order.repository.OrderLogRepository;
@@ -39,7 +37,7 @@ import static java.util.stream.Collectors.groupingBy;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class OrderService {
+public class BuyerOrderService {
 
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
@@ -238,7 +236,7 @@ public class OrderService {
         return "ORD-" + date + "-" + random;
     }
 
-    public List<BuyerOrderListResponse> getOrderList(Integer userId) {
+    public List<BuyerOrderListResponse> geyBuyerOrderList(Integer userId) {
 
         if (userId == null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);

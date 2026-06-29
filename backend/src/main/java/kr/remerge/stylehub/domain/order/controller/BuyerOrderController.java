@@ -1,7 +1,10 @@
-package kr.remerge.stylehub.domain.order;
+package kr.remerge.stylehub.domain.order.controller;
 
 import kr.remerge.stylehub.domain.order.dto.*;
-import kr.remerge.stylehub.domain.order.service.OrderService;
+import kr.remerge.stylehub.domain.order.dto.buyer.BuyerOrderDetailResponse;
+import kr.remerge.stylehub.domain.order.dto.buyer.BuyerOrderListResponse;
+import kr.remerge.stylehub.domain.order.dto.buyer.BuyerOrderOverviewResponse;
+import kr.remerge.stylehub.domain.order.service.BuyerOrderService;
 import kr.remerge.stylehub.global.auth.dto.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.response.ApiResponse;
@@ -12,11 +15,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping("/api/buyer/orders")
 @RequiredArgsConstructor
-public class OrderController {
+public class BuyerOrderController {
 
-    private final OrderService orderService;
+    private final BuyerOrderService buyerOrderService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<BuyerOrderListResponse>>> getOrderList(
@@ -24,7 +27,7 @@ public class OrderController {
     ) {
 
         List<BuyerOrderListResponse> orders =
-                orderService.getOrderList(authUser.userId());
+                buyerOrderService.geyBuyerOrderList(authUser.userId());
 
         return ResponseEntity.ok(ApiResponse.success(orders));
     }
@@ -36,7 +39,7 @@ public class OrderController {
     ) {
 
         BuyerOrderOverviewResponse overviewResponse =
-                orderService.getOrderOverview(authUser.userId(), orderId);
+                buyerOrderService.getOrderOverview(authUser.userId(), orderId);
 
         return ResponseEntity.ok(ApiResponse.success(overviewResponse));
     }
@@ -48,7 +51,7 @@ public class OrderController {
             ) {
 
         OrderCreateResponse orderCreateResponse =
-                orderService.createOrder(authUser.userId(), request);
+                buyerOrderService.createOrder(authUser.userId(), request);
 
         return ResponseEntity.ok(ApiResponse.success(orderCreateResponse));
     }
@@ -59,7 +62,7 @@ public class OrderController {
             @PathVariable Integer orderId
     ) {
         BuyerOrderDetailResponse response =
-                orderService.getOrderDetail(authUser.userId(), orderId);
+                buyerOrderService.getOrderDetail(authUser.userId(), orderId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
