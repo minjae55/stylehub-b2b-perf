@@ -1,5 +1,5 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import {type ReactNode, useEffect, useMemo, useState} from "react";
+import {Link, useNavigate, useSearchParams} from "react-router";
 import api from "@/api/axios";
 import {
   AlertCircle,
@@ -1227,7 +1227,7 @@ function OrderActions({
               <LinkButton to={`/checkout?orderIds=${order.orderId}`} icon={<Clock size={13} />}>결제하러 가기</LinkButton>
             </>
           ) : (
-            <ActionButton tone="ghost" icon={<Clock size={13} ㅑ/>} onClick={() => undefined}>결제 대기</ActionButton>
+              <ActionButton tone="ghost" icon={<Clock size={13}/>} onClick={() => undefined}>결제 대기</ActionButton>
           )}
           <ActionButton tone="ghost" icon={<XCircle size={13} />} onClick={() => onCancel(order)}>주문 취소</ActionButton>
         </>

@@ -1,7 +1,6 @@
 import {useEffect, useRef, useState} from "react";
-import {ArrowRight, RotateCcw, ShieldCheck} from "lucide-react";
+import {Loader2, RotateCcw, ShieldCheck} from "lucide-react";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const inputCls =
     "w-full border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors";
 
@@ -15,19 +14,20 @@ function digitsOnly(v: string) {
     return v.replace(/\D/g, "");
 }
 
-// ── Props 정의 ────────────────────────────────────────────────────────────────
 interface OtpVerificationPanelProps {
-    targetValue: string;                // 발송 대상 명칭 (예: "010-1234-5678" 또는 "test@email.com")
-    timerResetTrigger: boolean;         // 타이머를 180초로 리셋시킬 신호 (otpSent 상탯값 등)
-    onVerify: (code: string) => void;   // [인증확인] 버튼 눌렀을 때 부모가 처리할 함수
-    onResend: () => void;               // [인증번호 재전송] 눌렀을 때 부모가 처리할 함수
-    verifying: boolean;                 // 부모가 현재 API 검증 중인지 상태 (로딩 스피너용)
-    sendingOtp: boolean;                // 부모가 현재 재전송 중인지 상태
-    error: string;                      // 에러 메시지
+    targetValue: string;
+    initTimer?: number;
+    timerResetTrigger: boolean;
+    onVerify: (code: string) => void;
+    onResend: () => void;
+    verifying: boolean;
+    sendingOtp: boolean;
+    error: string;
 }
 
 export function OtpVerificationPanel({
                                          targetValue,
+                                         initTimer = 180,
                                          timerResetTrigger,
                                          onVerify,
                                          onResend,
@@ -36,17 +36,12 @@ export function OtpVerificationPanel({
                                          error
                                      }: OtpVerificationPanelProps) {
     const [code, setCode] = useState("");
-    const [timer, setTimer] = useState(180);
+    const [timer, setTimer] = useState(initTimer);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const canVerify = code.length === 6 && !verifying && timer > 0;
-
-    // 타이머 가동 효과 (기존 FindId 로직 그대로 이식)
-    useEffect(() => {
-        if (!timerResetTrigger) return;
-
+    const startTimer = () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
-        setTimer(180); // 신호가 오면 180초로 초기화
+        setTimer(initTimer);
 
         intervalRef.current = setInterval(() => {
             setTimer((t) => {
@@ -57,20 +52,29 @@ export function OtpVerificationPanel({
                 return t - 1;
             });
         }, 1000);
+    };
 
+    // timerResetTrigger(부모의 otpSent 상태)가 변경될 때마다 타이머를 리셋하고 시작
+    useEffect(() => {
+        startTimer();
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, [timerResetTrigger]);
+    }, [timerResetTrigger, initTimer]);
 
-    const handleVerifyClick = () => {
-        if (!canVerify) return;
-        onVerify(code);
+    const handleCodeChange = (val: string) => {
+        const numericCode = digitsOnly(val);
+        setCode(numericCode);
+
+        if (numericCode.length === 6 && !verifying && timer > 0) {
+            onVerify(numericCode);
+        }
     };
 
     const handleResendClick = () => {
-        onResend();
-        setCode(""); // 재전송 시 기존 입력칸 비우기
+        if (sendingOtp) return;
+        onResend(); // 부모 훅의 resend() 호출 -> 내부에서 API 전송 -> 성공 시 timerResetTrigger 토글됨
+        setCode("");
     };
 
     return (
@@ -92,9 +96,10 @@ export function OtpVerificationPanel({
                         inputMode="numeric"
                         maxLength={6}
                         value={code}
-                        onChange={(e) => setCode(digitsOnly(e.target.value))}
+                        onChange={(e) => handleCodeChange(e.target.value)}
                         placeholder="000000"
-                        className={`${inputCls} pr-16 tracking-[0.3em] font-mono bg-white`}
+                        disabled={verifying || sendingOtp}
+                        className={`${inputCls} pr-16 tracking-[0.3em] font-mono bg-white disabled:bg-muted/20`}
                     />
                     <span
                         className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono ${
@@ -112,33 +117,19 @@ export function OtpVerificationPanel({
                 )}
             </div>
 
-            <div className="flex items-center justify-between pt-0.5">
+            <div className="flex items-center pt-0.5">
                 <button
                     type="button"
                     onClick={handleResendClick}
                     disabled={sendingOtp}
                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40 transition-colors"
                 >
-                    <RotateCcw size={11}/>
-                    인증번호 재전송
-                </button>
-                <button
-                    type="button"
-                    onClick={handleVerifyClick}
-                    disabled={!canVerify}
-                    className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
-                >
-                    {verifying ? (
-                        <>
-                            <span
-                                className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
-                            확인 중...
-                        </>
+                    {sendingOtp ? (
+                        <Loader2 size={11} className="animate-spin"/>
                     ) : (
-                        <>
-                            인증확인 <ArrowRight size={13}/>
-                        </>
+                        <RotateCcw size={11}/>
                     )}
+                    {sendingOtp ? "인증번호 발송 중..." : "인증번호 재전송"}
                 </button>
             </div>
         </div>

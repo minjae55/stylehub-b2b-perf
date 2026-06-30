@@ -43,8 +43,10 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
 const getBusinessRoleLabel = (businessRole: string) => {
     switch (businessRole) {
         case "BOTH": return "통합 관리자 (구매/판매)";
-        case "SELLER": return "판매자";
-        case "BUYER": return "구매자";
+        case "SELLER":
+            return "공급사";
+        case "BUYER":
+            return "고객사";
         default: return businessRole;
     }
 };

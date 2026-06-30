@@ -4,6 +4,7 @@ import {
     BuyerSignUpRequest,
     ChangeEmailOtpRequest,
     ChangePhoneOtpRequest,
+    CompanyLookupResponse,
     EmployeeSignUpRequest,
     FindIdResponse,
     FindIdSendOtpRequest,
@@ -15,7 +16,10 @@ import {
     ResetPasswordRequest,
     ResetPasswordTokenResponse,
     SellerSignUpRequest,
+    SendPhoneOtpPayload,
+    VerifyEmailOtpPayload,
     VerifyEmailOtpRequest,
+    VerifyPhoneOtpPayload,
     VerifyPhoneOtpRequest
 } from "@/api/auth/auth.types";
 
@@ -47,6 +51,55 @@ export const signUpSeller = async (request: SellerSignUpRequest): Promise<void> 
 
 export const signUpEmployee = async (request: EmployeeSignUpRequest): Promise<void> => {
     await api.post<void>("/users/signup/employee", request);
+};
+
+/**
+ * 1. 이메일 중복 확인
+ * @description 409 상태 코드가 반환되면 중복된 이메일로 판단합니다.
+ */
+export const checkEmailDuplicate = async (email: string): Promise<void> => {
+    await api.get(`/auth/email/check?email=${encodeURIComponent(email)}`);
+};
+
+/**
+ * 2. 이메일 인증 코드 발송
+ */
+export const sendEmailOtp = async (email: string): Promise<void> => {
+    await api.post("/auth/email/send", {email});
+};
+
+/**
+ * 3. 이메일 인증 코드 검증
+ */
+export const verifyEmailOtp = async (payload: VerifyEmailOtpPayload): Promise<void> => {
+    await api.post("/auth/email/verify", payload);
+};
+
+/**
+ * 4. 휴대폰 인증 번호 발송 (SENS SMS)
+ */
+export const sendPhoneOtp = async (payload: SendPhoneOtpPayload): Promise<void> => {
+    await api.post("/auth/phone/send", payload);
+};
+
+/**
+ * 5. 휴대폰 인증 번호 검증
+ */
+export const verifyPhoneOtp = async (payload: VerifyPhoneOtpPayload): Promise<void> => {
+    await api.post("/auth/phone/verify", payload);
+};
+
+/**
+ * 6. 소속 회사 조회 및 가입 가능 여부(승인 상태) 검증
+ * @description 비로그인(회원가입 단계)에서 사업자번호로 등록된 회사를 조회합니다.
+ */
+export const lookupCompany = async (
+    businessNumber: string,
+    businessRole: "SELLER" | "BUYER"
+): Promise<CompanyLookupResponse> => {
+    return await api.get<CompanyLookupResponse>(
+        `/company/lookup?businessNumber=${businessNumber}&businessRole=${businessRole}`
+    );
 };
 
 // ───────────────────────────────────────────

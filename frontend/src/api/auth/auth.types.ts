@@ -15,7 +15,9 @@ export interface BuyerSignUpRequest {
     phone?: string;
     businessNumber: string;
     companyName: string;
+    zipCode: string;
     representativeName: string;
+    representativePhone: string;
     address?: string;
     addressDetail?: string;
     businessLicenseUrl?: string;
@@ -29,7 +31,9 @@ export interface SellerSignUpRequest {
     phone?: string;
     businessNumber: string;
     companyName: string;
+    zipCode: string
     representativeName: string;
+    representativePhone: string;
     address?: string;
     addressDetail?: string;
     businessLicenseUrl?: string;
@@ -69,6 +73,33 @@ export interface UserResponse {
     profileImageUrl: string | null;
     status: "PENDING" | "APPROVED" | "SUSPENDED" | "DELETED";
     createdAt: string;
+}
+
+// ───────────────────────────────────────────
+// 회원 가입
+// ───────────────────────────────────────────
+
+/** 이메일 인증코드 검증 요청 페이로드 */
+export interface VerifyEmailOtpPayload {
+    email: string;
+    code: string;
+}
+
+/** 휴대폰 인증코드 발송 요청 페이로드 */
+export interface SendPhoneOtpPayload {
+    phone: string;
+}
+
+/** 휴대폰 인증코드 검증 요청 페이로드 */
+export interface VerifyPhoneOtpPayload {
+    phone: string;
+    code: string;
+}
+
+export interface CompanyLookupResponse {
+    companyName: string;
+    representativeName: string;
+    sellerStatus: "NONE" | "PENDING" | "APPROVED" | "REJECTED"; // 백엔드 Enum 명세에 맞춤
 }
 
 // ───────────────────────────────────────────

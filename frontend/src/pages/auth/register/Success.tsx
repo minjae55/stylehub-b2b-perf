@@ -1,5 +1,5 @@
-import { Link } from "react-router";
-import { CheckCircle, ArrowRight } from "lucide-react";
+import {Link} from "react-router";
+import {ArrowRight, CheckCircle} from "lucide-react";
 
 export function RegisterSuccess() {
     return (

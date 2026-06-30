@@ -14,8 +14,9 @@ import {SearchPage} from "@/pages/admin/SearchPage";
 
 import {AuthLayout} from "@/pages/auth/layout";
 import {Login} from "@/pages/auth/Login";
-import {RegisterTypeSelect} from "@/pages/auth/RegisterTypeSelect";
-import {RegisterSuccess} from "@/pages/auth/Success";
+import {Register} from "@/pages/auth/register/Register";
+import {RegisterTypeSelect} from "@/pages/auth/register/RegisterTypeSelect";
+import {RegisterSuccess} from "@/pages/auth/register/Success";
 import {FindId} from "@/pages/auth/FindId";
 import {FindPw} from "@/pages/auth/FindPw";
 
@@ -69,7 +70,6 @@ import {SupplierRegister} from "@/pages/company/SupplierRegister";
 
 import PaymentSuccessPage from "@/pages/tosspayment/PaymentSuccessPage";
 import OrderCompletePage from "@/pages/tosspayment/OrderCompletePage";
-import {Register} from "@/pages/auth/Register";
 
 export const router = createBrowserRouter([
     {

@@ -35,7 +35,7 @@ api.interceptors.response.use(
 
         // /auth/ 경로 요청 (로그인, 회원가입, 토큰 재발급 등)은 인터셉터 처리 제외
         // 이 요청들이 401이 나도 재발급 시도하면 무한루프 위험이 있어서 그냥 패스
-        const isAuthRequest = url.includes("/auth/");
+        const isAuthRequest = url.includes("/auth");
         if (isAuthRequest) {
             return Promise.reject(error);
         }
@@ -46,7 +46,7 @@ api.interceptors.response.use(
             originalRequest._retry = true;
 
             try {
-                // ⚠️ api 인스턴스가 아닌 axios 원본으로 호출
+                // api 인스턴스가 아닌 axios 원본으로 호출
                 // api 인스턴스로 호출하면 이 인터셉터를 또 타게 되어 무한루프 위험
                 // 리프레시 토큰은 쿠키에 있어서 body 없이 요청만 보내면 됨
                 await axios.post("/api/auth/refresh", {}, { withCredentials: true });
