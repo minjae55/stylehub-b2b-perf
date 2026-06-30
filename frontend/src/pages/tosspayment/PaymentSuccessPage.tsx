@@ -22,23 +22,28 @@ export default function PaymentSuccessPage() {
         if (!orderId || !paymentKey || !amount || isProcessing) return;
 
         setIsProcessing(true);
+        const storedIds = sessionStorage.getItem("pending_order_ids");
+        const orderIds = storedIds ? JSON.parse(storedIds) : null;
 
         axios.post('/api/v1/payments/confirm', {
             orderId,
             paymentKey,
             amount: Number(amount),
+            orderIds
         })
             .then((response) => {
                 console.log('결제 성공, 이동 시도:', response);
+                sessionStorage.removeItem("pending_order_ids");
                 navigate('/payment/ordersuccess', { replace: true });
                 console.log('navigate 호출 완료');
             })
             .catch((error) => {
                 console.error('결제 승인 실패:', error);
+                sessionStorage.removeItem("pending_order_ids");
                 // 실패 시 존재하는 경로로 이동 (예: 장바구니나 에러 페이지)
                 navigate('/cart', { replace: true });
             });
-    }, []);
+    }, [orderId, paymentKey, amount, isProcessing, navigate]);
 
   return (
       <div className="p-8 text-center">

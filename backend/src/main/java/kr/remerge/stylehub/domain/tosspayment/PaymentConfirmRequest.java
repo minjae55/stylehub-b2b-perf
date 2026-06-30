@@ -6,5 +6,5 @@ public record PaymentConfirmRequest(
         String paymentKey,
         String orderId,
         Long amount,
-        List<Long> orderIds
+        List<String> orderIds
 ) {}

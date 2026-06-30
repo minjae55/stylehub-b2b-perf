@@ -8,22 +8,30 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/payments")
-@RequiredArgsConstructor // 💡 서비스 레이어 주입을 위한 어노테이션
+@RequiredArgsConstructor
 public class TossPaymentController {
 
-    // 비즈니스 로직이 구현되어 있는 서비스 컴포넌트 주입
     private final TossPaymentService tossPaymentService;
 
     @PostMapping("/confirm")
     public ResponseEntity<PaymentResponse> confirmPayment(@RequestBody PaymentConfirmRequest dto) {
 
-        log.info("=== 프론트엔드로부터 결제 승인 요청 도달 ===");
-        log.info("orderId: {}, paymentKey: {}, amount: {}", dto.orderId(), dto.paymentKey(), dto.amount());
+        log.info("============== [결제 요청 들어옴] ==============");
+        log.info("대표 tossOrderId: {}", dto.orderId());
+        log.info("금액 amount: {}", dto.amount());
+        log.info("하위 개별 주문 리스트 orderIds: {}", dto.orderIds()); // 💡 여기에 뭐가 찍히는지 콘솔에서 필히 확인해야 합니다!
 
-        // 💡 [수정] 서비스 레이어를 호출하여 실제 토스 API와 통신하고 결과를 받아옵니다.
-        PaymentResponse response = tossPaymentService.confirmPayment(dto);
+        PaymentResponse response;
 
-        // 💡 [수정] 최종 결과를 프론트엔드에게 return문으로 반환합니다.
+        // 💡 개수 조건(>1)을 빼고, 리스트가 존재하고 비어있지 않다면 무조건 그룹 결제로 넘깁니다.
+        if (dto.orderIds() != null && !dto.orderIds().isEmpty()) {
+            log.info("▶ [분기 완료] 하위 orderIds가 발견되어 '그룹 결제'로 처리합니다. (개수: {}개)", dto.orderIds().size());
+            response = tossPaymentService.confirmGroupPayment(dto);
+        } else {
+            log.info("▶ [분기 완료] 하위 orderIds가 없거나 비어있어 '단건 결제'로 처리합니다.");
+            response = tossPaymentService.confirmPayment(dto);
+        }
+
         return ResponseEntity.ok(response);
     }
 }

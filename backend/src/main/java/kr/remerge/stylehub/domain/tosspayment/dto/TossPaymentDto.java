@@ -6,7 +6,8 @@ public class TossPaymentDto {
     public record ConfirmRequest(
             String paymentKey,
             Long integrationPaymentId,
-            Long amount
+            Long amount,
+            String orderNo
     ) {}
 
     // 결제 취소 요청
@@ -18,6 +19,7 @@ public class TossPaymentDto {
     public record Response(
             String paymentKey,
             Long orderId,
-            String status
+            String status,
+            String orderNo
     ) {}
 }

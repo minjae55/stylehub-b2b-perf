@@ -166,7 +166,6 @@ const isSignedMap: Record<string, boolean> = {
   "ORD-2024-0901": false,
 };
 
-const TOSS_CLIENT_KEY = "test_ck_GePWvyJnrKme6gpAnkz63gLzN97E";
 
 function formatPrice(value: number) {
   return `${value.toLocaleString()}원`;
@@ -211,6 +210,7 @@ export function Checkout() {
   const [addressSaveError, setAddressSaveError] = useState("");
   const [showAddressForm, setShowAddressForm] = useState(false);
 
+
   useEffect(() => {
     if (isCustom) {
       setIsPreviewLoading(false);
@@ -252,8 +252,8 @@ export function Checkout() {
         }
 
         const response = await api.post<CheckoutPreviewResponse>("/checkout/preview", {
-          cartItemIds: checkoutState.cartItemIds,
-          cartType: checkoutState.cartType,
+          cartItemIds: checkoutState?.cartItemIds ?? [],
+          cartType: checkoutState?.cartType ?? "NORMAL",
         });
         setCheckoutPreview(response);
       } catch (error) {
@@ -329,6 +329,7 @@ export function Checkout() {
   const [createdOrderTotal, setCreatedOrderTotal] = useState(0);
   const [isTestOrderLoading, setIsTestOrderLoading] = useState(false);
   const [testOrderError, setTestOrderError] = useState("");
+
 
   const subtotal = checkoutPreview?.productAmount
     ?? orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -432,54 +433,54 @@ export function Checkout() {
       setIsAddressSaving(false);
     }
   };
-
+  const TOSS_CLIENT_KEY = "test_ck_GePWvyJnrKme6gpAnkz63gLzN97E";
   const handlePayment = async () => {
     if (!agreeTerms || !isSigned || !selectedAddress || isPaymentLoading) return;
     if (!checkoutState?.cartItemIds.length) return;
 
     try {
-        setIsPaymentLoading(true);
+      setIsPaymentLoading(true);
 
-        const orderResponse = await api.post<OrderCreateResponse>("/orders", {
-            cartItemIds: checkoutState.cartItemIds,
-            addressId: selectedAddress.addressId,
-            cartType: checkoutState.cartType,
-        });
+      // 1. 백엔드에 주문을 생성하고 실제 DB 주문 PK 리스트(orderNos)를 받아옵니다.
+      const orderResponse = await api.post<OrderCreateResponse>("/orders", {
+        cartItemIds: checkoutState.cartItemIds,
+        addressId: selectedAddress.addressId,
+        cartType: checkoutState.cartType,
+      });
 
-        const realOrderNumber = orderResponse.orderNos[0];
+      // 💡 [핵심]: 생성된 진짜 하위 주문 번호 리스트가 존재하는지 검증하고 세션 스토리지에 백업합니다.
+      if (orderResponse.orderNos && orderResponse.orderNos.length > 0) {
+        sessionStorage.setItem("pending_order_ids", JSON.stringify(orderResponse.orderNos));
+        console.log("▶ [성공페이지 전달용] orderNos 세션 저장 완료:", orderResponse.orderNos);
+      }
 
-        if (!realOrderNumber) {
-            alert("주문 번호를 발급받지 못했습니다.");
-            return;
-        }
+      // 토스 결제창에는 대표로 첫 번째 주문 번호를 던져줍니다. (realOrderNumber)
+      const realOrderNumber = orderResponse.orderNos[0];
 
-        const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
-        const payment = tossPayments.payment({ customerKey: "ANONYMOUS" });
+      if (!realOrderNumber) {
+        alert("주문 번호를 발급받지 못했습니다.");
+        return;
+      }
 
-        const orderName = orderItems.length > 1
-            ? `${orderItems[0].name} 외 ${orderItems.length - 1}건`
-            : orderItems[0].name;
+      // 2. 토스페이먼츠 SDK 및 결제 인스턴스 초기화
+      const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
+      const payment = tossPayments.payment({ customerKey: "ANONYMOUS" });
 
-        const commonRequest = {
-            amount: { currency: "KRW" as const, value: total },
-            orderId: realOrderNumber,
-            orderName,
-            successUrl: `${window.location.origin}/payment/success`,
-            failUrl: `${window.location.origin}/payment/fail`,
-            customerName: "구매 담당자",
-        };
+      const orderName = orderItems.length > 1
+          ? `${orderItems[0].name} 외 ${orderItems.length - 1}건`
+          : orderItems[0].name;
 
-        if (paymentMethod === "card") {
-            await payment.requestPayment({
-                method: "CARD",
-                ...commonRequest,
-            });
-        } else {
-            await payment.requestPayment({
-                method: "VIRTUAL_ACCOUNT",
-                ...commonRequest,
-            });
-        }
+      // 공통 결제 요청 데이터 조립
+      const commonRequest = {
+        amount: { currency: "KRW" as const, value: total },
+        orderId: realOrderNumber, // 대표 주문번호
+        orderName,
+        successUrl: `${window.location.origin}/payment/success`,
+        failUrl: `${window.location.origin}/payment/fail`,
+        customerName: "구매 담당자",
+      };
+
+      // 3. 결제 수단별 토스 결제창 호출 (중복 코드 제거 완료)
       if (paymentMethod === "card") {
         await payment.requestPayment({
           method: "CARD",
@@ -493,12 +494,12 @@ export function Checkout() {
       }
 
     } catch (error) {
-        console.error("주문 생성 또는 결제 요청 실패:", error);
-        alert("결제 처리 중 오류가 발생했습니다.");
+      console.error("주문 생성 또는 결제 요청 실패:", error);
+      alert("결제 처리 중 오류가 발생했습니다.");
     } finally {
-        setIsPaymentLoading(false);
+      setIsPaymentLoading(false);
     }
-};
+  };
 
   const handleTestOrder = async () => {
     if (isOrderCheckout || !checkoutState?.cartItemIds.length || !selectedAddress || isTestOrderLoading) return;

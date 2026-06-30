@@ -43,5 +43,5 @@ public class TossPayments {
     )
     @Column(name = "order_id")
     @Builder.Default
-    private List<Long> orderIds = new ArrayList<>();
+    private List<String> orderIds = new ArrayList<>();
 }

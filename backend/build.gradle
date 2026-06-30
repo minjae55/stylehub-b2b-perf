@@ -36,6 +36,7 @@ dependencies {
 	implementation 'net.nurigo:sdk:4.3.2'                                        // CoolSMS(누리고) SDK
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
 
+
 	// ── 컴파일 타임 전용 (런타임 jar에 포함 안 됨) ───────────────────────────
 	compileOnly 'org.projectlombok:lombok'                   // Lombok - @Getter/@Setter/@Builder 등 보일러플레이트 코드 자동 생성
 

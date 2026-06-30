@@ -148,7 +148,7 @@ export default function Settlements() {
               <span className="text-sm font-medium">플랫폼 수수료 수익</span>
               <DollarSign size={18} className="text-green-500" />
             </div>
-            <div className="text-2xl font-bold">{summary.totalFee.toLocaleString()}원</div>
+            <div className="text-2xl font-bold">{(summary.totalGMV/10).toLocaleString()}원</div>
             <span className="text-xs text-muted-foreground">평균 수수료율 10%</span>
           </div>
 
