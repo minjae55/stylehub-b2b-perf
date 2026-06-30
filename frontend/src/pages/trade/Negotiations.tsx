@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import api from "@/api/axios";
+
 import {
   MessageSquare,
   Search,
@@ -43,7 +45,6 @@ type Negotiation = {
   sellerName: string;
   status: NegotiationStatus;
   lastUpdatedAt: string;
-  items: NegotiationItem[];
 };
 
 const statusConfig: Record<
@@ -187,7 +188,9 @@ const sampleNegotiations: Negotiation[] = [
 ];
 
 export function Negotiations() {
-  const [selectedId, setSelectedId] = useState(sampleNegotiations[0].id);
+
+  const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
+  const [selectedId, setSelectedId] = useState<String | null>(null);
   const [filter, setFilter] = useState<"ALL" | TargetType>("ALL");
   const [search, setSearch] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -197,7 +200,21 @@ export function Negotiations() {
     fileName: "",
   });
 
-  const filtered = sampleNegotiations.filter((item) => {
+useEffect(() => {
+  const fetchNegotiations = async () => {
+    const data = await api.get<Negotiation[]>("/negotiations");
+
+    setNegotiations(data);
+
+    if (data.length > 0) {
+      setSelectedId(data[0].id);
+    }
+  };
+
+  fetchNegotiations();
+}, []);
+
+  const filtered = negotiations.filter((item) => {
     const matchFilter = filter === "ALL" || item.targetType === filter;
     const matchSearch =
       item.title.includes(search) ||
@@ -208,7 +225,7 @@ export function Negotiations() {
     return matchFilter && matchSearch;
   });
 
-  const selected = sampleNegotiations.find((item) => item.id === selectedId);
+  const selected = negotiations.find((item) => item.id === selectedId);
 
   const handleSubmit = () => {
     if (!form.title.trim() || !form.content.trim()) return;
