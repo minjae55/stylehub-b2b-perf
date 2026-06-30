@@ -125,8 +125,8 @@ public class JwtProvider {
     }
 
     // ───────────────────────────────────────────
-// 비밀번호 재설정 토큰 생성 (추가할 부분)
-// ───────────────────────────────────────────
+    // 비밀번호 재설정 토큰 생성 (추가할 부분)
+    // ───────────────────────────────────────────
     public String createPasswordResetToken(String email) {
         long passwordResetExpiration = 1800000L; // 30분 (30 * 60 * 1000)
 
@@ -137,5 +137,26 @@ public class JwtProvider {
                 .expiration(new Date(System.currentTimeMillis() + passwordResetExpiration))
                 .signWith(getSigningKey())
                 .compact();
+    }
+
+    // ───────────────────────────────────────────
+    // 비밀번호 재설정 토큰에서 이메일 추출
+    // ───────────────────────────────────────────
+    public String extractEmail(String token) {
+        // 이미 하단에 정의된 getClaims(token) 메서드를 쓰면 코드도 간결해지고 파서도 재사용됩니다.
+        return getClaims(token).getSubject();
+    }
+
+    // ───────────────────────────────────────────
+    // 비밀번호 재설정 토큰 전용 검증 로직
+    // ───────────────────────────────────────────
+    public boolean validatePasswordResetToken(String token) {
+        try {
+            Claims claims = getClaims(token); // 마찬가지로 중복 파서 생성 코드 제거하고 공통 로직 태우기
+            String purpose = claims.get("purpose", String.class);
+            return "PASSWORD_RESET".equals(purpose);
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

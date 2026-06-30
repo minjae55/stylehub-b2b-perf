@@ -5,7 +5,7 @@ import kr.remerge.stylehub.domain.cart.dto.CartAddRequest;
 import kr.remerge.stylehub.domain.cart.dto.CartQuantityUpdateRequest;
 import kr.remerge.stylehub.domain.cart.dto.CartResponse;
 import kr.remerge.stylehub.domain.cart.service.CartService;
-import kr.remerge.stylehub.global.auth.dto.AuthUser;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;

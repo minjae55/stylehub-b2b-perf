@@ -75,14 +75,16 @@ public class Company extends BaseEntity {
     private CompanyStoreType storeType;
 
     // PENDING / APPROVED / REJECTED / DELETED / SUSPENDED
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private CompanyStatus status;
+    private CompanyStatus status = CompanyStatus.PENDING;
 
     // NONE / PENDING / APPROVED / REJECTED
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "seller_status", nullable = false, length = 20)
-    private SellerStatus sellerStatus;
+    private SellerStatus sellerStatus = SellerStatus.NONE;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -92,22 +94,6 @@ public class Company extends BaseEntity {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
-
-    // ───────────────────────────────────────────
-    // 생명주기 콜백
-    // ───────────────────────────────────────────
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        if (this.status == null) this.status = CompanyStatus.PENDING;
-        if (this.sellerStatus == null) this.sellerStatus = SellerStatus.NONE;
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 
     // ───────────────────────────────────────────
     // 상태 변경 메서드

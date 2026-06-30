@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.global.auth.dto;
+package kr.remerge.stylehub.global.auth.dto.change;
 
 // 로그인/재발급 성공 시 반환하는 토큰 응답 DTO
 public record TokenResponse(

@@ -2,7 +2,7 @@ package kr.remerge.stylehub.domain.order;
 
 import kr.remerge.stylehub.domain.order.dto.*;
 import kr.remerge.stylehub.domain.order.service.OrderService;
-import kr.remerge.stylehub.global.auth.dto.AuthUser;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;

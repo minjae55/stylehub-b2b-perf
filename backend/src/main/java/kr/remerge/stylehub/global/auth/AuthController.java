@@ -3,21 +3,18 @@ package kr.remerge.stylehub.global.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import kr.remerge.stylehub.domain.user.UserService;
-import kr.remerge.stylehub.domain.user.dto.request.FindIdSendOtpRequest;
-import kr.remerge.stylehub.domain.user.dto.request.FindIdVerifyOtpRequest;
-import kr.remerge.stylehub.domain.user.dto.request.FindPwRequest;
 import kr.remerge.stylehub.domain.user.dto.response.FindIdResponse;
-import kr.remerge.stylehub.global.auth.dto.ChangeAuthRequest;
-import kr.remerge.stylehub.global.auth.dto.LoginRequest;
-import kr.remerge.stylehub.global.auth.dto.TokenResponse;
-import kr.remerge.stylehub.global.auth.dto.VerifyChangeAuthRequest;
+import kr.remerge.stylehub.global.auth.dto.change.LoginRequest;
+import kr.remerge.stylehub.global.auth.dto.change.TokenResponse;
+import kr.remerge.stylehub.global.auth.dto.find.*;
+import kr.remerge.stylehub.global.auth.dto.login.ChangeAuthRequest;
+import kr.remerge.stylehub.global.auth.dto.login.VerifyChangeAuthRequest;
 import kr.remerge.stylehub.global.auth.jwt.JwtProperties;
 import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -44,9 +41,13 @@ public class AuthController {
         String clientIp = resolveClientIp(httpRequest);
         TokenResponse tokenResponse = authService.login(request, clientIp);
 
-        // 💡 밀리초(ms)를 초(Seconds) 단위로 변환해서 쿠키 Max-Age에 주입
-        long accessTokenMaxAge = jwtProperties.getAccessTokenExpiration() / 1000;
-        long refreshTokenMaxAge = jwtProperties.getRefreshTokenExpiration() / 1000;
+        final long accessTokenMaxAge = request.rememberMe() // 사용자가 '로그인 상태 유지'를 체크한 경우에만 실제 수명(밀리초 -> 초)을 부여
+                ? jwtProperties.getAccessTokenExpiration() / 1000 // 밀리초(ms)를 초(Seconds) 단위로 변환해서 쿠키 Max-Age에 주입
+                : -1; // 기본 수명 설정 (자동로그인 미체크 시: 브라우저 닫으면 만료되도록 -1 세팅)
+
+        final long refreshTokenMaxAge = request.rememberMe()
+                ? jwtProperties.getRefreshTokenExpiration() / 1000
+                : -1;
 
         ResponseCookie accessTokenCookie = createCookie(
                 "accessToken", tokenResponse.accessToken(), accessTokenMaxAge);
@@ -134,36 +135,76 @@ public class AuthController {
     // ───────────────────────────────────────────
     // 아이디 / 비밀번호 찾기 API
     // ───────────────────────────────────────────
-    @PostMapping("/find-id/otp")
+
+    /**
+     * 1단계: 아이디 찾기 인증번호 발송
+     */
+    @PostMapping("/find-id/send-otp")
     public ResponseEntity<ApiResponse<Void>> sendFindIdOtp(@Valid @RequestBody FindIdSendOtpRequest request) {
-        userService.sendFindIdOtp(request);
+        authService.sendFindIdOtp(request);
         return ResponseEntity.ok()
                 .body(ApiResponse.successWithMessage("인증번호가 발송되었습니다."));
     }
 
-    @PostMapping("/find-id/otp/verify")
+    /**
+     * 2단계: 아이디 찾기 인증번호 검증 및 아이디 반환
+     */
+    @PostMapping("/find-id/verify-otp")
     public ResponseEntity<ApiResponse<FindIdResponse>> verifyFindIdOtp(@Valid @RequestBody FindIdVerifyOtpRequest request) {
-        FindIdResponse response = userService.verifyFindIdOtp(request);
+        FindIdResponse response = authService.verifyFindIdOtp(request);
         return ResponseEntity.ok()
                 .body(ApiResponse.success(response));
     }
 
-    @PostMapping("/find-pw")
-    public ResponseEntity<ApiResponse<Void>> requestFindPassword(@Valid @RequestBody FindPwRequest request) {
-        userService.requestFindPassword(request);
-        return ResponseEntity.ok()
-                .body(ApiResponse.successWithMessage("비밀번호 재설정 링크가 메일로 발송되었습니다."));
+    /**
+     * 비밀번호 찾기 - 1단계: 이메일 인증번호 발송
+     * POST /api/auth/find-pw/send-otp
+     */
+    @PostMapping("/find-pw/send-otp")
+    public ResponseEntity<ApiResponse<Void>> sendFindPwOtp(
+            @RequestBody @Valid FindPwSendOtpRequest request
+    ) {
+        authService.sendFindPwOtp(request);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    /**
+     * 비밀번호 찾기 - 2단계: 인증번호 검증 및 1회성 임시 재설정 토큰 발급
+     * POST /api/auth/find-pw/verify-otp
+     */
+    @PostMapping("/find-pw/verify-otp")
+    public ResponseEntity<ApiResponse<ResetPasswordTokenResponse>> verifyFindPwOtp(
+            @RequestBody @Valid FindPwVerifyOtpRequest request
+    ) {
+        ResetPasswordTokenResponse response = authService.verifyFindPwOtp(request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 비밀번호 찾기 - 3단계: 1회성 토큰 검증 후 새 비밀번호로 최종 변경
+     * POST /api/auth/find-pw/reset
+     */
+    @PostMapping("/find-pw/reset")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @RequestBody @Valid ResetPasswordRequest request
+    ) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // ───────────────────────────────────────────
+    // 회원정보 변경 시 이메일/휴대폰 본인 점유인증 (마이페이지 연동용)
+    // ───────────────────────────────────────────
 
     @PostMapping("/request-change-auth")
     public ResponseEntity<ApiResponse<Void>> requestChangeAuth(@Valid @RequestBody ChangeAuthRequest request) {
         authService.sendChangeAuthCode(request.target());
-        return ResponseEntity.ok(ApiResponse.success());
+        return ResponseEntity.ok(ApiResponse.successWithMessage("인증 코드가 발송되었습니다."));
     }
 
     @PostMapping("/verify-change-auth")
     public ResponseEntity<ApiResponse<Void>> verifyChangeAuth(@Valid @RequestBody VerifyChangeAuthRequest request) {
         authService.verifyChangeAuthCode(request.target(), request.code());
-        return ResponseEntity.ok(ApiResponse.success());
+        return ResponseEntity.ok(ApiResponse.successWithMessage("인증이 완료되었습니다."));
     }
 }

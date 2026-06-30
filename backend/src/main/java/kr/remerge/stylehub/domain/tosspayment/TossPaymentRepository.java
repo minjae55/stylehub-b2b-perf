@@ -19,4 +19,8 @@ public interface TossPaymentRepository extends JpaRepository<TossPayments, Strin
 
     @Query(value = "SELECT total_amount FROM orders WHERE order_id = :orderId", nativeQuery = true)
     Long findAmountByOrderId(@Param("orderId") Long orderId);
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = "INSERT INTO toss_payment_orders (toss_payment_id, order_id) VALUES (:paymentId, :orderId)", nativeQuery = true)
+    void forceInsertPaymentOrder(@Param("paymentId") String paymentId, @Param("orderId") Long orderId);
 }

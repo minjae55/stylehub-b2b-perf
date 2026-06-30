@@ -1,6 +1,7 @@
 package kr.remerge.stylehub.domain.company.entity;
 
 import jakarta.persistence.*;
+import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class Address {
+public class Address extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,28 +36,8 @@ public class Address {
     @Column(name = "address_detail", length = 255)
     private String addressDetail;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
-
-    // ───────────────────────────────────────────
-    // 생명주기 콜백
-    // ───────────────────────────────────────────
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 
     // ───────────────────────────────────────────
     // 상태 변경 메서드

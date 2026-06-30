@@ -1,5 +1,4 @@
 // auth.types.ts에 있는 검증된 유저 타입을 그대로 가져와 연결합니다.
-import { UserResponse } from "./auth.types";
 
 /**
  * 프로필 및 회원 정보 수정 요청 (PATCH /users/me)에 사용되는 객체입니다.

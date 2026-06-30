@@ -4,8 +4,6 @@ import jakarta.persistence.*;
 import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.*;
 
-import java.time.LocalDateTime;
-
 @Entity
 @Table(name = "brands")
 @Getter
@@ -29,26 +27,6 @@ public class Brand extends BaseEntity {
 
     @Column(name = "brand_logo_url", length = 2000)
     private String brandLogoUrl;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    // ───────────────────────────────────────────
-    // 생명주기 콜백
-    // ───────────────────────────────────────────
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 
     // ───────────────────────────────────────────
     // 상태 변경 메서드

@@ -1,14 +1,14 @@
-import React, { useState, useRef, useEffect } from "react";
-import { User, Camera, AlertTriangle, Lock, Building2, Briefcase, IdCard, CheckCircle2 } from "lucide-react";
-import { useAuthStore } from "@/store/useAuthStore";
+import React, {useEffect, useRef, useState} from "react";
+import {AlertTriangle, Briefcase, Building2, Camera, CheckCircle2, IdCard, Lock, User} from "lucide-react";
+import {useAuthStore} from "@/store/useAuthStore";
 import {
-    uploadFile,
     sendEmailChangeOtp,
-    verifyEmailChangeOtp,
     sendPhoneChangeOtp,
+    uploadFile,
+    verifyEmailChangeOtp,
     verifyPhoneChangeOtp
-} from "@/api/auth";
-import { verifyGatePassword, updateProfileInfo } from "@/api/user";
+} from "@/api/auth/auth.service";
+import {updateProfileInfo, verifyGatePassword} from "@/api/user/user.service";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -248,7 +248,7 @@ export function ProfileTab() {
 
     const handleWithdraw = async () => {
         try {
-            // 회원 탈퇴는 기본 user 기능이므로 엔드포인트 유지 혹은 user.ts 확장 가능
+            // 회원 탈퇴는 기본 user 기능이므로 엔드포인트 유지 혹은 user.service.ts 확장 가능
             // await api.delete("/users/me");
             alert("회원 탈퇴가 완료되었습니다.");
             clearUser();

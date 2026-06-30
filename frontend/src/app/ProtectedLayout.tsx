@@ -1,7 +1,7 @@
 import {Navigate, Outlet, useMatches} from "react-router";
 import {useAuthStore} from "@/store/useAuthStore";
 import {useEffect} from "react";
-import {getMe} from "@/api/user";
+import {getMe} from "@/api/user/user.service";
 
 // ───────────────────────────────────────────
 // 인증 보호 레이아웃

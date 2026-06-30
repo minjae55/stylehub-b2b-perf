@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.global.auth.dto;
+package kr.remerge.stylehub.global.auth.dto.change;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -12,5 +12,7 @@ public record LoginRequest(
         String email,
 
         @NotBlank(message = "비밀번호를 입력해주세요.")
-        String password
+        String password,
+
+        boolean rememberMe // 자동 로그인
 ) {}

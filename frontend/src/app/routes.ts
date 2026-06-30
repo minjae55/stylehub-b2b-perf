@@ -12,12 +12,9 @@ import {AdminAnalytics} from "@/pages/admin/AdminAnalytics";
 import {AdminUsers} from "@/pages/admin/AdminUsers";
 import {SearchPage} from "@/pages/admin/SearchPage";
 
-import {RegisterBuyer} from "@/pages/auth/BuyerRegister";
-import {RegisterSeller} from "@/pages/auth/SellerRegister";
 import {AuthLayout} from "@/pages/auth/layout";
 import {Login} from "@/pages/auth/Login";
-import {Register} from "@/pages/auth/Register";
-import {RegisterEmployee} from "@/pages/auth/EmployeeRegister";
+import {RegisterTypeSelect} from "@/pages/auth/RegisterTypeSelect";
 import {RegisterSuccess} from "@/pages/auth/Success";
 import {FindId} from "@/pages/auth/FindId";
 import {FindPw} from "@/pages/auth/FindPw";
@@ -73,6 +70,7 @@ import {SupplierRegister} from "@/pages/company/SupplierRegister";
 //토스페이먼츠
 import PaymentSuccessPage from "@/pages/tosspayment/PaymentSuccessPage";
 import OrderCompletePage from "@/pages/tosspayment/OrderCompletePage";
+import {Register} from "@/pages/auth/Register";
 
 export const router = createBrowserRouter([
     // ─────────────────────────────────────────
@@ -83,10 +81,8 @@ export const router = createBrowserRouter([
         Component: AuthLayout,
         children: [
             {index: true, Component: Login},
-            {path: "register", Component: Register},
-            {path: "register/buyer", Component: RegisterBuyer},
-            {path: "register/seller", Component: RegisterSeller},
-            {path: "register/employee", Component: RegisterEmployee},
+            {path: "register", Component: RegisterTypeSelect},
+            {path: "register/:role/:memberType", Component: Register},
             {path: "register/success", Component: RegisterSuccess},
             {path: "find-id", Component: FindId},
             {path: "find-pw", Component: FindPw},

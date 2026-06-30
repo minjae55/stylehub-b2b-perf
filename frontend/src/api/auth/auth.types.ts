@@ -5,6 +5,7 @@
 export interface LoginRequest {
     email: string;
     password: string;
+    rememberMe: boolean;
 }
 
 export interface BuyerSignUpRequest {
@@ -104,9 +105,35 @@ export interface FindIdResponse {
 // 비밀번호 찾기
 // ───────────────────────────────────────────
 
-export interface FindPwRequest {
+/**
+ * 1단계: 이메일 인증번호 발송 요청
+ */
+export interface FindPwSendOtpRequest {
     email: string;
     name: string;
+}
+
+/**
+ * 2단계: 인증번호 검증 요청
+ */
+export interface FindPwVerifyOtpRequest {
+    email: string;
+    code: string; // 6자리 인증번호
+}
+
+/**
+ * 2단계 성공 시 백엔드가 내려주는 일회성 비밀번호 재설정 토큰
+ */
+export interface ResetPasswordTokenResponse {
+    resetToken: string;
+}
+
+/**
+ * 3단계: 최종 비밀번호 재설정 요청
+ */
+export interface ResetPasswordRequest {
+    resetToken: string;
+    newPassword: string;
 }
 
 // ───────────────────────────────────────────
@@ -129,4 +156,22 @@ export interface ChangePhoneOtpRequest {
 export interface VerifyPhoneOtpRequest {
     targetValue: string;
     otpCode: string; // 6자리 인증번호
+}
+
+// ───────────────────────────────────────────
+// OCR 및 국세청 검증 관련 타입 추가
+// ───────────────────────────────────────────
+
+export interface OcrResultResponse {
+    businessNumber: string;
+    companyName: string;
+    representativeName: string;
+    openDate: string;
+}
+
+export interface BusinessVerifyRequest {
+    businessNumber: string;
+    companyName: string;
+    representativeName: string;
+    openDate: string;
 }

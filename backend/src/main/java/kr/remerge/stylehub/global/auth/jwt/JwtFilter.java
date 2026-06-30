@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import kr.remerge.stylehub.global.auth.security.CustomUserDetailsService;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,17 +21,17 @@ import java.io.IOException;
 
 /*
 ───────────────────────────────────────────
-전체 흐름 ──────────────────────────────────────
+전체 흐름
 ───────────────────────────────────────────
 HTTP 요청
     ↓
 JwtFilter.doFilterInternal()
     ↓
-resolveToken()                                 # Authorization 헤더에서 토큰 추출
+resolveToken()                                 # 쿠키(accessToken)에서 토큰 추출
     ↓
 jwtProvider.validateToken()                    # 유효한지 검증
     ↓
-customUserDetailsService.loadUserByUsername()  # DB에서 유저 로드
+customUserDetailsService.loadUserByUserId()    # 토큰 내부의 userId로 유저 로드
     ↓
 SecurityContextHolder에 인증 정보 저장
     ↓
@@ -57,9 +58,9 @@ public class JwtFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService customUserDetailsService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         // 1. 쿠키에서 토큰 추출
         String token = resolveToken(request);

@@ -1,6 +1,6 @@
 import {create} from "zustand";
 import {createJSONStorage, persist} from "zustand/middleware";
-import type {UserResponse} from "@/api/auth.types";
+import type {UserResponse} from "@/api/auth/auth.types";
 
 // ───────────────────────────────────────────
 // 인증 전역 상태 (Auth Store)

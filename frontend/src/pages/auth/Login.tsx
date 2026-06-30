@@ -1,9 +1,9 @@
-import React, {useState} from "react";
+import React, {useRef, useState} from "react";
 import {Link, useNavigate} from "react-router";
 import {ArrowRight, Eye, EyeOff, ShoppingBag, TrendingUp, Users} from "lucide-react";
 import {useAuthStore} from "@/store/useAuthStore";
-import {getMe} from "@/api/user";
-import {login} from "@/api/auth";
+import {getMe} from "@/api/user/user.service";
+import {login} from "@/api/auth/auth.service";
 
 const STATS = [
     {icon: <ShoppingBag size={16}/>, value: "2,400+", label: "입점 브랜드"},
@@ -19,21 +19,57 @@ export function Login() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
+    //  비밀번호 인풋창을 직접 제어하기 위한 ref 생성
+    const emailInputRef = useRef<HTMLInputElement>(null);
+    const passwordInputRef = useRef<HTMLInputElement>(null);
+
     const navigate = useNavigate();
     const setUser = useAuthStore((state) => state.setUser);
 
-    const handleLogin = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
+    // 아무것도 입력하지 않았을 때 버튼을 회색으로 만들기 위한 체크 변수
+    const isFormEmpty = !form.email.trim() || !form.password.trim();
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const {name, value, type, checked} = e.target;
+
+        // name이 form의 key 중 하나임을 TypeScript에게 명확히 알려줍니다.
+        const fieldName = name as keyof typeof form;
+        const fieldValue = type === "checkbox" ? checked : value;
+
+        setForm((prev) => ({
+            ...prev,
+            [fieldName]: fieldValue,
+        }));
+    };
+
+    const handleLogin = async (e: React.SubmitEvent) => {
+        e.preventDefault();
         setError(null);
 
-        if (!form.email.trim() || !form.password.trim()) {
-            setError("이메일과 비밀번호를 모두 입력해주세요.");
+        // 아예 둘다 비어있을 때 버튼을 누른 경우
+        if ((!form.email.trim() && !form.password.trim())) {
+            setError("이메일과 비밀번호를 입력해주세요.");
+            emailInputRef.current?.focus();
+            return;
+        }
+
+        // 이메일이 비어있을 때
+        if (!form.email.trim()) {
+            setError("이메일을 입력해주세요.");
+            emailInputRef.current?.focus();
+            return;
+        }
+
+        // 이메일은 있는데 비밀번호가 비어있을 때
+        if (!form.password.trim()) {
+            setError("비밀번호를 입력해주세요.");
+            passwordInputRef.current?.focus();
             return;
         }
 
         setLoading(true);
         try {
-            await login({email: form.email, password: form.password});
+            await login({email: form.email, password: form.password, rememberMe: form.remember});
             const user = await getMe();
             setUser(user);
 
@@ -41,7 +77,14 @@ export function Login() {
             else if (user.businessRole === "SELLER") navigate("/seller");
             else navigate("/");
         } catch (err: any) {
-            setError(err.response?.data?.message ?? "로그인에 실패했습니다.");
+            const responseData = err.response?.data;
+            if (responseData?.code === "COMMON_001" && responseData?.data) {
+                const errorDetail = responseData.data;
+                const firstErrorKey = Object.keys(errorDetail)[0];
+                setError(errorDetail[firstErrorKey]);
+            } else {
+                setError(responseData?.message ?? "로그인에 실패했습니다.");
+            }
         } finally {
             setLoading(false);
         }
@@ -128,17 +171,21 @@ export function Login() {
 
                         <div className="space-y-4">
                             <input
+                                ref={emailInputRef}
                                 type="email"
+                                name="email"
                                 value={form.email}
-                                onChange={(e) => setForm({...form, email: e.target.value})}
+                                onChange={handleChange}
                                 placeholder="이메일"
                                 className="w-full border border-border rounded-lg px-4 py-3 text-sm outline-none focus:border-primary transition-colors bg-white"
                             />
                             <div className="relative">
                                 <input
+                                    ref={passwordInputRef}
                                     type={showPassword ? "text" : "password"}
+                                    name="password"
                                     value={form.password}
-                                    onChange={(e) => setForm({...form, password: e.target.value})}
+                                    onChange={handleChange}
                                     placeholder="비밀번호 입력"
                                     className="w-full border border-border rounded-lg px-4 py-3 text-sm outline-none focus:border-primary transition-colors pr-11 bg-white"
                                 />
@@ -173,7 +220,11 @@ export function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-white py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-4"
+                            className={`w-full disabled:opacity-50 text-white py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-4
+                            ${isFormEmpty
+                                ? "bg-gray-300 cursor-pointer"
+                                : "bg-primary hover:bg-primary/90 cursor-pointer"
+                            }`}
                         >
                             {loading ? "로그인 중..." : "로그인"} <ArrowRight size={15}/>
                         </button>

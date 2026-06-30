@@ -1,7 +1,8 @@
 package kr.remerge.stylehub.global.auth.security;
 
-import kr.remerge.stylehub.global.auth.dto.AuthUser;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import org.springframework.core.MethodParameter;
+import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -24,20 +25,20 @@ public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver 
 
     // 실제로 파라미터에 들어갈 값을 만들어서 반환
     @Override
-    public Object resolveArgument(MethodParameter parameter,
+    public Object resolveArgument(@NonNull MethodParameter parameter,
                                   ModelAndViewContainer mavContainer,
-                                  NativeWebRequest webRequest,
+                                  @NonNull NativeWebRequest webRequest,
                                   WebDataBinderFactory binderFactory) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        // [방어 코드 1] 인증 정보가 아예 없거나, 인증되지 않은 상태면 null 반환
+        // 인증 정보가 아예 없거나, 인증되지 않은 상태면 null 반환
         if (authentication == null || !authentication.isAuthenticated()) {
             return null;
         }
 
         Object principal = authentication.getPrincipal();
 
-        // [방어 코드 2] 로그인을 안 해서 principal이 "anonymousUser"(String)인 경우 null 반환
+        // 로그인을 안 해서 principal이 "anonymousUser"(String)인 경우 null 반환
         if (principal instanceof String) {
             return null;
         }

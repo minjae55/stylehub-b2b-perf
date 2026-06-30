@@ -37,4 +37,9 @@ public interface UserRepository extends JpaRepository<User, Integer> {
      * 3. 가입 이메일과 이름으로 유저 엔티티 단건 조회 (비밀번호 재설정 링크 발송용)
      */
     Optional<User> findByEmailAndName(String email, String name);
+
+    /**
+     * 가입 이메일과 이름으로 유저가 존재하는지 여부 확인
+     */
+    boolean existsByEmailAndName(String email, String name);
 }

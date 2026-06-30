@@ -3,7 +3,7 @@ package kr.remerge.stylehub.domain.order.checkout;
 import jakarta.validation.Valid;
 import kr.remerge.stylehub.domain.order.checkout.dto.*;
 import kr.remerge.stylehub.domain.order.checkout.service.CheckoutService;
-import kr.remerge.stylehub.global.auth.dto.AuthUser;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;

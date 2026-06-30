@@ -1,7 +1,7 @@
 import api from "@/api/axios";
-import { UserResponse } from "./auth.types"; // auth.types에서 가져옴
-import { UpdateProfileRequest } from "./user.types";
-import {UpdateProfilePayload} from "@/api/auth"; // user.types에서 가져옴
+import {UserResponse} from "../auth/auth.types"; // auth.types에서 가져옴
+import {UpdateProfileRequest} from "./user.types";
+import {UpdateProfilePayload} from "@/api/auth/auth.service"; // user.types에서 가져옴
 
 // ───────────────────────────────────────────
 // 내 정보 조회

@@ -30,9 +30,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'            // Spring MVC + 내장 Tomcat (REST API 서버)
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'      // WebSocket 지원 (실시간 양방향 통신)
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'       // 헬스체크·메트릭 엔드포인트 (/actuator/health 등) - 운영 모니터링 필수
-	implementation 'io.jsonwebtoken:jjwt-api:0.12.7'                            // JWT 생성·파싱 API (버전 명시 필요 - BOM 미포함)
-	implementation 'org.mapstruct:mapstruct:1.6.3'                               // MapStruct - Entity ↔ DTO 변환 구현체 자동 생성
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.7'                             // JWT 생성·파싱 API (버전 명시 필요 - BOM 미포함)
+	implementation 'org.mapstruct:mapstruct:1.6.3'                              // MapStruct - Entity ↔ DTO 변환 구현체 자동 생성
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+	implementation 'net.nurigo:sdk:4.3.2'                                        // CoolSMS(누리고) SDK
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
 
 	// ── 컴파일 타임 전용 (런타임 jar에 포함 안 됨) ───────────────────────────
 	compileOnly 'org.projectlombok:lombok'                   // Lombok - @Getter/@Setter/@Builder 등 보일러플레이트 코드 자동 생성
@@ -46,7 +48,7 @@ dependencies {
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.7'       // JWT ↔ JSON 직렬화 (Jackson 연동)
 
 	// ── 어노테이션 프로세서 (컴파일 시 코드 생성) ───────────────────────────
-	// ⚠️ 순서 중요 - Lombok → lombok-mapstruct-binding → MapStruct 순서 지켜야 함
+	// 순서 중요 - Lombok → lombok-mapstruct-binding → MapStruct 순서 지켜야 함
 	annotationProcessor 'org.projectlombok:lombok'                        // Lombok 어노테이션 처리기 (compileOnly와 세트)
 	annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'  // Lombok @Builder와 MapStruct 충돌 방지 바인딩
 	annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'          // MapStruct 매퍼 구현체 자동 생성

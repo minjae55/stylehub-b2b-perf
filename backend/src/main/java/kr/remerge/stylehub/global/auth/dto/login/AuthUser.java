@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.global.auth.dto;
+package kr.remerge.stylehub.global.auth.dto.login;
 
 import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
 
