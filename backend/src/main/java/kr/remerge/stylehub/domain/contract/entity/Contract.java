@@ -9,6 +9,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -78,13 +79,31 @@ public class Contract {
     @Column(name = "canceled_at")
     private LocalDateTime canceledAt;
 
-    public Contract(
+    @Column(name = "delivery_date", nullable = false)
+    private LocalDate deliveryDate;
+
+    @Column(name = "payment_terms", nullable = false, length = 500)
+    private String paymentTerms;
+
+    @Lob
+    @Column(name = "return_policy", nullable = false)
+    private String returnPolicy;
+
+    @Lob
+    @Column(name = "special_terms")
+    private String specialTerms;
+
+    private Contract(
             Quote quote,
             Company company,
             String buyerCompanyName,
             String sellerCompanyName,
             String contractNo,
-            Long contractAmount
+            Long contractAmount,
+            LocalDate deliveryDate,
+            String paymentTerms,
+            String returnPolicy,
+            String specialTerms
     ) {
         this.quote = quote;
         this.company = company;
@@ -92,13 +111,19 @@ public class Contract {
         this.sellerCompanyName = sellerCompanyName;
         this.contractNo = contractNo;
         this.contractAmount = contractAmount;
+        this.deliveryDate = deliveryDate;
+        this.paymentTerms = paymentTerms;
+        this.returnPolicy = returnPolicy;
+        this.specialTerms = specialTerms;
         this.status = ContractStatus.DRAFT;
         this.version = 1;
     }
 
     public void sellerSign() {
         this.status = ContractStatus.SELLER_SIGNED;
-        this.sellerSignedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        this.sellerSignedAt = now;
+        this.submittedAt = now;
     }
 
     public void buyerSign() {
@@ -131,4 +156,40 @@ public class Contract {
     public void updateContractHash(String contractHash) {
         this.contractHash = contractHash;
     }
+
+    public static Contract createDraftFromQuote(
+            Quote quote,
+            String contractNo,
+            LocalDate deliveryDate,
+            String paymentTerms,
+            String returnPolicy,
+            String specialTerms
+    ) {
+
+        if (deliveryDate == null) {
+            throw new IllegalArgumentException("납품 예정일은 필수입니다.");
+        }
+
+        if (paymentTerms == null || paymentTerms.isBlank()) {
+            throw new IllegalArgumentException("결제 조건은 필수입니다.");
+        }
+
+        if (returnPolicy == null || returnPolicy.isBlank()) {
+            throw new IllegalArgumentException("반품·교환 조건은 필수입니다.");
+        }
+
+        return new Contract(
+                quote,
+                quote.getCompany(),
+                quote.getBuyer().getCompany().getName(),
+                quote.getCompany().getName(),
+                contractNo,
+                quote.getTotalAmount(),
+                deliveryDate,
+                paymentTerms,
+                returnPolicy,
+                specialTerms
+        );
+    }
 }
+

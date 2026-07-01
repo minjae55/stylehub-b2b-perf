@@ -75,7 +75,7 @@ public enum ErrorCode {
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_001", "주문을 찾을 수 없습니다."),
     INVALID_ORDER_STATUS(HttpStatus.BAD_REQUEST, "ORDER_002", "유효하지 않은 주문 상태입니다."),
     ORDER_CANCEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "ORDER_003", "취소할 수 없는 주문입니다."),
-    ORDER_ITEMS_NOT_READY(HttpStatus.CONFLICT, "ORDER_004","모든 주문 상품의 출고 준비가 완료되지 않았습니다."
+    ORDER_ITEMS_NOT_READY(HttpStatus.CONFLICT, "ORDER_004", "모든 주문 상품의 출고 준비가 완료되지 않았습니다."
     ),
 
     // ───────────────────────────────────────────
@@ -83,13 +83,14 @@ public enum ErrorCode {
     // ───────────────────────────────────────────
     QUOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "QUOTE_001", "견적서를 찾을 수 없습니다."),
     QUOTE_EXPIRED(HttpStatus.BAD_REQUEST, "QUOTE_002", "만료된 견적서입니다."),
-
+    INVALID_QUOTE_STATUS(HttpStatus.BAD_REQUEST, "QUOTE_003", "변경할 수 없는 견적 상태입니다."),
     // ───────────────────────────────────────────
     // 계약 (CONTRACT)
     // ───────────────────────────────────────────
     CONTRACT_NOT_FOUND(HttpStatus.NOT_FOUND, "CONTRACT_001", "계약서를 찾을 수 없습니다."),
     CONTRACT_ALREADY_SIGNED(HttpStatus.BAD_REQUEST, "CONTRACT_002", "이미 서명된 계약서입니다."),
-
+    CONTRACT_ALREADY_EXISTS(HttpStatus.CONFLICT, "CONTRACT_003", "이미 생성된 계약서가 있습니다."),
+    INVALID_CONTRACT_STATUS(HttpStatus.BAD_REQUEST, "CONTRACT_004", "현재 상태에서는 계약서를 처리할 수 없습니다."),
     // ───────────────────────────────────────────
     // 소싱 (SOURCING)
     // ───────────────────────────────────────────
@@ -114,7 +115,8 @@ public enum ErrorCode {
     EMPTY_FILE(HttpStatus.BAD_REQUEST, "COMMON_002", "업로드한 파일이 비어있습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_003", "서버 오류가 발생했습니다."),
     FILE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_004", "파일 업로드 중 오류가 발생했습니다.");
+
     private final HttpStatus httpStatus; // 400, 500 대신 HttpStatus 객체로 명확히 관리
     private final String code;           // 프론트엔드가 식별할 비즈니스 커스텀 에러 코드 (ex: COMPANY_002)
     private final String message;        // 에러 메시지
-}
+    }
