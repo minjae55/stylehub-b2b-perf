@@ -8,7 +8,7 @@ import {CheckCircle2, Eye, EyeOff, Loader2, User, XCircle} from "lucide-react";
 import {OtpVerificationPanel} from "@/app/components/ui/otp-vertification-panel";
 import {Field, formatPhoneNumber, inputCls, PasswordStrengthBar, type RegisterFormData} from "./shared";
 import {
-    checkEmailDuplicate,
+    checkEmailDuplicate, checkPhoneDuplicate,
     sendEmailOtp,
     sendPhoneOtp,
     verifyEmailOtp,
@@ -176,7 +176,14 @@ function useEmailVerify(email: string) {
 
 // ── 휴대폰 인증 훅 — 이메일과 동일한 잠금/재발송 패턴 ────────────────────────
 
-type PhoneStatus = "idle" | "sending" | "sent" | "verified";
+type PhoneStatus =
+    | "idle"
+    | "checking"
+    | "available"
+    | "duplicate"
+    | "sending"
+    | "sent"
+    | "verified";
 
 function usePhoneVerify(phone: string) {
     const [status, setStatus] = useState<PhoneStatus>("idle");
@@ -185,10 +192,57 @@ function usePhoneVerify(phone: string) {
     const [sending, setSending] = useState(false);
     const [otpSent, setOtpSent] = useState(false);
 
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const requestPhoneRef = useRef("");
+    const statusRef = useRef(status);
+    statusRef.current = status;
+
     const isVerified = status === "verified";
+    const isChecking = status === "checking";
+    const isAvailable = status === "available";
+    const isDuplicate = status === "duplicate";
     const codeSent = status === "sending" || status === "sent";
 
     const isValidPhone = /^01[016789][0-9]{3,4}[0-9]{4}$/.test(phone.replace(/-/g, ""));
+
+    useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+
+        const currentStatus = statusRef.current;
+        const cleaned = phone.replace(/-/g, "");
+
+        if (!isValidPhone) {
+            if (currentStatus !== "idle") setStatus("idle");
+            return;
+        }
+
+        if (currentStatus === "sent" || currentStatus === "sending" || currentStatus === "verified") return;
+
+        debounceRef.current = setTimeout(async () => {
+            requestPhoneRef.current = cleaned;
+            setStatus("checking");
+            try {
+                // 백엔드에 만들어둔 휴대폰 중복체크 API 호출 (예시 명칭 기재)
+                // 만약 단독 API가 없다면 기존 sendPhoneOtp 진입 전 예외를 catch하여 판단해야 하나,
+                // 안전한 사용을 위해 checkPhoneDuplicate(cleaned) API를 연동하는 것을 권장합니다.
+                await checkPhoneDuplicate(cleaned);
+                if (requestPhoneRef.current !== cleaned) return;
+                setStatus("available");
+            } catch (error: any) {
+                if (requestPhoneRef.current !== cleaned) return;
+                const errorData: ErrorResponse = error?.response?.data;
+                // 409 Conflict 이거나 특정 코드 매핑 시 중복으로 판정
+                if (errorData?.status === 409 || error?.response?.status === 409 || errorData?.code === "DUPLICATE_PHONE_NUMBER") {
+                    setStatus("duplicate");
+                } else {
+                    setStatus("idle");
+                }
+            }
+        }, DUPLICATE_CHECK_DEBOUNCE_MS);
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, [phone, isValidPhone]);
 
     /** 최초 발송 — 유효한 번호일 때만 */
     const sendCode = async () => {
@@ -253,6 +307,7 @@ function usePhoneVerify(phone: string) {
         verifying, sending, verifyError,
         btnLabel, isValidPhone, otpSent,
         sendCode, resend, verifyCode, reset,
+        isChecking, isAvailable, isDuplicate
     };
 }
 
@@ -515,23 +570,20 @@ export function StepAccount({
                         value={form.phone}
                         onChange={(e) => handlePhoneChange(e.target.value)}
                         placeholder="01000000000 ('-' 없이 숫자만)"
-                        // codeSent 구간 동안 잠금 — 이메일과 동일 패턴
                         disabled={phone.isVerified || phone.codeSent}
                         className={`${inputCls} ${
-                            phone.isVerified
-                                ? "border-emerald-400 bg-emerald-50/40"
-                                : form.phone && !phone.isValidPhone
-                                    ? "border-amber-400"
-                                    : ""
+                            phone.isVerified ? "border-emerald-400 bg-emerald-50/40"
+                                : phone.isDuplicate ? "border-red-400"
+                                    : phone.isAvailable ? "border-emerald-300"
+                                        : form.phone && !phone.isValidPhone ? "border-amber-400"
+                                            : ""
                         } ${phone.isVerified || phone.codeSent ? "bg-muted/30 text-muted-foreground" : ""}`}
                     />
-                    {/* 코드 발송 후(codeSent)에는 패널 안의 "인증번호 재전송" 버튼이
-                        같은 역할을 하므로 여기 버튼은 숨김 — 중복 노출 방지 */}
                     {!phone.codeSent && (
                         <button
                             type="button"
                             onClick={handlePhoneBtnClick}
-                            disabled={phone.sending || (!phone.isVerified && !phone.isValidPhone)}
+                            disabled={phone.sending || (!phone.isVerified && !phone.isAvailable)}
                             className={`shrink-0 px-3 py-2.5 text-xs font-semibold rounded transition-colors whitespace-nowrap ${
                                 phone.isVerified
                                     ? "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -547,6 +599,26 @@ export function StepAccount({
                     <p className="text-xs text-amber-600 mt-1">
                         올바른 휴대폰 번호 형식이 아닙니다. (010으로 시작하는 10~11자리 숫자)
                     </p>
+                )}
+
+                {!phone.codeSent && !phone.isVerified && phone.isValidPhone && (
+                    <>
+                        {phone.isChecking && (
+                            <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                                <Loader2 size={12} className="animate-spin"/> 번호 중복 확인 중...
+                            </p>
+                        )}
+                        {phone.isAvailable && (
+                            <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
+                                <CheckCircle2 size={12}/> 가입 가능한 휴대폰 번호입니다.
+                            </p>
+                        )}
+                        {phone.isDuplicate && (
+                            <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">
+                                <XCircle size={12}/> 이미 가입된 휴대폰 번호입니다. 다른 번호를 입력해 주세요.
+                            </p>
+                        )}
+                    </>
                 )}
 
                 {/* OTP 입력 패널 — 발송중/발송완료 동안 노출, 인증완료 시 즉시 접힘 */}

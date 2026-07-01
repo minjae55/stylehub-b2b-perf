@@ -172,20 +172,20 @@ export interface ResetPasswordRequest {
 // ───────────────────────────────────────────
 
 export interface ChangeEmailOtpRequest {
-    targetValue: string; // 변경할 이메일 주소
+    target: string; // 변경할 이메일 주소
 }
 
 export interface VerifyEmailOtpRequest {
-    targetValue: string;
+    target: string;
     otpCode: string; // 6자리 인증번호
 }
 
 export interface ChangePhoneOtpRequest {
-    targetValue: string; // 변경할 연락처
+    target: string; // 변경할 연락처
 }
 
 export interface VerifyPhoneOtpRequest {
-    targetValue: string;
+    target: string;
     otpCode: string; // 6자리 인증번호
 }
 

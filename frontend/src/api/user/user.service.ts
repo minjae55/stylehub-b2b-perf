@@ -41,6 +41,5 @@ export const verifyGatePassword = async (password: string): Promise<void> => {
  * 최종 회원 정보 업데이트 (PATCH)
  */
 export const updateProfileInfo = async (payload: UpdateProfilePayload) => {
-    const { data } = await api.patch("/users/me", payload);
-    return data; // 서버에서 반환한 최신 유저 객체
+    return await api.patch<UserResponse>("/users/profile", payload);
 };
