@@ -82,6 +82,7 @@ public class SourcingRequestService {
             SourcingRequest request = SourcingRequest.builder()
                     .sourcingNo(sourcingNo)
                     .buyer(buyer)
+                    .buyerCompanyId(buyer.getCompany().getCompanyId())
                     .type(itemDto.getType())
                     .status(SourcingStatus.PENDING)
                     .productName(itemDto.getProductName())

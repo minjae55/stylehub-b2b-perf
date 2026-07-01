@@ -3,13 +3,13 @@ import { useNavigate, useParams } from "react-router";
 import {
   ArrowLeft, Package, FileText, FlaskConical, Clock,
   CheckCircle, XCircle, MessageSquare, CreditCard,
-  ChevronRight, RotateCcw, X, Truck, BadgeCheck,
-  CircleDot, AlertTriangle, Loader2,
+  ChevronRight, X, Truck, BadgeCheck,
+  CircleDot, AlertTriangle, Loader2, Ban,
 } from "lucide-react";
 
 // ── 타입 (백엔드 SourcingRequestDto 기준) ────────────────────────────────────
 // SourcingStatus enum → 한글 매핑
-type RequestStatus = "PENDING" | "QUOTED" | "APPROVED" | "CANCELLED" | "REJECTED" | "REREQUESTED";
+type RequestStatus = "PENDING" | "QUOTED" | "TRADING" | "NEGOTIATING" | "CANCELLED" | "COMPLETED" | "WITHDRAWN";
 // SourcingSupplierStatus enum → 한글 매핑
 type BidStatus = "SUGGESTED" | "RECOMMENDED" | "QUOTED" | "DECLINED" | "EXPIRED";
 
@@ -33,15 +33,8 @@ export interface BidDetail {
   companyName?: string;
   status: BidStatus;
   submittedAt?: string;
-  // Quote 필드 (견적 제출 전이면 null)
   quoteId?: number;
-  totalAmount?: number;
-  unitPrice?: number;
-  leadTimeDays?: number;
-  availableDate?: string;
-  sampleAvailable?: string;
-  sellerMemo?: string;
-  validUntil?: string;
+  totalAmount?: number; // SupplierCard 요약용
 }
 
 export interface SourcingRequestDetail {
@@ -70,19 +63,21 @@ export interface SourcingRequestDetail {
 const REQUEST_STATUS_LABEL: Record<RequestStatus, string> = {
   PENDING:     "대기중",
   QUOTED:      "견적수신",
-  APPROVED:    "승인",
+  TRADING:     "거래중",
+  NEGOTIATING: "협의중",
   CANCELLED:   "취소됨",
-  REJECTED:    "거절",
-  REREQUESTED: "재요청됨",
+  COMPLETED:   "완료",
+  WITHDRAWN:   "취소됨",
 };
 
 const REQUEST_STATUS_STYLE: Record<RequestStatus, string> = {
   PENDING:     "bg-secondary text-muted-foreground border-border",
   QUOTED:      "bg-blue-50 text-blue-600 border-blue-200",
-  APPROVED:    "bg-green-50 text-green-600 border-green-200",
+  TRADING:     "bg-blue-50 text-blue-600 border-blue-200",
+  NEGOTIATING: "bg-purple-50 text-purple-600 border-purple-200",
   CANCELLED:   "bg-red-50 text-red-500 border-red-200",
-  REJECTED:    "bg-red-50 text-red-500 border-red-200",
-  REREQUESTED: "bg-amber-50 text-amber-600 border-amber-200",
+  COMPLETED:   "bg-green-50 text-green-600 border-green-200",
+  WITHDRAWN:   "bg-secondary text-muted-foreground border-border",
 };
 
 const BID_STATUS_LABEL: Record<BidStatus, string> = {
@@ -120,6 +115,89 @@ async function fetchSourcingDetail(requestId: string): Promise<SourcingRequestDe
   return res.json();
 }
 
+interface QuoteDetail {
+  quote_id: number;
+  quote_no: string;
+  company_name: string;
+  seller_name: string;
+  lead_time_days: number;
+  valid_until: string;
+  sample_available: string;
+  seller_memo: string;
+  subtotal_amount: number;
+  total_amount: number;
+  shipping_fee: number;
+  status: string;
+  submitted_at: string;
+  quote_items: {
+    quote_item_id: number;
+    option_summary: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+    is_sample: boolean;
+  }[];
+}
+
+async function fetchQuoteDetail(quoteId: number): Promise<QuoteDetail> {
+  const res = await fetch(`/api/quotes/${quoteId}`, { credentials: "include" });
+  if (!res.ok) throw new Error(`견적 조회 실패: ${res.status}`);
+  return res.json();
+}
+
+async function withdrawSourcingRequest(sourcingRequestId: number): Promise<void> {
+  const res = await fetch(`/api/sourcing/buyer/requests/${sourcingRequestId}/withdraw`, {
+    method: "PATCH",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`취소 처리 실패: ${res.status}`);
+}
+
+// ── 취소 확인 모달 ────────────────────────────────────────────────────────────
+function WithdrawConfirmModal({ onClose, onConfirm, isLoading }: {
+  onClose: () => void;
+  onConfirm: () => void;
+  isLoading: boolean;
+}) {
+  return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[380px] overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Ban size={16} className="text-red-500" />
+              <h3 className="font-bold text-foreground">소싱 요청 취소</h3>
+            </div>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-sm text-foreground">
+              소싱 요청을 취소하면 배정된 공급사들의 견적이 모두 거절 처리됩니다.
+            </p>
+            <p className="text-xs text-muted-foreground">취소 후에는 되돌릴 수 없습니다.</p>
+            <div className="flex gap-2 pt-1">
+              <button
+                  onClick={onClose}
+                  className="flex-1 py-2.5 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors font-medium"
+              >
+                닫기
+              </button>
+              <button
+                  onClick={onConfirm}
+                  disabled={isLoading}
+                  className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Ban size={14} /> {isLoading ? "처리 중..." : "취소하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+  );
+}
+
 // ── 견적 상세 모달 ────────────────────────────────────────────────────────────
 function BidDetailModal({
                           request,
@@ -133,6 +211,17 @@ function BidDetailModal({
   onNavigateNegotiation: () => void;
 }) {
   const hasQuote = bid.quoteId != null;
+  const [quoteDetail, setQuoteDetail] = useState<QuoteDetail | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  useEffect(() => {
+    if (!bid.quoteId) return;
+    setQuoteLoading(true);
+    fetchQuoteDetail(bid.quoteId)
+        .then(setQuoteDetail)
+        .catch(console.error)
+        .finally(() => setQuoteLoading(false));
+  }, [bid.quoteId]);
 
   return (
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -165,74 +254,122 @@ function BidDetailModal({
                 <>
                   {/* 핵심 수치 */}
                   <div className="grid grid-cols-2 gap-2">
-                    {bid.totalAmount != null && (
+                    {quoteDetail?.total_amount != null && (
                         <div className="bg-secondary rounded-lg p-3 text-center">
                           <div className="text-xs text-muted-foreground mb-0.5">제시 총금액</div>
                           <div className="font-bold text-foreground">
-                            {(bid.totalAmount / 10000).toLocaleString()}만원
+                            {(quoteDetail.total_amount / 10000).toLocaleString()}만원
                           </div>
                           {request.totalBudget && (
-                              <div className={`text-[10px] mt-0.5 font-medium ${bid.totalAmount <= request.totalBudget ? "text-green-600" : "text-red-500"}`}>
-                                희망 대비 {bid.totalAmount <= request.totalBudget
-                                  ? `▼ ${((request.totalBudget - bid.totalAmount) / 10000).toLocaleString()}만원`
-                                  : `▲ ${((bid.totalAmount - request.totalBudget) / 10000).toLocaleString()}만원`}
+                              <div className={`text-[10px] mt-0.5 font-medium ${quoteDetail.total_amount <= request.totalBudget ? "text-green-600" : "text-red-500"}`}>
+                                희망 대비 {quoteDetail.total_amount <= request.totalBudget
+                                  ? `▼ ${((request.totalBudget - quoteDetail.total_amount) / 10000).toLocaleString()}만원`
+                                  : `▲ ${((quoteDetail.total_amount - request.totalBudget) / 10000).toLocaleString()}만원`}
                               </div>
                           )}
                         </div>
                     )}
-                    {bid.unitPrice != null && (
-                        <div className="bg-secondary rounded-lg p-3 text-center">
-                          <div className="text-xs text-muted-foreground mb-0.5">제시 단가</div>
-                          <div className="font-bold text-foreground">{bid.unitPrice.toLocaleString()}원</div>
-                          {request.unitPrice && (
-                              <div className={`text-[10px] mt-0.5 font-medium ${bid.unitPrice <= request.unitPrice ? "text-green-600" : "text-red-500"}`}>
-                                희망 대비 {bid.unitPrice <= request.unitPrice
-                                  ? `▼ ${(request.unitPrice - bid.unitPrice).toLocaleString()}원`
-                                  : `▲ ${(bid.unitPrice - request.unitPrice).toLocaleString()}원`}
-                              </div>
-                          )}
-                        </div>
-                    )}
-                    {bid.leadTimeDays != null && (
+                    {quoteDetail?.lead_time_days != null && (
                         <div className="bg-secondary rounded-lg p-3 text-center">
                           <div className="text-xs text-muted-foreground mb-0.5">리드타임</div>
-                          <div className="font-bold text-foreground">{bid.leadTimeDays}일</div>
-                          {bid.availableDate && (
-                              <div className={`text-[10px] mt-0.5 font-medium ${
-                                  request.deliveryDate && bid.availableDate <= request.deliveryDate
-                                      ? "text-green-600" : "text-red-500"
-                              }`}>
-                                {request.deliveryDate && bid.availableDate <= request.deliveryDate ? "납기 충족" : "납기 초과"}
-                              </div>
-                          )}
+                          <div className="font-bold text-foreground">{quoteDetail.lead_time_days}일</div>
                         </div>
                     )}
-                    {bid.sampleAvailable && (
+                    {quoteDetail?.sample_available && (
                         <div className="bg-secondary rounded-lg p-3 text-center">
                           <div className="text-xs text-muted-foreground mb-0.5">샘플</div>
                           <div className="font-bold text-foreground text-sm">
-                            {bid.sampleAvailable === "AVAILABLE" ? "가능" : "불가"}
+                            {quoteDetail.sample_available === "AVAILABLE" ? "가능" : "불가"}
                           </div>
+                        </div>
+                    )}
+                    {quoteDetail?.shipping_fee != null && (
+                        <div className="bg-secondary rounded-lg p-3 text-center">
+                          <div className="text-xs text-muted-foreground mb-0.5">배송비</div>
+                          <div className="font-bold text-foreground">{quoteDetail.shipping_fee.toLocaleString()}원</div>
                         </div>
                     )}
                   </div>
 
+                  {/* 옵션별 단가 테이블 */}
+                  {quoteLoading && (
+                      <div className="text-center py-4 text-sm text-muted-foreground">불러오는 중...</div>
+                  )}
+                  {!quoteLoading && quoteDetail?.quote_items?.length ? (
+                      <div>
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">옵션별 견적</div>
+                        <div className="border border-border rounded-lg overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead className="bg-secondary">
+                            <tr>
+                              <th className="text-left px-3 py-2 text-muted-foreground font-medium">옵션</th>
+                              <th className="text-right px-3 py-2 text-muted-foreground font-medium">수량</th>
+                              <th className="text-right px-3 py-2 text-muted-foreground font-medium">단가</th>
+                              <th className="text-right px-3 py-2 text-muted-foreground font-medium">합계</th>
+                            </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                            {quoteDetail.quote_items.map((item) => (
+                                <tr key={item.quote_item_id} className={item.is_sample ? "bg-amber-50" : ""}>
+                                  <td className="px-3 py-2 text-foreground">
+                                    {item.option_summary || "—"}
+                                    {item.is_sample && <span className="ml-1 text-amber-600 font-medium">(샘플)</span>}
+                                  </td>
+                                  <td className="px-3 py-2 text-right text-foreground">{item.quantity.toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-right text-foreground">{item.unit_price.toLocaleString()}원</td>
+                                  <td className="px-3 py-2 text-right font-semibold text-foreground">{item.total_price.toLocaleString()}원</td>
+                                </tr>
+                            ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                  ) : null}
+
                   {/* 셀러 메모 */}
-                  {bid.sellerMemo && (
+                  {quoteDetail?.seller_memo && (
                       <div>
                         <div className="text-xs font-medium text-muted-foreground mb-1.5">공급사 메모</div>
                         <div className="bg-secondary rounded-lg px-4 py-3 text-sm text-foreground leading-relaxed">
-                          {bid.sellerMemo}
+                          {quoteDetail.seller_memo}
                         </div>
                       </div>
                   )}
 
                   {/* 유효기간 */}
-                  {bid.validUntil && (
+                  {quoteDetail?.valid_until && (
                       <div className="text-xs text-muted-foreground bg-secondary rounded px-3 py-2">
-                        견적 유효기간: <strong className="text-foreground">{bid.validUntil.slice(0, 10)}</strong>
+                        견적 유효기간: <strong className="text-foreground">{quoteDetail.valid_until.slice(0, 10)}</strong>
                       </div>
                   )}
+
+                  {/* 액션 버튼 */}
+                  <div className="flex gap-2">
+                    {/* TODO: 거절 API 연동 (팀원 도메인) */}
+                    <button
+                        onClick={() => alert("TODO: 거절 API")}
+                        className="flex-1 py-2.5 border border-red-200 text-red-500 hover:bg-red-50 rounded font-semibold text-sm transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <XCircle size={14} /> 거절
+                    </button>
+
+                    {/* TODO: 승인/샘플요청 API 연동 (팀원 도메인) */}
+                    {request.needSample === "Y" ? (
+                        <button
+                            onClick={() => alert("TODO: 샘플 요청 API")}
+                            className="flex-1 py-2.5 border border-amber-200 text-amber-600 hover:bg-amber-50 rounded font-semibold text-sm transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <FlaskConical size={14} /> 샘플 요청
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => alert("TODO: 승인 API")}
+                            className="flex-1 py-2.5 border border-green-200 text-green-600 hover:bg-green-50 rounded font-semibold text-sm transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <CheckCircle size={14} /> 승인
+                        </button>
+                    )}
+                  </div>
 
                   {/* 협의하기 */}
                   <button
@@ -282,7 +419,6 @@ function SupplierCard({
               {hasQuote ? (
                   <>
                     {bid.totalAmount != null && `${(bid.totalAmount / 10000).toLocaleString()}만원`}
-                    {bid.leadTimeDays != null && ` · 리드타임 ${bid.leadTimeDays}일`}
                     {budgetDiff !== null && (
                         <span className={`ml-1.5 font-semibold ${budgetDiff >= 0 ? "text-green-600" : "text-red-500"}`}>
                     ({budgetDiff >= 0
@@ -296,7 +432,35 @@ function SupplierCard({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+            {hasQuote && (
+                <>
+                  {/* TODO: 거절 API 연동 (팀원 도메인) */}
+                  <button
+                      onClick={() => alert("TODO: 거절 API")}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    <XCircle size={12} /> 거절
+                  </button>
+
+                  {/* TODO: 승인/샘플요청 API 연동 (팀원 도메인) */}
+                  {request.needSample === "Y" ? (
+                      <button
+                          onClick={() => alert("TODO: 샘플 요청 API")}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        <FlaskConical size={12} /> 샘플 요청
+                      </button>
+                  ) : (
+                      <button
+                          onClick={() => alert("TODO: 승인 API")}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-green-200 text-green-600 hover:bg-green-50 rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        <CheckCircle size={12} /> 승인
+                      </button>
+                  )}
+                </>
+            )}
             <button
                 onClick={onNavigateNegotiation}
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-lg text-xs font-semibold transition-colors"
@@ -324,6 +488,8 @@ export function BuyerSourcingDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedBid, setSelectedBid] = useState<BidDetail | null>(null);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   useEffect(() => {
     if (!requestId) return;
@@ -333,6 +499,20 @@ export function BuyerSourcingDetail() {
         .catch((e) => setError(e.message))
         .finally(() => setLoading(false));
   }, [requestId]);
+
+  const handleWithdraw = async () => {
+    if (!request) return;
+    setWithdrawing(true);
+    try {
+      await withdrawSourcingRequest(request.sourcingRequestId);
+      setRequest((prev) => prev ? { ...prev, status: "WITHDRAWN" } : prev);
+      setShowWithdraw(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "취소 처리 중 오류가 발생했습니다.");
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -391,12 +571,10 @@ export function BuyerSourcingDetail() {
               </div>
               {["PENDING", "QUOTED"].includes(request.status) && (
                   <button
-                      onClick={() => navigate("/buyer/sourcing-request", {
-                        state: { prefillItem: request, isRerequest: true, originalRequestId: request.sourcingRequestId },
-                      })}
-                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 border-2 border-dashed border-border hover:border-primary text-muted-foreground hover:text-primary rounded-lg text-xs font-medium transition-colors"
+                      onClick={() => setShowWithdraw(true)}
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-xs font-medium transition-colors"
                   >
-                    <RotateCcw size={12} /> 재요청
+                    <Ban size={12} /> 취소
                   </button>
               )}
             </div>
@@ -562,6 +740,15 @@ export function BuyerSourcingDetail() {
                     state: { supplierId: selectedBid.sellerCompanyId, requestId: request.sourcingRequestId },
                   });
                 }}
+            />
+        )}
+
+        {/* 취소 확인 모달 */}
+        {showWithdraw && (
+            <WithdrawConfirmModal
+                onClose={() => setShowWithdraw(false)}
+                onConfirm={handleWithdraw}
+                isLoading={withdrawing}
             />
         )}
       </div>

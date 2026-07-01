@@ -27,6 +27,9 @@ public class SourcingRequest extends BaseEntity {
     @JoinColumn(name = "buyer_id", nullable = false)
     private User buyer;
 
+    @Column(name = "buyer_company_id", nullable = false)
+    private Integer buyerCompanyId;
+
     @Column(nullable = false, length = 10)
     private String type;
 
@@ -71,5 +74,12 @@ public class SourcingRequest extends BaseEntity {
     // 모든 공급사 거절 시 자동 반려
     public void cancel() {
         this.status = SourcingStatus.CANCELLED;
+    }
+    public void quote() {
+        this.status = SourcingStatus.QUOTED;
+    }
+
+    public void withdraw() {
+        this.status = SourcingStatus.WITHDRAWN;
     }
 }

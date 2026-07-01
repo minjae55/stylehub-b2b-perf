@@ -1,6 +1,7 @@
 package kr.remerge.stylehub.domain.sourcing.repository;
 
 import io.lettuce.core.dynamic.annotation.Param;
+import jakarta.persistence.Tuple;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingSupplier;
 import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -63,4 +64,16 @@ public interface SourcingSupplierRepository extends JpaRepository<SourcingSuppli
     // 특정 소싱 요청의 전체 supplier 조회 (CANCELLED 체크용)
     List<SourcingSupplier> findAllBySourcingRequest_SourcingRequestId(Integer sourcingRequestId);
     List<SourcingSupplier> findBySourcingRequest_SourcingRequestId(Integer sourcingRequestId);
+    // sourcingRequestId 목록에 대해 QUOTED 상태 supplier 개수를 한 번에 group by 조회
+    @Query("""
+            SELECT s.sourcingRequest.sourcingRequestId AS requestId, COUNT(s) AS cnt
+            FROM SourcingSupplier s
+            WHERE s.sourcingRequest.sourcingRequestId IN :requestIds
+              AND s.status = :status
+            GROUP BY s.sourcingRequest.sourcingRequestId
+            """)
+    List<Tuple> countByStatusGroupedByRequestId(
+            @Param("requestIds") List<Integer> requestIds,
+            @Param("status") SourcingSupplierStatus status
+    );
 }

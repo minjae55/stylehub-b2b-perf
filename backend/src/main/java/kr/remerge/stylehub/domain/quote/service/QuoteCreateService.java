@@ -129,7 +129,15 @@ public class QuoteCreateService {
                 .filter(s -> s.getStatus() == SourcingSupplierStatus.RECOMMENDED)
                 .findFirst()
                 .ifPresentOrElse(
-                        supplier -> supplier.quote(null, quote),
+                        supplier -> {
+                            supplier.quote(null, quote);
+
+                            // SourcingRequest 상태도 QUOTED로 업데이트
+                            SourcingRequest sourcingRequest = sourcingRequestRepository
+                                    .findById(sourcingRequestId)
+                                    .orElseThrow(() -> new IllegalArgumentException("소싱 요청 없음: " + sourcingRequestId));
+                            sourcingRequest.quote();
+                        },
                         () -> {
                             throw new IllegalStateException(
                                     "해당 셀러에게 배정된(RECOMMENDED) 소싱 요청이 아닙니다. sourcingRequestId=" + sourcingRequestId);

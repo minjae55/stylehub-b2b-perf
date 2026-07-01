@@ -6,14 +6,18 @@ import lombok.Getter;
 import lombok.Setter;
 
 public enum SourcingStatus {
-    // 대기중
+    // 대기중 (공급사 배정 후 견적 대기)
     PENDING,
-    // 거래중
-    TRADING,
+    // 견적수신 (공급사가 견적 제출)
+    QUOTED,
     // 협의중
     NEGOTIATING,
-    //반려(소싱 전부 거절시)
-    CANCELLED,
+    // 거래중
+    TRADING,
     // 완료
-    COMPLETED
+    COMPLETED,
+    // 반려 (모든 공급사 거절 시 자동)
+    CANCELLED,
+    // 취소 (buyer 직접 취소)
+    WITHDRAWN
 }

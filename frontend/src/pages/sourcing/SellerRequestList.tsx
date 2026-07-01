@@ -42,6 +42,42 @@ interface MyBid {
   status: BidSubmitStatus; submittedAt: string; trackingNumber?: string;
 }
 
+// 셀러용 소싱 요청 상세 (백엔드 SourcingRequestSellerDetailResponse, snake_case)
+interface SellerSourcingDetailItem {
+  sourcing_request_item_id: number;
+  option_summary: string;
+  quantity: number;
+  sample_quantity?: number;
+}
+
+interface SellerSourcingDetailFile {
+  sourcing_request_file_id: number;
+  file_type: "REF_IMAGE" | "WORK_FILE";
+  file_name: string;
+  file_url: string;
+}
+
+interface SellerSourcingRequestDetail {
+  sourcing_request_id: number;
+  sourcing_no: string;
+  type: SourcingType;
+  status: string;
+  product_name: string;
+  brand_name?: string;
+  sub_category_id?: number;
+  need_sample: "Y" | "N";
+  main_material?: string;
+  unit_price?: number;
+  ref_url?: string;
+  total_budget?: number;
+  detail?: string;
+  delivery_date?: string;
+  expiry_date?: string;
+  created_at: string;
+  items: SellerSourcingDetailItem[];
+  files: SellerSourcingDetailFile[];
+}
+
 // ── API ───────────────────────────────────────────────────────────────
 const BASE_URL = "/api/sourcing/seller";
 
@@ -54,6 +90,12 @@ async function fetchSellerRequests(type: SourcingType, status: SupplierStatus): 
 async function fetchSellerPastRequests(type: SourcingType): Promise<SellerSourcingResponse[]> {
   const res = await fetch(`${BASE_URL}/requests/past?type=${type}`);
   if (!res.ok) throw new Error("이전 요청 조회 실패");
+  return res.json();
+}
+
+async function fetchSellerSourcingDetail(sourcingRequestId: number): Promise<SellerSourcingRequestDetail> {
+  const res = await fetch(`${BASE_URL}/requests/${sourcingRequestId}`, { credentials: "include" });
+  if (!res.ok) throw new Error("상세 조회 실패");
   return res.json();
 }
 
@@ -226,9 +268,30 @@ function DeclineModal({ req, onClose, onConfirm }: {
 }
 
 // ── 소싱 요청 상세 모달 (셀러용) ─────────────────────────────────────
+// 리스트 응답(req)에는 옵션/첨부파일 정보가 없어서, 모달이 열릴 때
+// /api/sourcing/seller/requests/{id} 상세 API를 따로 호출해서 채운다.
 function SellerSourcingDetailModal({ req, onClose }: { req: SellerSourcingResponse; onClose: () => void }) {
   const navigate = useNavigate();
   const isCustom = req.type === "CUSTOM";
+
+  const [detail, setDetail] = useState<SellerSourcingRequestDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(true);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDetailLoading(true);
+    setDetailError(null);
+    fetchSellerSourcingDetail(req.sourcingRequestId)
+        .then((data) => { if (!cancelled) setDetail(data); })
+        .catch((e) => { if (!cancelled) setDetailError(e.message); })
+        .finally(() => { if (!cancelled) setDetailLoading(false); });
+    return () => { cancelled = true; };
+  }, [req.sourcingRequestId]);
+
+  const totalQty = detail?.items?.length
+      ? detail.items.reduce((sum, o) => sum + o.quantity, 0)
+      : null;
 
   return (
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -250,7 +313,11 @@ function SellerSourcingDetailModal({ req, onClose }: { req: SellerSourcingRespon
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
             <div className={`grid divide-x divide-border border border-border rounded-lg overflow-hidden ${isCustom ? "grid-cols-4" : "grid-cols-3"}`}>
               {[
-                { label: "희망 수량", value: "미제공", icon: <Package size={12} /> },
+                {
+                  label: "희망 수량",
+                  value: detailLoading ? "..." : totalQty != null ? `${totalQty.toLocaleString()}벌` : "미제공",
+                  icon: <Package size={12} />,
+                },
                 {
                   label: isCustom ? "전체 예산" : "희망 단가",
                   value: isCustom
@@ -268,12 +335,67 @@ function SellerSourcingDetailModal({ req, onClose }: { req: SellerSourcingRespon
               ))}
             </div>
 
-            {req.detail && (
+            {detailLoading && (
+                <div className="text-center py-6 text-sm text-muted-foreground">상세 정보를 불러오는 중...</div>
+            )}
+
+            {detailError && (
+                <div className="text-center py-6 text-sm text-red-500">상세 정보를 불러오지 못했습니다. ({detailError})</div>
+            )}
+
+            {!detailLoading && !detailError && detail?.items?.length ? (
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">옵션별 수량</div>
+                  <div className="space-y-1.5">
+                    {detail.items.map((opt) => (
+                        <div key={opt.sourcing_request_item_id} className="flex items-center justify-between text-sm bg-secondary rounded px-3 py-2">
+                          <span className="text-foreground">{opt.option_summary || "—"}</span>
+                          <div className="flex items-center gap-3 text-muted-foreground text-xs">
+                            <span><strong className="text-foreground">{opt.quantity.toLocaleString()}</strong>개</span>
+                            {opt.sample_quantity != null && (
+                                <span className="text-primary">샘플 <strong>{opt.sample_quantity.toLocaleString()}</strong>개</span>
+                            )}
+                          </div>
+                        </div>
+                    ))}
+                  </div>
+                </div>
+            ) : null}
+
+            {(req.detail || detail?.detail) && (
                 <div>
                   <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">바이어 요구사항</div>
-                  <div className="bg-secondary rounded-lg px-4 py-3 text-sm text-foreground leading-relaxed whitespace-pre-line">{req.detail}</div>
+                  <div className="bg-secondary rounded-lg px-4 py-3 text-sm text-foreground leading-relaxed whitespace-pre-line">
+                    {detail?.detail ?? req.detail}
+                  </div>
                 </div>
             )}
+
+            {!detailLoading && !detailError && detail?.files?.length ? (
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    첨부 파일 ({detail.files.length}건)
+                  </div>
+                  <div className="space-y-1.5">
+                    {detail.files.map((f) => (
+                        <a
+                            key={f.sourcing_request_file_id}
+                            href={f.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 border border-border rounded px-3 py-2 bg-secondary hover:border-primary transition-colors group/file"
+                        >
+                          <FileText size={13} className="text-primary flex-shrink-0" />
+                          <span className="text-xs text-foreground flex-1 truncate">{f.file_name}</span>
+                          <span className="text-xs text-muted-foreground">
+                        {f.file_type === "WORK_FILE" ? "작업지시서" : "참고이미지"}
+                      </span>
+                          <span className="text-xs text-primary opacity-0 group-hover/file:opacity-100 transition-opacity">다운로드</span>
+                        </a>
+                    ))}
+                  </div>
+                </div>
+            ) : null}
           </div>
 
           <div className="px-6 py-4 border-t border-border flex gap-2 flex-shrink-0">
@@ -378,17 +500,10 @@ function BidDetailModal({ bid, requestName, onClose, onShip }: {
           </div>
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              {bid.type === "READY" ? (
-                  <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">제시 단가</label>
-                    <div className={inputCls}>{Number(bid.unitPrice).toLocaleString()}원</div>
-                  </div>
-              ) : (
-                  <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">제시 총예산</label>
-                    <div className={inputCls}>{(Number(bid.totalBudget) / 10000).toLocaleString()}만원</div>
-                  </div>
-              )}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">제시 총금액</label>
+                <div className={inputCls}>{(Number(bid.totalBudget) / 10000).toLocaleString()}만원</div>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">납품 가능일</label>
                 <div className={inputCls}>{bid.availableDate}</div>
@@ -443,9 +558,9 @@ function RequestRow({ req, myBids, onDecline, onViewBid, onShip, onDetail }: {
   const [expanded, setExpanded] = useState(myBids.length > 0);
   const latestBid = myBids[0];
   const hasSamplePaid = myBids.some((b) => b.status === "샘플결제됨");
-  const bidSummary = (bid: MyBid) => isCustom
-      ? `${(Number(bid.totalBudget) / 10000).toLocaleString()}만원`
-      : `${Number(bid.unitPrice).toLocaleString()}원`;
+  // 견적은 READY/CUSTOM 모두 totalAmount(총액) 기준으로 제출됨 — unitPrice는 사용하지 않음
+  const bidSummary = (bid: MyBid) =>
+      `${(Number(bid.totalBudget) / 10000).toLocaleString()}만원`;
 
   return (
       <div className="bg-white border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors">

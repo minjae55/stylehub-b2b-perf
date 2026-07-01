@@ -28,6 +28,11 @@ public class SourcingSupplier extends BaseEntity {
     @Column(name = "sourcing_supplier_id")
     private Integer sourcingSupplierSId;
 
+    // 낙관적 락 - 동시 수정 충돌 감지용 (ex. buyer 취소 + seller 견적 제출 동시 발생)
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sourcing_request_id", nullable = false)
     private SourcingRequest sourcingRequest;
