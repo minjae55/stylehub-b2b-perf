@@ -1,6 +1,42 @@
 import axios from 'axios';
 
 // 백엔드와 주고받을 정산 데이터 타입 정의
+export interface Summary {
+  totalGMV: number;
+  totalFee: number;
+  pendingAmount: number;
+  refundRequestAmound: number;
+}
+
+export interface MomthlyStat{
+  month: string;
+  total: number;
+  count: number;
+  avgOrder: number;
+}
+
+export interface  SettlementRow {
+  settlementId: number;
+  orderNo?: string;
+  createdAt?: string;
+  buyerName?: string;
+  sellerCompanyName?: string;
+  totalAmount: number;
+  status: string;
+}
+
+export interface UserStats {
+  buyers: { total: number; thisMonth: number; active: number; growth: number};
+  sellers: { total: number; thisMonth: number; verified: number; growth: number};
+}
+
+export interface DashboardDataResponse {
+  summary: Summary;
+  paymentStats: MomthlyStat[];
+  rows: SettlementRow[];
+  userStats: UserStats;
+}
+
 export interface SettlementResponse {
   settlement_id: number;
   seller_id: number;

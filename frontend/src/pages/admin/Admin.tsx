@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { DollarSign, Users, ShoppingBag, TrendingUp, Calendar, ArrowUp, ArrowDown, FileText, ChevronRight, CreditCard, MessageCircleQuestion } from "lucide-react";
 import AdminHeader from "./AdminHeader";
 import { Outlet } from "react-router";
-import axios from "axios"; // 💡 백엔드 API 호출을 위해 추가
+import { settlementApi} from "@/pages/admin/Settlement";
 
 // ==========================================================
 // 💡 [타입 정의] 백엔드 SettlementDashboard DTO 사양과 일치화
@@ -72,8 +72,8 @@ export function Admin() {
   const [paymentStats, setPaymentStats] = useState<MonthlyStat[]>([]);
   const [recentPayments, setRecentPayments] = useState<SettlementRow[]>([]);
   const [userStats, setUserStats] = useState<UserStats>({
-    buyers: { total: 0, thisMonth: 0, active: 0, growth: 12 },
-    sellers: { total: 0, thisMonth: 0, verified: 0, growth: 4 }
+    buyers: { total: 0, thisMonth: 0, active: 0, growth: 0 },
+    sellers: { total: 0, thisMonth: 0, verified: 0, growth: 0 }
   });
 
   // ==========================================================
@@ -82,8 +82,8 @@ export function Admin() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get("/api/settlements");
-      const data = response.data;
+
+      const data = await settlementApi.getSettlements();
 
       if (data) {
         if (data.summary) setSummary(data.summary);
@@ -91,8 +91,8 @@ export function Admin() {
         if (Array.isArray(data.rows)) setRecentPayments(data.rows);
         if (data.userStats) {
           setUserStats({
-            buyers: { ...data.userStats.buyers, growth: 12 }, // UI 가이드 레이아웃 비율 유지
-            sellers: { ...data.userStats.sellers, growth: 4 }
+            buyers: { ...data.userStats.buyers, growth: 0 },
+            sellers: { ...data.userStats.sellers, growth: 0 }
           });
         }
       }
@@ -110,6 +110,10 @@ export function Admin() {
   // 상단 요약 계산 연산 로직 보정
   const totalOrders = paymentStats.reduce((a, s) => a + s.count, 0);
   const avgOrderValue = totalOrders > 0 ? summary.totalGMV / totalOrders : 0;
+  const lastMonthBuyers = userStats.buyers.total - userStats.buyers.thisMonth;
+  const buyerGrowth = lastMonthBuyers > 0
+    ? Math.floor((userStats.buyers.thisMonth / lastMonthBuyers) * 100 * 10) / 10
+    : (userStats.buyers.thisMonth > 0 ? 100 : 0);
 
   const quickLinks = [
     { to: "/admin/sourcing-requests", title: "소싱 요청서 관리", desc: "바이어 소싱 요청 처리", icon: FileText, color: "text-emerald-600", bg: "bg-emerald-50 group-hover:bg-emerald-100" },
@@ -163,7 +167,7 @@ export function Admin() {
             { title: "총 결제액 (GMV)", value: `₩${summary.totalGMV.toLocaleString()}`, trend: "실시간 연동 데이터", up: true, icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
             { title: "총 주문 건수", value: `${totalOrders}건`, trend: "주문 테이블 기준", up: true, icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50" },
             { title: "총 바이어", value: `${userStats.buyers.total}명`, trend: `+${userStats.buyers.thisMonth}명 (이번 달)`, up: true, icon: Users, color: "text-indigo-600", bg: "bg-indigo-50" },
-            { title: "평균 주문액", value: `₩${avgOrderValue ? avgOrderValue : Math.floor(avgOrderValue).toLocaleString()}`, trend: "총액 / 총건수", up: true, icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50" },
+            { title: "평균 주문액", value: `₩${avgOrderValue ? Math.floor(avgOrderValue).toLocaleString('ko-KR') : 0}`, trend: "총액 / 총건수", up: true, icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50" },
           ].map((metric, i) => {
             const Icon = metric.icon;
             return (
@@ -211,7 +215,7 @@ export function Admin() {
                   <tbody className="divide-y divide-slate-100">
                   {recentPayments.map((p, index) => (
                       <tr key={p.settlementId || index} className="hover:bg-slate-50/40 transition-colors group">
-                        <td className="px-5 py-3.5 font-mono text-xs text-slate-500 font-medium">SET-{p.settlementId || "000"}</td>
+                        <td className="px-5 py-3.5 font-mono text-xs text-slate-500 font-medium">{p.settlementId || "000"}</td>
                         <td className="px-3 py-3.5 text-slate-400 text-xs font-mono">{p.createdAt ? p.createdAt.substring(0, 10) : "-"}</td>
                         <td className="px-3 py-3.5">
                           <div className="flex flex-col">
@@ -223,9 +227,9 @@ export function Admin() {
                         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md inline-block ${
                             p.status === "COMPLETED" || p.status === "완료" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
                                 p.status === "PENDING" || p.status === "대기" ? "bg-amber-50 text-amber-700 border border-amber-100" :
-                                    "bg-rose-50 text-rose-700 border border-rose-100"
+                                    "bg-teal-50 text-teal-700 border border-teal-100"
                         }`}>
-                          {p.status}
+                          정산 완료
                         </span>
                         </td>
                       </tr>
@@ -293,7 +297,7 @@ export function Admin() {
                 <div>
                   <div className="text-[11px] font-medium text-slate-400 mb-1">전월비 증감</div>
                   <div className="text-xl font-bold text-emerald-600 font-mono flex items-center justify-center gap-0.5">
-                    <ArrowUp size={14} />{userStats.buyers.growth}%
+                    <ArrowUp size={14} />{buyerGrowth}%
                   </div>
                 </div>
               </div>

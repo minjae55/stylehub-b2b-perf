@@ -8,7 +8,7 @@ import java.util.List;
 @Setter
 public class SettlementDashboard {
     private Summary summary;
-    private List<Settlement> rows;
+    private List<RecentPayment> rows;
     private UserStats userStats;
     private List<MonthlyStat> paymentStats;
 
@@ -54,4 +54,14 @@ public class SettlementDashboard {
             private long growth;
         }
     }
+        @Getter
+        @Setter
+        public static class RecentPayment {
+            private String settlementId;
+            private String createdAt;
+            private String sellerCompanyName;
+            private Long totalAmount;
+            private String status;
+        }
+
 }

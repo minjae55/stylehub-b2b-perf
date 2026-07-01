@@ -17,7 +17,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true) // 💡 대시보드 조회는 기본적으로 읽기 전용으로 설정하는 것이 성능에 좋습니다.
+@Transactional(readOnly = true)
 public class SettlementService {
 
     private final SettlementRepository settlementRepository;
@@ -36,7 +36,7 @@ public class SettlementService {
 
         // 2. 자바 Stream을 사용하여 메모리 상에서 "COMPLETED" 상태인 주문들의 totalAmount를 합산합니다.
         long totalGMV = allOrders.stream()
-                .filter(order -> order != null && OrderStatus.COMPLETED == order.getStatus()) // 💡 getStatus()로 수정 및 Enum 비교
+                .filter(order -> order != null && OrderStatus.COMPLETED == order.getStatus())
                 .mapToLong(Order::getTotalAmount)
                 .sum();
 
@@ -87,28 +87,28 @@ public class SettlementService {
         // 🔍 바이어(BUYER) 통계
         String buyerSql = "SELECT COUNT(*), " +
                 "COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH) THEN 1 END) " +
-                "FROM users WHERE business_role = 'BUYER' AND status != 'DELETED'";
+                "FROM users WHERE business_role IN ('BUYER', 'BOTH') AND status != 'DELETED'";
         Object[] buyerResult = (Object[]) em.createNativeQuery(buyerSql).getSingleResult();
 
         SettlementDashboard.UserStats.BuyerStats buyerStats = new SettlementDashboard.UserStats.BuyerStats();
         buyerStats.setTotal(((Number) buyerResult[0]).longValue());
         buyerStats.setThisMonth(((Number) buyerResult[1]).longValue());
         buyerStats.setActive(((Number) buyerResult[0]).longValue());     // 우선 전체 카운트로 동기화
-        buyerStats.setGrowth(12); // 프론트 UI 유지용 고정값
+
         userStats.setBuyers(buyerStats);
 
         // 🔍 셀러(SELLER) 통계
         String sellerSql = "SELECT COUNT(*), " +
                 "COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH) THEN 1 END), " +
                 "COUNT(CASE WHEN status = 'APPROVED' THEN 1 END) " +
-                "FROM users WHERE business_role = 'SELLER' AND status != 'DELETED'";
+                "FROM users WHERE business_role IN ('SELLER', 'BOTH') AND status != 'DELETED'";
         Object[] sellerResult = (Object[]) em.createNativeQuery(sellerSql).getSingleResult();
 
         SettlementDashboard.UserStats.SellerStats sellerStats = new SettlementDashboard.UserStats.SellerStats();
         sellerStats.setTotal(((Number) sellerResult[0]).longValue());
         sellerStats.setThisMonth(((Number) sellerResult[1]).longValue());
         sellerStats.setVerified(((Number) sellerResult[2]).longValue());  // APPROVED된 실활동 공급사 수
-        sellerStats.setGrowth(4);  // 프론트 UI 유지용 고정값
+
         userStats.setSellers(sellerStats);
 
         dashboard.setUserStats(userStats);
@@ -116,9 +116,21 @@ public class SettlementService {
         // ==========================================================
         // 4. 하단 메인 테이블 데이터 세팅 (기존 유지)
         // ==========================================================
-        List<Settlement> rows = settlementRepository.findAllByOrderByCreatedAtDesc();
+        List<SettlementDashboard.RecentPayment> rows = allOrders.stream()
+                .filter(order -> order != null && OrderStatus.CONFIRMED == order.getStatus())
+                .sorted((o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()))
+                .limit(10)
+                .map(order -> {
+                    SettlementDashboard.RecentPayment row = new SettlementDashboard.RecentPayment();
+                    row.setSettlementId(order.getOrderNo());
+                    row.setCreatedAt(order.getCreatedAt() != null ? order.getCreatedAt().toString() : null);
+                    row.setSellerCompanyName(order.getSellerCompanyName());
+                    row.setTotalAmount(order.getTotalAmount());
+                    row.setStatus(order.getStatus() != null ? order.getStatus().name() : null);
+                    return row;
+                })
+                .toList();
         dashboard.setRows(rows);
-
         return dashboard;
     }
 
