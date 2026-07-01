@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router";
 import api from "../../api/axios";
-import { Search, Heart, ShoppingCart, Grid3x3, List, ChevronDown, X, FolderOpen, Check } from "lucide-react";
+import { Search, Heart, ShoppingCart, Grid3x3, List, ChevronDown, X, FolderOpen, Check, Plus } from "lucide-react";
 
 interface ProductSummary {
   productId: number;
@@ -11,6 +11,8 @@ interface ProductSummary {
   brandName: string;
   categoryId: number;
   categoryName: string;
+  parentCategoryId: number | null;
+  parentCategoryName: string | null;
   unitPrice: number;
   moq: number;
   oemAvailable: boolean;
@@ -19,13 +21,20 @@ interface ProductSummary {
   createdAt: string;
 }
 
-const categoryIdMap: Record<string, string> = {
-  tops: "상의", bottoms: "하의", dresses: "원피스/세트", outerwear: "아우터",
-  innerwear: "이너/언더웨어", sports: "스포츠/애슬레저", accessories: "액세서리", shoes: "신발",
+// 대분류 id 매핑
+const mainCategoryIdMap: Record<string, number> = {
+  tops: 1, bottoms: 2, dresses: 3, outerwear: 4,
+  innerwear: 5, sports: 6, accessories: 7, shoes: 8,
+};
+
+// 대분류 이름 매핑
+const mainCategoryNameMap: Record<number, string> = {
+  1: "상의", 2: "하의", 3: "원피스/세트", 4: "아우터",
+  5: "이너/언더웨어", 6: "스포츠/애슬레저", 7: "액세서리", 8: "신발",
 };
 
 const categories = [
-  { id: "all", name: "전체", subCategories: [] },
+  { id: "all", name: "전체", subCategories: [] as string[] },
   { id: "tops", name: "상의", subCategories: ["티셔츠/탑", "블라우스/셔츠", "니트/스웨터", "후드/맨투맨", "재킷/블레이저"] },
   { id: "bottoms", name: "하의", subCategories: ["팬츠/슬랙스", "스커트", "진/데님", "레깅스", "반바지"] },
   { id: "dresses", name: "원피스/세트", subCategories: ["원피스", "점프수트", "투피스세트"] },
@@ -33,7 +42,7 @@ const categories = [
   { id: "innerwear", name: "이너/언더웨어", subCategories: ["이너웨어", "속옷", "잠옷/홈웨어"] },
   { id: "sports", name: "스포츠/애슬레저", subCategories: ["스포츠탑", "스포츠레깅스", "트레이닝복", "스포츠세트"] },
   { id: "accessories", name: "액세서리", subCategories: ["가방/백", "모자", "스카프/머플러", "벨트", "양말/타이즈"] },
-  { id: "shoes", name: "신발", subCategories: ["스니커즈", "부츠/앵클부츠", "플랫/로퍼", "힐/펌프스"] },
+  { id: "shoes", name: "신발", subCategories: ["스니커즈", "부츠/앵클부츠", "플랫/로퍼", "힐/롬프스"] },
 ];
 
 const allBrands = [
@@ -66,7 +75,7 @@ const searchCategories = [
   { id: "innerwear", name: "이너/언더웨어", iconImg: "/images/inner.png", alias: ["속옷", "잠옷"], subCategories: ["이너웨어", "속옷", "잠옷/홈웨어"] },
   { id: "sports", name: "스포츠/애슬레저", iconImg: "/images/sports.png", alias: ["스포츠", "운동복"], subCategories: ["스포츠탑", "스포츠레깅스", "트레이닝복", "스포츠세트"] },
   { id: "accessories", name: "액세서리", iconImg: "/images/accessory.png", alias: ["악세서리"], subCategories: ["가방/백", "모자", "스카프/머플러", "벨트", "양말/타이즈"] },
-  { id: "shoes", name: "신발", iconImg: "/images/shoes.png", alias: ["구두", "운동화"], subCategories: ["스니커즈", "부츠/앵클부츠", "플랫/로퍼", "힐/펌프스"] },
+  { id: "shoes", name: "신발", iconImg: "/images/shoes.png", alias: ["구두", "운동화"], subCategories: ["스니커즈", "부츠/앵클부츠", "플랫/로퍼", "힐/롬프스"] },
 ];
 
 function getChosung(str: string): string {
@@ -113,6 +122,9 @@ export function AllProducts() {
   const [folderModalProductId, setFolderModalProductId] = useState<number | null>(null);
   const [apiProducts, setApiProducts] = useState<ProductSummary[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const newFolderInputRef = useRef<HTMLInputElement>(null);
 
   const favorites = [...new Set(folders.flatMap(f => f.productIds))];
 
@@ -142,6 +154,12 @@ export function AllProducts() {
       document.removeEventListener("click", clickHandler);
     };
   }, []);
+
+  useEffect(() => {
+    if (creatingFolder) {
+      newFolderInputRef.current?.focus();
+    }
+  }, [creatingFolder]);
 
   const handleCategoryChange = (catId: string) => {
     if (catId === "all") {
@@ -186,12 +204,46 @@ export function AllProducts() {
     setFolderModalProductId(null);
   };
 
+  const addFolder = () => {
+    const trimmed = newFolderName.trim();
+    if (!trimmed) {
+      setCreatingFolder(false);
+      return;
+    }
+    const newFolder: Folder = {
+      id: `folder_${Date.now()}`,
+      name: trimmed,
+      productIds: [],
+    };
+    const next = [...folders, newFolder];
+    setFolders(next);
+    saveFolderData(next);
+    setNewFolderName("");
+    setCreatingFolder(false);
+  };
+
   const filteredProducts = apiProducts
       .filter((p) => {
-        const matchCategory = selectedCategory === "all" || p.categoryName === categoryIdMap[selectedCategory];
+        const mainCatId = mainCategoryIdMap[selectedCategory];
+
+        // 대분류 필터
+        // parentCategoryId가 있으면 중분류 상품 → parentCategoryId로 대분류 비교
+        // parentCategoryId가 없으면 대분류 상품 → categoryId로 비교
+        const matchMainCategory = selectedCategory === "all" || (
+            p.parentCategoryId !== null
+                ? p.parentCategoryId === mainCatId
+                : p.categoryId === mainCatId
+        );
+
+        // 중분류 필터: categoryName이 선택된 중분류와 일치
+        const matchSubCategory = !selectedSubCategory || p.categoryName === selectedSubCategory;
+
         const matchBrand = !selectedBrand || p.brandName === selectedBrand;
-        const matchSearch = !searchQuery || p.productName.toLowerCase().includes(searchQuery.toLowerCase()) || p.brandName.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchCategory && matchBrand && matchSearch;
+        const matchSearch = !searchQuery ||
+            p.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            p.brandName.toLowerCase().includes(searchQuery.toLowerCase());
+
+        return matchMainCategory && matchSubCategory && matchBrand && matchSearch;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -208,6 +260,14 @@ export function AllProducts() {
 
   const brandFiltered = brandChosung === "전체" ? allBrands : allBrands.filter(b => getChosung(b.name) === brandChosung);
   const brandVisible = brandFiltered.slice(0, brandVisibleCount);
+
+  // 상품의 카테고리 표시명 (대분류 or 중분류)
+  const getCategoryDisplayName = (p: ProductSummary) => {
+    if (p.parentCategoryId !== null) {
+      return `${mainCategoryNameMap[p.parentCategoryId] ?? ""} > ${p.categoryName}`;
+    }
+    return p.categoryName;
+  };
 
   const Pagination = () => {
     if (totalPages <= 1) return null;
@@ -257,8 +317,8 @@ export function AllProducts() {
 
         {/* 폴더 선택 모달 */}
         {folderModalProductId !== null && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setFolderModalProductId(null)}>
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => { setFolderModalProductId(null); setCreatingFolder(false); setNewFolderName(""); }}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
                     <Heart size={20} className="text-primary" />
@@ -268,26 +328,100 @@ export function AllProducts() {
                     <p className="text-xs text-muted-foreground">저장할 폴더를 선택하세요</p>
                   </div>
                 </div>
-                <div className="space-y-2 max-h-64 overflow-y-auto mb-5">
+                <div className="grid grid-cols-3 gap-3 max-h-72 overflow-y-auto mb-5">
                   {folders.map(folder => {
                     const isAdded = folder.productIds.includes(folderModalProductId);
+                    const allFavIds = [...new Set(folders.flatMap(f => f.productIds))];
+                    const ids = folder.id === "default" ? allFavIds : folder.productIds;
+                    const needed = ids.length === 0 ? 0 : ids.length === 1 ? 1 : ids.length < 4 ? 2 : 4;
+                    const thumbImgs = ids.slice(0, needed).map(id => apiProducts.find(p => p.productId === id)?.mainImageUrl ?? null);
                     return (
                         <button
                             key={folder.id}
                             onClick={() => !isAdded && addToFolder(folder.id)}
-                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left ${isAdded ? "border-primary bg-primary/5 text-primary cursor-default" : "border-border hover:border-primary hover:bg-primary/5 text-foreground"}`}
+                            className={`flex flex-col rounded-xl border-2 overflow-hidden transition-all text-left ${isAdded ? "border-primary" : "border-border hover:border-primary"} ${isAdded ? "cursor-default" : "cursor-pointer"}`}
                         >
-                          <div className="flex items-center gap-3">
-                            <FolderOpen size={16} className={isAdded ? "text-primary" : "text-muted-foreground"} />
-                            <span className="text-sm font-medium">{folder.name}</span>
-                            <span className="text-xs text-muted-foreground">{folder.productIds.length}개</span>
+                          {/* 썸네일 */}
+                          <div className="w-full aspect-square bg-muted relative overflow-hidden">
+                            {thumbImgs.length === 0 ? (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Heart size={24} className="text-muted-foreground opacity-30" />
+                                </div>
+                            ) : thumbImgs.length === 1 ? (
+                                <img src={thumbImgs[0]!} alt="" className="w-full h-full object-cover" />
+                            ) : thumbImgs.length < 4 ? (
+                                <div className="w-full h-full grid grid-cols-2 gap-0.5">
+                                  {thumbImgs.slice(0, 2).map((img, i) =>
+                                      img ? <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+                                          : <div key={i} className="w-full h-full bg-muted" />
+                                  )}
+                                </div>
+                            ) : (
+                                <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
+                                  {thumbImgs.slice(0, 4).map((img, i) =>
+                                      img ? <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+                                          : <div key={i} className="w-full h-full bg-muted" />
+                                  )}
+                                </div>
+                            )}
+                            {isAdded && (
+                                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                  <Check size={24} className="text-primary" />
+                                </div>
+                            )}
                           </div>
-                          {isAdded && <Check size={15} className="text-primary flex-shrink-0" />}
+                          {/* 폴더명 */}
+                          <div className="px-2 py-1.5">
+                            <p className={`text-xs font-medium truncate ${isAdded ? "text-primary" : "text-foreground"}`}>{folder.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{ids.length}개</p>
+                          </div>
                         </button>
                     );
                   })}
+
+                  {/* 새 폴더 만들기 타일 */}
+                  {creatingFolder ? (
+                      <div className="flex flex-col rounded-xl border-2 border-primary overflow-hidden">
+                        <div className="w-full aspect-square bg-primary/5 flex items-center justify-center">
+                          <FolderOpen size={24} className="text-primary opacity-50" />
+                        </div>
+                        <div className="px-2 py-1.5 flex items-center gap-1">
+                          <input
+                              ref={newFolderInputRef}
+                              type="text"
+                              value={newFolderName}
+                              onChange={(e) => setNewFolderName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); addFolder(); }
+                                if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
+                              }}
+                              placeholder="폴더명"
+                              maxLength={20}
+                              className="w-full min-w-0 text-xs outline-none border-b border-primary/40 focus:border-primary bg-transparent"
+                          />
+                          <button onClick={addFolder} className="text-primary flex-shrink-0" title="추가">
+                            <Check size={14} />
+                          </button>
+                          <button onClick={() => { setCreatingFolder(false); setNewFolderName(""); }} className="text-muted-foreground flex-shrink-0" title="취소">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                  ) : (
+                      <button
+                          onClick={() => setCreatingFolder(true)}
+                          className="flex flex-col rounded-xl border-2 border-dashed border-border hover:border-primary transition-all text-left"
+                      >
+                        <div className="w-full aspect-square bg-muted/30 flex items-center justify-center">
+                          <Plus size={24} className="text-muted-foreground" />
+                        </div>
+                        <div className="px-2 py-1.5">
+                          <p className="text-xs font-medium text-muted-foreground">새 폴더</p>
+                        </div>
+                      </button>
+                  )}
                 </div>
-                <button onClick={() => setFolderModalProductId(null)} className="w-full py-2.5 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors">닫기</button>
+                <button onClick={() => { setFolderModalProductId(null); setCreatingFolder(false); setNewFolderName(""); }} className="w-full py-2.5 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors">닫기</button>
               </div>
             </div>
         )}
@@ -526,7 +660,7 @@ export function AllProducts() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-4 mb-2">
                               <div className="flex-1">
-                                <div className="text-xs text-muted-foreground mb-1">{product.brandName} · {product.categoryName}</div>
+                                <div className="text-xs text-muted-foreground mb-1">{product.brandName} · {getCategoryDisplayName(product)}</div>
                                 <Link to={`/products/${product.productId}`}>
                                   <h3 className="font-semibold text-foreground text-lg mb-1 hover:text-primary transition-colors">{product.productName}</h3>
                                 </Link>
@@ -546,7 +680,7 @@ export function AllProducts() {
                               </div>
                               <div>
                                 <div className="text-xs text-muted-foreground mb-0.5">카테고리</div>
-                                <div className="font-medium text-foreground">{product.categoryName}</div>
+                                <div className="font-medium text-foreground">{getCategoryDisplayName(product)}</div>
                               </div>
                               <div>
                                 <div className="text-xs text-muted-foreground mb-0.5">OEM/ODM</div>

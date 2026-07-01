@@ -7,54 +7,53 @@ import {
   CheckCircle, CloudUpload, Upload, Plus, Trash2, Star
 } from "lucide-react";
 
-const subCategories: Record<string, Record<string, string[]>> = {
-  "상의": {
-    "티셔츠": ["반팔티", "긴팔티", "나시"],
-    "블라우스/셔츠": ["셔츠", "레이스 블라우스"],
-    "니트/스웨터": ["가디건", "풀오버", "조끼"],
-    "후드/맨투맨": ["후드집업", "크루넥"],
-    "재킷/블레이저": ["테일러드", "숏재킷"],
-  },
-  "하의": {
-    "스커트": ["미니", "미디", "롱", "플리츠"],
-    "팬츠": ["슬랙스", "청바지", "와이드팬츠"],
-    "레깅스": ["기본", "패턴"],
-    "반바지": ["숏팬츠", "버뮤다"],
-  },
-  "원피스/세트": {
-    "원피스": ["미니", "미디", "맥시"],
-    "점프수트": ["오버올", "롬퍼"],
-    "투피스/세트": ["상하의 세트", "수트 세트"],
-  },
-  "아우터": {
-    "코트": ["롱코트", "하프코트", "트렌치"],
-    "패딩": ["롱패딩", "숏패딩", "조끼패딩"],
-    "점퍼/바람막이": ["야상", "항공점퍼"],
-    "가죽/인조가죽": ["라이더재킷"],
-  },
-  "이너/언더웨어": {
-    "이너티": ["민소매", "반팔 이너"],
-    "속옷": ["브라", "팬티 세트"],
-    "홈웨어": ["파자마", "잠옷 세트"],
-  },
-  "스포츠/애슬레저": {
-    "스포츠 상의": ["스포츠브라", "래쉬가드"],
-    "스포츠 하의": ["요가팬츠", "트레이닝팬츠"],
-    "스포츠 세트": ["상하의 세트"],
-  },
-  "액세서리": {
-    "가방": ["토트백", "크로스백", "클러치"],
-    "모자": ["볼캡", "버킷햇", "베레모"],
-    "스카프/머플러": ["실크스카프", "울머플러"],
-    "벨트": ["가죽벨트", "체인벨트"],
-    "양말/타이즈": ["기본양말", "패턴타이즈"],
-  },
-  "신발": {
-    "힐/펌프스": ["스틸레토", "블록힐"],
-    "플랫/로퍼": ["발레리나", "옥스퍼드"],
-    "부츠": ["앵클부츠", "롱부츠"],
-    "스니커즈": ["캐주얼", "러닝화"],
-  },
+// 중분류 id 매핑 (DB categories 테이블 기준)
+const subCategoryMap: Record<string, { name: string; id: number }[]> = {
+  "상의":           [{ name: "티셔츠/탑", id: 9 }, { name: "블라우스/셔츠", id: 10 }, { name: "니트/스웨터", id: 11 }, { name: "후드/맨투맨", id: 12 }, { name: "재킷/블레이저", id: 13 }],
+  "하의":           [{ name: "팬츠/슬랙스", id: 14 }, { name: "스커트", id: 15 }, { name: "진/데님", id: 16 }, { name: "레깅스", id: 17 }, { name: "반바지", id: 18 }],
+  "원피스/세트":    [{ name: "원피스", id: 19 }, { name: "점프수트", id: 20 }, { name: "투피스세트", id: 21 }],
+  "아우터":         [{ name: "코트", id: 22 }, { name: "재킷/점퍼", id: 23 }, { name: "가디건", id: 24 }, { name: "패딩", id: 25 }],
+  "이너/언더웨어":  [{ name: "이너웨어", id: 26 }, { name: "속옷", id: 27 }, { name: "잠옷/홈웨어", id: 28 }],
+  "스포츠/애슬레저":[{ name: "스포츠탑", id: 29 }, { name: "스포츠레깅스", id: 30 }, { name: "트레이닝복", id: 31 }, { name: "스포츠세트", id: 32 }],
+  "액세서리":       [{ name: "가방/백", id: 33 }, { name: "모자", id: 34 }, { name: "스카프/머플러", id: 35 }, { name: "벨트", id: 36 }, { name: "양말/타이즈", id: 37 }],
+  "신발":           [{ name: "스니커즈", id: 38 }, { name: "부츠/앵클부츠", id: 39 }, { name: "플랫/로퍼", id: 40 }, { name: "힐/롬프스", id: 41 }],
+};
+
+// 세부유형 (소분류 - 하드코딩)
+const subTypes: Record<string, string[]> = {
+  "티셔츠/탑": ["반팔티", "긴팔티", "나시"],
+  "블라우스/셔츠": ["셔츠", "레이스 블라우스"],
+  "니트/스웨터": ["가디건", "풀오버", "조끼"],
+  "후드/맨투맨": ["후드집업", "크루넥"],
+  "재킷/블레이저": ["테일러드", "숏재킷"],
+  "팬츠/슬랙스": ["슬랙스", "청바지", "와이드팬츠"],
+  "스커트": ["미니", "미디", "롱", "플리츠"],
+  "진/데님": ["스키니", "와이드", "부츠컷"],
+  "레깅스": ["기본", "패턴"],
+  "반바지": ["숏팬츠", "버뮤다"],
+  "원피스": ["미니", "미디", "맥시"],
+  "점프수트": ["오버올", "롬퍼"],
+  "투피스세트": ["상하의 세트", "수트 세트"],
+  "코트": ["롱코트", "하프코트", "트렌치"],
+  "재킷/점퍼": ["야상", "항공점퍼"],
+  "가디건": ["기본", "롱"],
+  "패딩": ["롱패딩", "숏패딩", "조끼패딩"],
+  "이너웨어": ["민소매", "반팔 이너"],
+  "속옷": ["브라", "팬티 세트"],
+  "잠옷/홈웨어": ["파자마", "잠옷 세트"],
+  "스포츠탑": ["스포츠브라", "래쉬가드"],
+  "스포츠레깅스": ["요가팬츠", "트레이닝팬츠"],
+  "트레이닝복": ["트레이닝세트", "조거팬츠"],
+  "스포츠세트": ["상하의 세트"],
+  "가방/백": ["토트백", "크로스백", "클러치"],
+  "모자": ["볼캡", "버킷햇", "베레모"],
+  "스카프/머플러": ["실크스카프", "울머플러"],
+  "벨트": ["가죽벨트", "체인벨트"],
+  "양말/타이즈": ["기본양말", "패턴타이즈"],
+  "스니커즈": ["캐주얼", "러닝화"],
+  "부츠/앵클부츠": ["앵클부츠", "롱부츠"],
+  "플랫/로퍼": ["발레리나", "옥스퍼드"],
+  "힐/롬프스": ["스틸레토", "블록힐"],
 };
 
 const sizeSystems = ["한국 사이즈 (XS–3XL)", "US 사이즈", "EU 사이즈", "프리사이즈", "넘버 사이즈 (23–29)"];
@@ -72,19 +71,12 @@ const certGroups = [
   { label: "소재 / 환경 인증", items: ["OEKO-TEX Standard 100", "GOTS (유기농 섬유)", "Recycled Content (GRS)", "비건 인증", "Fair Trade"] },
 ];
 
-interface OptionValue {
-  optionName: string;
-  optionValue: string;
-  sortOrder: number;
-}
-
 interface ProductOption {
   optionLabel: string;
   sku: string;
   stockQuantity: string;
   additionalPrice: string;
   restockAlertQuantity: string;
-  optionValues: OptionValue[];
 }
 
 interface ProductImage {
@@ -246,22 +238,20 @@ const initialForm = {
 
 const newOption = (): ProductOption => ({
   optionLabel: "", sku: "", stockQuantity: "", additionalPrice: "0", restockAlertQuantity: "",
-  optionValues: [
-    { optionName: "색상", optionValue: "", sortOrder: 1 },
-    { optionName: "패턴", optionValue: "", sortOrder: 2 },
-  ],
 });
 
 export function SellerProductRegister() {
   const [submitted, setSubmitted] = useState(false);
-  const [categories, setCategories] = useState<{ id: number; name: string; group: string }[]>([]);
   const [brands, setBrands] = useState<{ brandId: number; brandName: string }[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null); // 중분류 id 저장
   const [form, setForm] = useState(initialForm);
   const [selectedSubTypes, setSelectedSubTypes] = useState<string[]>([]);
   const [selectedSizeSystem, setSelectedSizeSystem] = useState<string>("");
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [customSizeInput, setCustomSizeInput] = useState("");
+  const [leadTimeOption, setLeadTimeOption] = useState<"range1" | "range2" | "custom" | "">("");
+  const [leadTimeCustomInput, setLeadTimeCustomInput] = useState("");
   const [selectedCerts, setSelectedCerts] = useState<string[]>([]);
   const [certFiles, setCertFiles] = useState<Record<string, CertFile>>({});
   const [certModalTarget, setCertModalTarget] = useState<string | null>(null);
@@ -270,12 +260,15 @@ export function SellerProductRegister() {
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [imageUploading, setImageUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [detailPdfUrl, setDetailPdfUrl] = useState<string | null>(null);
+  const [detailPdfName, setDetailPdfName] = useState<string>("");
+  const [detailPdfUploading, setDetailPdfUploading] = useState(false);
+  const detailPdfInputRef = useRef<HTMLInputElement>(null);
 
-  const dragIdx = useRef<number | null>(null);
-  const dragOverIdx = useRef<number | null>(null);
+  const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
+  const [dragOverIdxState, setDragOverIdxState] = useState<number | null>(null);
 
   useEffect(() => {
-    api.get("/categories/main").then(res => setCategories(res));
     api.get("/company/brands").then(res => setBrands(res));
   }, []);
 
@@ -283,20 +276,40 @@ export function SellerProductRegister() {
   const toggleItem = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, item: string) =>
       setList((p) => (p.includes(item) ? p.filter((x) => x !== item) : [...p, item]));
 
-  const currentSubGroups = form.mainCategory ? (subCategories[form.mainCategory] ?? {}) : {};
-  const currentSubTypes = form.subCategory ? currentSubGroups[form.subCategory] ?? [] : [];
-
+  // 대분류 변경 시
   const handleMainCategoryChange = (val: string) => {
     update("mainCategory", val);
-    const selected = categories.find(c => c.name === val);
-    setSelectedCategoryId(selected?.id ?? null);
     update("subCategory", "");
+    setSelectedCategoryId(null);
     setSelectedSubTypes([]);
   };
 
+  // 중분류 변경 시 → 중분류 id를 selectedCategoryId에 저장
   const handleSubCategoryChange = (val: string) => {
     update("subCategory", val);
     setSelectedSubTypes([]);
+    const found = subCategoryMap[form.mainCategory]?.find(c => c.name === val);
+    setSelectedCategoryId(found?.id ?? null);
+  };
+
+  const currentSubList = form.mainCategory ? (subCategoryMap[form.mainCategory] ?? []) : [];
+  const currentSubTypes = form.subCategory ? (subTypes[form.subCategory] ?? []) : [];
+
+  const addCustomSize = () => {
+    const trimmed = customSizeInput.trim();
+    if (!trimmed) return;
+    if (!selectedSizes.includes(trimmed)) {
+      setSelectedSizes((prev) => [...prev, trimmed]);
+    }
+    setCustomSizeInput("");
+  };
+
+  const addCustomLeadTime = () => {
+    const trimmed = leadTimeCustomInput.trim();
+    if (!trimmed) return;
+    setLeadTimeOption("custom");
+    update("leadTime", trimmed);
+    setLeadTimeCustomInput("");
   };
 
   const updateOption = (idx: number, field: keyof ProductOption, value: string) =>
@@ -355,24 +368,26 @@ export function SellerProductRegister() {
     setProductImages(prev => prev.map((img, i) => ({ ...img, isMain: i === idx })));
   };
 
-  const handleDragStart = (idx: number) => { dragIdx.current = idx; };
-  const handleDragEnter = (idx: number) => { dragOverIdx.current = idx; };
+  const handleDragStart = (idx: number) => setDragSrcIdx(idx);
+  const handleDragEnter = (idx: number) => setDragOverIdxState(idx);
   const handleDragEnd = () => {
-    if (dragIdx.current === null || dragOverIdx.current === null) return;
-    if (dragIdx.current === dragOverIdx.current) return;
+    if (dragSrcIdx === null || dragOverIdxState === null || dragSrcIdx === dragOverIdxState) {
+      setDragSrcIdx(null);
+      setDragOverIdxState(null);
+      return;
+    }
     setProductImages(prev => {
       const updated = [...prev];
-      const [moved] = updated.splice(dragIdx.current!, 1);
-      updated.splice(dragOverIdx.current!, 0, moved);
+      const [moved] = updated.splice(dragSrcIdx, 1);
+      updated.splice(dragOverIdxState, 0, moved);
       return updated;
     });
-    dragIdx.current = null;
-    dragOverIdx.current = null;
+    setDragSrcIdx(null);
+    setDragOverIdxState(null);
   };
 
   const handleCertSave = async (data: { files: File[]; expiryYear: string; expiryMonth: string }) => {
     if (!certModalTarget) return;
-    console.log("인증서 저장 시작:", certModalTarget, data.files);  // 여기
     try {
       const uploadedUrls = await Promise.all(
           data.files.map(async (file) => {
@@ -384,8 +399,6 @@ export function SellerProductRegister() {
             return res as string;
           })
       );
-      console.log("업로드된 URLs:", uploadedUrls);
-
       setCertFiles((prev) => ({
         ...prev,
         [certModalTarget]: {
@@ -402,19 +415,43 @@ export function SellerProductRegister() {
     setCertModalTarget(null);
   };
 
+  const handleDetailPdfUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (file.type !== "application/pdf") { alert("PDF 파일만 업로드 가능합니다."); return; }
+    setDetailPdfUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api.post("/upload/pdf?folder=product_detail", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      setDetailPdfUrl(res as string);
+      setDetailPdfName(file.name);
+    } catch {
+      alert("PDF 업로드 중 오류가 발생했습니다.");
+    }
+    setDetailPdfUploading(false);
+  };
+
   const resetAll = () => {
     setForm(initialForm);
+    setSelectedCategoryId(null);
+    setSelectedBrandId(null);
     setSelectedSubTypes([]);
     setSelectedSizeSystem("");
     setSelectedSizes([]);
+    setCustomSizeInput("");
+    setLeadTimeOption("");
+    setLeadTimeCustomInput("");
     setSelectedCerts([]);
     setCertFiles({});
     setOptions([newOption()]);
     setProductImages([]);
+    setDetailPdfUrl(null);
+    setDetailPdfName("");
   };
 
   const handleRegisterSubmit = async () => {
-    if (!form.productName || !form.mainCategory || !form.subCategory || !form.moq || !form.unitPrice || !form.mainMaterial || !form.description) {
+    if (!form.productName || !form.mainCategory || !form.subCategory || !selectedCategoryId || !form.moq || !form.unitPrice || !form.mainMaterial || !form.description) {
       alert("필수 입력 사항(*)을 모두 기재해 주세요.");
       return;
     }
@@ -423,16 +460,18 @@ export function SellerProductRegister() {
     const orderedImgs = mainImg ? [mainImg, ...otherImgs] : productImages;
 
     const payload = {
-      categoryId: selectedCategoryId,
+      categoryId: selectedCategoryId, // 중분류 id
       brandId: selectedBrandId,
       productName: form.productName,
       productEngName: form.engName,
       season: form.season,
       moq: form.moq ? parseInt(form.moq) : null,
       unitPrice: form.unitPrice ? parseInt(form.unitPrice) : null,
+      leadTimeDays: form.leadTime ? parseInt(form.leadTime) : null,
       mainMaterial: form.mainMaterial,
       description: form.description,
       careInstruction: form.careInstruction,
+      productUrl: detailPdfUrl ?? null,
       oemAvailable: form.oemAvailable,
       sampleAvailable: form.sampleAvailable,
       whiteLabel: form.whiteLabel,
@@ -443,7 +482,6 @@ export function SellerProductRegister() {
         stockQuantity: o.stockQuantity ? parseInt(o.stockQuantity) : 0,
         additionalPrice: o.additionalPrice ? parseInt(o.additionalPrice) : 0,
         restockAlertQuantity: o.restockAlertQuantity ? parseInt(o.restockAlertQuantity) : null,
-        optionValues: o.optionValues.filter(v => v.optionValue),
       })),
       certifications: Object.values(certFiles).map((c) => ({
         certName: c.certName,
@@ -557,8 +595,8 @@ export function SellerProductRegister() {
                             onDragEnter={() => handleDragEnter(idx)}
                             onDragEnd={handleDragEnd}
                             onDragOver={(e) => e.preventDefault()}
-                            className="relative group aspect-square rounded-lg overflow-hidden border-2 transition-colors cursor-grab active:cursor-grabbing"
-                            style={{ borderColor: img.isMain ? "var(--primary)" : "var(--border)" }}
+                            className={`relative group aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-grab active:cursor-grabbing ${dragOverIdxState === idx && dragSrcIdx !== idx ? "scale-105 border-primary" : ""}`}
+                            style={{ borderColor: img.isMain ? "var(--primary)" : "var(--border)", opacity: dragSrcIdx === idx ? 0.4 : 1 }}
                         >
                           <img src={img.previewUrl} alt={`product-${idx}`} className="w-full h-full object-cover" />
                           {img.isMain && (
@@ -599,14 +637,18 @@ export function SellerProductRegister() {
                 <label className="block text-sm font-medium text-foreground mb-1.5">대분류 <span className="text-red-500">*</span></label>
                 <select value={form.mainCategory} onChange={(e) => handleMainCategoryChange(e.target.value)} className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors">
                   <option value="">선택하세요</option>
-                  {categories.map(c => (<option key={c.id} value={c.name}>{c.name}</option>))}
+                  {Object.keys(subCategoryMap).map(name => (
+                      <option key={name} value={name}>{name}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">중분류 <span className="text-red-500">*</span></label>
                 <select value={form.subCategory} onChange={(e) => handleSubCategoryChange(e.target.value)} disabled={!form.mainCategory} className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors disabled:opacity-50">
                   <option value="">{form.mainCategory ? "선택하세요" : "대분류를 먼저 선택하세요"}</option>
-                  {Object.keys(currentSubGroups).map((g) => (<option key={g} value={g}>{g}</option>))}
+                  {currentSubList.map((c) => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -661,18 +703,47 @@ export function SellerProductRegister() {
               <div className="flex flex-wrap gap-2">
                 {sizeSystems.map((item) => (
                     <ToggleChip key={item} label={item} selected={selectedSizeSystem === item}
-                                onToggle={() => { setSelectedSizeSystem(prev => prev === item ? "" : item); setSelectedSizes([]); }} />
+                                onToggle={() => { setSelectedSizeSystem(prev => prev === item ? "" : item); setSelectedSizes([]); setCustomSizeInput(""); }} />
                 ))}
               </div>
             </div>
             {selectedSizeSystem && (
                 <div className="mb-4">
                   <p className="text-xs font-medium text-muted-foreground mb-2">제공 사이즈</p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 items-center">
                     {(sizeOptionsBySystem[selectedSizeSystem] ?? []).map((item) => (
                         <ToggleChip key={item} label={item} selected={selectedSizes.includes(item)}
                                     onToggle={() => toggleItem(selectedSizes, setSelectedSizes, item)} />
                     ))}
+                    {selectedSizes
+                        .filter((s) => !(sizeOptionsBySystem[selectedSizeSystem] ?? []).includes(s))
+                        .map((custom) => (
+                            <span key={custom} className="flex items-center gap-1 py-1.5 px-3 text-xs rounded border border-primary bg-primary text-white">
+                              {custom}
+                              <button type="button" onClick={() => toggleItem(selectedSizes, setSelectedSizes, custom)} className="hover:opacity-70">
+                                <X size={11} />
+                              </button>
+                            </span>
+                        ))}
+                    <div className="flex items-center gap-1.5 ml-1">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">기타</span>
+                      <input
+                          type="text"
+                          value={customSizeInput}
+                          onChange={(e) => setCustomSizeInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addCustomSize();
+                            }
+                          }}
+                          placeholder="직접작성"
+                          className="border border-border rounded px-2 py-1.5 text-xs outline-none focus:border-primary transition-colors w-24"
+                      />
+                      <button type="button" onClick={addCustomSize} className="text-xs text-primary border border-primary rounded px-2 py-1.5 hover:bg-primary hover:text-white transition-colors">
+                        추가
+                      </button>
+                    </div>
                   </div>
                 </div>
             )}
@@ -717,7 +788,6 @@ export function SellerProductRegister() {
                   </div>
               ))}
             </div>
-            {/* 업로드된 인증서 목록 */}
             {Object.keys(certFiles).length > 0 && (
                 <div className="mt-4 pt-4 border-t border-border">
                   <p className="text-xs font-medium text-muted-foreground mb-2">업로드된 인증서</p>
@@ -747,7 +817,7 @@ export function SellerProductRegister() {
                 <Plus size={13} /> 옵션 추가
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">옵션 라벨은 조합명(예: 블랙/M), 색상과 패턴은 각각 입력하세요.</p>
+            <p className="text-xs text-muted-foreground mb-4">옵션 라벨은 조합명(예: 블랙/M)으로 입력하세요.</p>
             <div className="space-y-4">
               {options.map((opt, optIdx) => (
                   <div key={optIdx} className="border border-border rounded-lg p-4">
@@ -759,7 +829,7 @@ export function SellerProductRegister() {
                           </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-foreground mb-1">옵션 라벨 <span className="text-red-500">*</span></label>
                         <input type="text" value={opt.optionLabel} onChange={(e) => updateOption(optIdx, "optionLabel", e.target.value)} placeholder="예: 블랙/M" className="w-full border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors" />
@@ -781,83 +851,6 @@ export function SellerProductRegister() {
                         <input type="number" value={opt.restockAlertQuantity} onChange={(e) => updateOption(optIdx, "restockAlertQuantity", e.target.value)} placeholder="예: 10" className="w-full border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors" />
                       </div>
                     </div>
-                    <div className="border-t border-border pt-3">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">옵션 속성값</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-xs text-muted-foreground">색상</label>
-                            <button type="button" onClick={() => setOptions(prev => prev.map((o, i) => i === optIdx
-                                ? { ...o, optionValues: [...o.optionValues, { optionName: "색상", optionValue: "", sortOrder: o.optionValues.length + 1 }] }
-                                : o
-                            ))} className="text-xs text-primary flex items-center gap-0.5 hover:underline">
-                              <Plus size={10} /> 추가
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            {opt.optionValues.filter(v => v.optionName === "색상").map((v, vi) => {
-                              const realIdx = opt.optionValues.indexOf(v);
-                              return (
-                                  <div key={vi} className="flex gap-1 items-center">
-                                    <input type="text" value={v.optionValue}
-                                           onChange={(e) => setOptions(prev => prev.map((o, i) => i === optIdx
-                                               ? { ...o, optionValues: o.optionValues.map((ov, j) => j === realIdx ? { ...ov, optionValue: e.target.value } : ov) }
-                                               : o
-                                           ))}
-                                           placeholder="예: 블랙"
-                                           className="flex-1 border border-border rounded px-2 py-1 text-xs outline-none focus:border-primary transition-colors"
-                                    />
-                                    {opt.optionValues.filter(v => v.optionName === "색상").length > 1 && (
-                                        <button type="button" onClick={() => setOptions(prev => prev.map((o, i) => i === optIdx
-                                            ? { ...o, optionValues: o.optionValues.filter((_, j) => j !== realIdx) }
-                                            : o
-                                        ))} className="text-muted-foreground hover:text-red-500 transition-colors">
-                                          <X size={11} />
-                                        </button>
-                                    )}
-                                  </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-xs text-muted-foreground">패턴</label>
-                            <button type="button" onClick={() => setOptions(prev => prev.map((o, i) => i === optIdx
-                                ? { ...o, optionValues: [...o.optionValues, { optionName: "패턴", optionValue: "", sortOrder: o.optionValues.length + 1 }] }
-                                : o
-                            ))} className="text-xs text-primary flex items-center gap-0.5 hover:underline">
-                              <Plus size={10} /> 추가
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            {opt.optionValues.filter(v => v.optionName === "패턴").map((v, vi) => {
-                              const realIdx = opt.optionValues.indexOf(v);
-                              return (
-                                  <div key={vi} className="flex gap-1 items-center">
-                                    <input type="text" value={v.optionValue}
-                                           onChange={(e) => setOptions(prev => prev.map((o, i) => i === optIdx
-                                               ? { ...o, optionValues: o.optionValues.map((ov, j) => j === realIdx ? { ...ov, optionValue: e.target.value } : ov) }
-                                               : o
-                                           ))}
-                                           placeholder="예: 솔리드"
-                                           className="flex-1 border border-border rounded px-2 py-1 text-xs outline-none focus:border-primary transition-colors"
-                                    />
-                                    {opt.optionValues.filter(v => v.optionName === "패턴").length > 1 && (
-                                        <button type="button" onClick={() => setOptions(prev => prev.map((o, i) => i === optIdx
-                                            ? { ...o, optionValues: o.optionValues.filter((_, j) => j !== realIdx) }
-                                            : o
-                                        ))} className="text-muted-foreground hover:text-red-500 transition-colors">
-                                          <X size={11} />
-                                        </button>
-                                    )}
-                                  </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
               ))}
             </div>
@@ -875,6 +868,32 @@ export function SellerProductRegister() {
                 <label className="block text-sm font-medium text-foreground mb-1.5">세탁 / 관리 방법</label>
                 <textarea value={form.careInstruction} onChange={(e) => update("careInstruction", e.target.value)} rows={2} placeholder="예: 손세탁 권장, 30°C 이하 세탁, 드라이클리닝 가능" className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary resize-none transition-colors" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">상세 설명 PDF</label>
+                <input ref={detailPdfInputRef} type="file" accept=".pdf" className="hidden" onChange={(e) => handleDetailPdfUpload(e.target.files)} />
+                <div
+                    onClick={() => detailPdfInputRef.current?.click()}
+                    className="border-2 border-dashed border-border hover:border-primary hover:bg-muted/20 rounded-lg px-4 py-5 text-center cursor-pointer transition-colors"
+                >
+                  <CloudUpload size={22} className="mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium text-foreground mb-0.5">PDF 파일을 클릭하여 업로드</p>
+                  <p className="text-xs text-muted-foreground">PDF · 최대 20MB</p>
+                </div>
+                {detailPdfUploading && (
+                    <p className="text-xs text-primary mt-2 animate-pulse">업로드 중...</p>
+                )}
+                {detailPdfUrl && (
+                    <div className="flex items-center justify-between mt-2 px-3 py-2 bg-muted/30 border border-border rounded">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText size={14} className="text-primary flex-shrink-0" />
+                        <span className="text-xs text-foreground truncate">{detailPdfName}</span>
+                      </div>
+                      <button type="button" onClick={() => { setDetailPdfUrl(null); setDetailPdfName(""); }} className="text-muted-foreground hover:text-red-500 transition-colors ml-2 flex-shrink-0">
+                        <X size={13} />
+                      </button>
+                    </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -888,11 +907,60 @@ export function SellerProductRegister() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">단가 <span className="text-red-500">*</span></label>
-                <input type="text" value={form.unitPrice} onChange={(e) => update("unitPrice", e.target.value)} placeholder="예: 10000" className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors" />
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    value={form.unitPrice ? `${Number(form.unitPrice).toLocaleString()} ₩` : ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9]/g, "");
+                      update("unitPrice", raw);
+                    }}
+                    placeholder="예: 10,000"
+                    className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">리드타임 (일)</label>
-                <input type="text" value={form.leadTime} onChange={(e) => update("leadTime", e.target.value)} placeholder="예: 7" className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors" />
+                <label className="block text-sm font-medium text-foreground mb-1.5">리드타임</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <ToggleChip
+                      label="3~5일 이내"
+                      selected={leadTimeOption === "range1"}
+                      onToggle={() => { setLeadTimeOption("range1"); update("leadTime", "5"); }}
+                  />
+                  <ToggleChip
+                      label="15일 이내"
+                      selected={leadTimeOption === "range2"}
+                      onToggle={() => { setLeadTimeOption("range2"); update("leadTime", "15"); }}
+                  />
+                  {leadTimeOption === "custom" && form.leadTime && (
+                      <span className="flex items-center gap-1 py-1.5 px-3 text-xs rounded border border-primary bg-primary text-white">
+                        {form.leadTime}일 이내
+                        <button type="button" onClick={() => { setLeadTimeOption(""); update("leadTime", ""); }} className="hover:opacity-70">
+                          <X size={11} />
+                        </button>
+                      </span>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">기타</span>
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        value={leadTimeCustomInput}
+                        onChange={(e) => setLeadTimeCustomInput(e.target.value.replace(/[^0-9]/g, ""))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addCustomLeadTime();
+                          }
+                        }}
+                        placeholder="직접작성"
+                        className="border border-border rounded px-2 py-1.5 text-xs outline-none focus:border-primary transition-colors w-24"
+                    />
+                    <button type="button" onClick={addCustomLeadTime} className="text-xs text-primary border border-primary rounded px-2 py-1.5 hover:bg-primary hover:text-white transition-colors">
+                      추가
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

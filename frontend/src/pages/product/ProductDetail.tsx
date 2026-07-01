@@ -2,9 +2,9 @@ import api from "../../api/axios";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import {
-  ArrowLeft, Bookmark, ShoppingCart, Truck, Shield, CheckCircle,
+  ArrowLeft, ShoppingCart, Truck, Shield, CheckCircle,
   Award, MapPin, Phone, Mail, Plus, Minus, Leaf, RefreshCw,
-  Heart, Users, ShieldCheck,
+  Heart, Users, ShieldCheck, FileText, FolderOpen, Check, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 type CertKey = "KC" | "OEKO-TEX" | "GOTS" | "GRS" | "비건" | "Fair Trade" | "REACH" | "CPSIA" | "UKCA" | "어린이안전" | "환경마크" | "섬유품질";
@@ -45,6 +45,20 @@ function CertBadge({ certKey }: { certKey: CertKey }) {
         {c.label}
       </div>
   );
+}
+
+type Folder = { id: string; name: string; productIds: number[] };
+
+function loadFolderData(): Folder[] {
+  try {
+    const raw = localStorage.getItem("wishlistFolders");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [{ id: "default", name: "전체 찜", productIds: [] }];
+}
+
+function saveFolderData(folders: Folder[]) {
+  localStorage.setItem("wishlistFolders", JSON.stringify(folders));
 }
 
 interface ProductDetailData {
@@ -99,8 +113,19 @@ export function ProductDetail() {
   const [selectedOptionIdx, setSelectedOptionIdx] = useState(0);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(0);
-  const [isBookmarked, setIsBookmarked] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [folders, setFolders] = useState<Folder[]>(loadFolderData);
+  const [folderModalOpen, setFolderModalOpen] = useState(false);
+  const [allProducts, setAllProducts] = useState<{productId: number; mainImageUrl: string | null}[]>([]);
+  const [pdfExpanded, setPdfExpanded] = useState(false);
+
+  useEffect(() => {
+    api.get("/products").then(res => setAllProducts(res)).catch(() => {});
+  }, []);
+
+  const favorites = [...new Set(folders.flatMap(f => f.productIds))];
+  const productId = product?.productId ?? null;
+  const isFavorite = productId !== null && favorites.includes(productId);
 
   useEffect(() => {
     if (!id) return;
@@ -113,6 +138,29 @@ export function ProductDetail() {
         .catch(() => alert("상품 정보를 불러오지 못했습니다."))
         .finally(() => setLoading(false));
   }, [id]);
+
+  const handleHeartClick = () => {
+    if (!productId) return;
+    if (isFavorite) {
+      const next = folders.map(f => ({ ...f, productIds: f.productIds.filter(pid => pid !== productId) }));
+      setFolders(next);
+      saveFolderData(next);
+    } else {
+      setFolderModalOpen(true);
+    }
+  };
+
+  const addToFolder = (folderId: string) => {
+    if (!productId) return;
+    const next = folders.map(f =>
+        f.id === folderId && !f.productIds.includes(productId)
+            ? { ...f, productIds: [...f.productIds, productId] }
+            : f
+    );
+    setFolders(next);
+    saveFolderData(next);
+    setFolderModalOpen(false);
+  };
 
   if (loading) {
     return (
@@ -130,10 +178,8 @@ export function ProductDetail() {
     );
   }
 
-  // 모든 이미지 수집 (전체 옵션에서)
   const allImages = product.options.flatMap(opt => opt.images).sort((a, b) => a.sortOrder - b.sortOrder);
   const mainImages = allImages.length > 0 ? allImages : [];
-
   const selectedOption = product.options[selectedOptionIdx] ?? null;
   const total = (product.unitPrice + (selectedOption?.additionalPrice ?? 0)) * quantity;
 
@@ -162,6 +208,74 @@ export function ProductDetail() {
 
   return (
       <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
+
+        {/* 폴더 선택 모달 */}
+        {folderModalOpen && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setFolderModalOpen(false)}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Heart size={20} className="text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-foreground">폴더에 저장</h2>
+                    <p className="text-xs text-muted-foreground">저장할 폴더를 선택하세요</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 max-h-72 overflow-y-auto mb-5">
+                  {folders.map(folder => {
+                    const isAdded = productId !== null && folder.productIds.includes(productId);
+                    const allFavIds = [...new Set(folders.flatMap(f => f.productIds))];
+                    const ids = folder.id === "default" ? allFavIds : folder.productIds;
+                    const needed = ids.length === 0 ? 0 : ids.length === 1 ? 1 : ids.length < 4 ? 2 : 4;
+                    const thumbImgs = ids.slice(0, needed).map(id => allProducts.find(p => p.productId === id)?.mainImageUrl ?? null);
+                    return (
+                        <button
+                            key={folder.id}
+                            onClick={() => !isAdded && addToFolder(folder.id)}
+                            className={`flex flex-col rounded-xl border-2 overflow-hidden transition-all text-left ${isAdded ? "border-primary" : "border-border hover:border-primary"} ${isAdded ? "cursor-default" : "cursor-pointer"}`}
+                        >
+                          <div className="w-full aspect-square bg-muted relative overflow-hidden">
+                            {thumbImgs.length === 0 ? (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Heart size={24} className="text-muted-foreground opacity-30" />
+                                </div>
+                            ) : thumbImgs.length === 1 ? (
+                                thumbImgs[0] ? <img src={thumbImgs[0]} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-muted" />
+                            ) : thumbImgs.length < 4 ? (
+                                <div className="w-full h-full grid grid-cols-2 gap-0.5">
+                                  {thumbImgs.slice(0, 2).map((img, i) =>
+                                      img ? <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+                                          : <div key={i} className="w-full h-full bg-muted" />
+                                  )}
+                                </div>
+                            ) : (
+                                <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
+                                  {thumbImgs.slice(0, 4).map((img, i) =>
+                                      img ? <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+                                          : <div key={i} className="w-full h-full bg-muted" />
+                                  )}
+                                </div>
+                            )}
+                            {isAdded && (
+                                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                  <Check size={24} className="text-primary" />
+                                </div>
+                            )}
+                          </div>
+                          <div className="px-2 py-1.5">
+                            <p className={`text-xs font-medium truncate ${isAdded ? "text-primary" : "text-foreground"}`}>{folder.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{ids.length}개</p>
+                          </div>
+                        </button>
+                    );
+                  })}
+                </div>
+                <button onClick={() => setFolderModalOpen(false)} className="w-full py-2.5 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors">닫기</button>
+              </div>
+            </div>
+        )}
+
         <Link to="/products" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-6">
           <ArrowLeft size={16} />
           상품 목록으로 돌아가기
@@ -170,11 +284,36 @@ export function ProductDetail() {
         <div className="grid grid-cols-[500px_1fr] gap-8 mb-8">
           {/* Left: Images */}
           <div>
-            <div className="bg-white border border-border rounded-lg overflow-hidden mb-3">
+            <div className="bg-white border border-border rounded-lg overflow-hidden mb-3 relative group">
               {mainImages.length > 0 ? (
-                  <img src={mainImages[selectedImage]?.imageUrl} alt={product.productName} className="w-full h-[500px] object-cover" />
+                  <img src={mainImages[selectedImage]?.imageUrl} alt={product.productName} className="w-full h-[500px] object-cover transition-opacity duration-300" />
               ) : (
                   <div className="w-full h-[500px] bg-muted flex items-center justify-center text-muted-foreground text-sm">이미지 없음</div>
+              )}
+              {mainImages.length > 1 && (
+                  <>
+                    <button
+                        onClick={() => setSelectedImage(i => (i - 1 + mainImages.length) % mainImages.length)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                    <button
+                        onClick={() => setSelectedImage(i => (i + 1) % mainImages.length)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {mainImages.map((_, i) => (
+                          <button
+                              key={i}
+                              onClick={() => setSelectedImage(i)}
+                              className={`rounded-full transition-all ${i === selectedImage ? "w-5 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}`}
+                          />
+                      ))}
+                    </div>
+                  </>
               )}
             </div>
             {mainImages.length > 1 && (
@@ -218,11 +357,12 @@ export function ProductDetail() {
                   {product.season && <><span>·</span><span>{product.season}</span></>}
                 </div>
               </div>
+              {/* 하트 버튼 */}
               <button
-                  onClick={() => setIsBookmarked(!isBookmarked)}
+                  onClick={handleHeartClick}
                   className="border border-border rounded p-2 hover:border-primary transition-colors"
               >
-                <Bookmark size={20} className={isBookmarked ? "fill-primary text-primary" : "text-muted-foreground"} />
+                <Heart size={20} className={isFavorite ? "fill-red-500 text-red-500" : "text-muted-foreground"} />
               </button>
             </div>
 
@@ -234,7 +374,6 @@ export function ProductDetail() {
               <div className="text-sm text-muted-foreground mb-5">최소 주문 수량: {product.moq.toLocaleString()}벌</div>
 
               <div className="space-y-4">
-                {/* 옵션 선택 */}
                 {product.options.length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">옵션 선택</label>
@@ -260,7 +399,6 @@ export function ProductDetail() {
                     </div>
                 )}
 
-                {/* 수량 */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">주문 수량</label>
                   <div className="flex items-center gap-3">
@@ -305,7 +443,6 @@ export function ProductDetail() {
               </div>
             </div>
 
-            {/* Quick Benefits */}
             <div className="grid grid-cols-3 gap-3">
               {[
                 { icon: <Shield size={18} />, label: "안전결제", desc: "에스크로 보호" },
@@ -329,7 +466,7 @@ export function ProductDetail() {
           </div>
           <div className="p-6 space-y-8">
 
-            {/* 제품 설명 */}
+            {/* 1. 제품 설명 */}
             {product.description && (
                 <div>
                   <h3 className="font-bold text-foreground mb-3">제품 설명</h3>
@@ -337,7 +474,49 @@ export function ProductDetail() {
                 </div>
             )}
 
-            {/* 제품 사양 */}
+            {/* 2. 상세 설명 자료 (PDF) */}
+            {product.productUrl && (
+                <div>
+                  <button
+                      onClick={() => setPdfExpanded(v => !v)}
+                      className="w-full flex items-center justify-between mb-3 group"
+                  >
+                    <h3 className="font-bold text-foreground flex items-center gap-2">
+                      <FileText size={18} className="text-primary" />
+                      상세 설명 자료
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                      {pdfExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </div>
+                  </button>
+                  <div className="rounded-lg overflow-hidden bg-white" style={{ height: pdfExpanded ? "800px" : "256px", transition: "height 0.3s" }}>
+                    <iframe
+                        src={`${product.productUrl}#toolbar=0&navpanes=0`}
+                        className="w-full h-full"
+                        style={{ border: "none" }}
+                        title="상세 설명 PDF"
+                    />
+                  </div>
+                  {!pdfExpanded && (
+                      <button
+                          onClick={() => setPdfExpanded(true)}
+                          className="mt-2 w-full flex items-center justify-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors py-2 border border-dashed border-primary/40 rounded-lg hover:bg-primary/5"
+                      >
+                        <ChevronDown size={16} /> 전체 보기
+                      </button>
+                  )}
+                  {pdfExpanded && (
+                      <button
+                          onClick={() => setPdfExpanded(false)}
+                          className="mt-2 w-full flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors py-2 border border-dashed border-border rounded-lg hover:bg-muted/30"
+                      >
+                        <ChevronUp size={16} /> 접기
+                      </button>
+                  )}
+                </div>
+            )}
+
+            {/* 3. 제품 사양 */}
             <div>
               <h3 className="font-bold text-foreground mb-3">제품 사양</h3>
               <div className="grid grid-cols-2 gap-3">
@@ -357,7 +536,7 @@ export function ProductDetail() {
               </div>
             </div>
 
-            {/* 세탁/관리 방법 */}
+            {/* 4. 세탁/관리 방법 */}
             {product.careInstruction && (
                 <div>
                   <h3 className="font-bold text-foreground mb-3">세탁 / 관리 방법</h3>

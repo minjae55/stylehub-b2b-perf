@@ -1,5 +1,6 @@
 package kr.remerge.stylehub.domain.product.dto;
 
+import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.product.entity.Product;
 import kr.remerge.stylehub.domain.product.entity.ProductImage;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
@@ -141,7 +142,7 @@ public class ProductDto {
     }
 
     // ───────────────────────────────────────────
-    // [RESPONSE] 상품 목록용 요약
+    // [RESPONSE] 상품 목록용 요약 [수정]
     // ───────────────────────────────────────────
     public record SummaryResponse(
             Integer productId,
@@ -150,6 +151,9 @@ public class ProductDto {
             Integer brandId,
             String brandName,
             Integer categoryId,
+            String categoryName,        // [추가]
+            Integer parentCategoryId,   // [추가] null이면 자기자신이 대분류
+            String parentCategoryName,  // [추가]
             Long unitPrice,
             Integer moq,
             Boolean oemAvailable,
@@ -165,13 +169,19 @@ public class ProductDto {
                     .map(ProductImage::getImageUrl)
                     .orElse(null);
 
+            Category cat = p.getCategory();
+            Category parent = cat.getParent();
+
             return new SummaryResponse(
                     p.getProductId(),
                     p.getProductName(),
                     p.getProductEngName(),
                     p.getBrand().getBrandId(),
                     p.getBrand().getBrandName(),
-                    p.getCategory().getCategoryId(),
+                    cat.getCategoryId(),
+                    cat.getCategoryName(),                                    // [추가]
+                    parent != null ? parent.getCategoryId() : null,           // [추가]
+                    parent != null ? parent.getCategoryName() : null,         // [추가]
                     p.getUnitPrice(),
                     p.getMoq(),
                     p.getOemAvailable(),
