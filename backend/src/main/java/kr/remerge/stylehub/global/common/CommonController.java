@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.global.common; // 프로젝트 패키지 구조에 맞게 수정
+package kr.remerge.stylehub.global.common;
 
 import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/api/upload") // 💡 프론트엔드의 /api/common 주소와 매핑
+@RequestMapping("/api/upload")
 @RequiredArgsConstructor
 public class CommonController {
 
@@ -36,12 +36,14 @@ public class CommonController {
     }
 
     @PostMapping("/pdf")
-    public ResponseEntity<?> uploadPdf(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadPdf(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "folder", defaultValue = "certifications") String folder // folder 파라미터 추가 (기본값: certifications)
+    ) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(ApiResponse.success("파일이 비어있습니다."));
         }
-        String url = imageUploadService.uploadPdf(file, "certifications");
+        String url = imageUploadService.uploadPdf(file, folder);
         return ResponseEntity.ok(ApiResponse.success(url));
     }
-
 }

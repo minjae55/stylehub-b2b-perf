@@ -28,7 +28,6 @@ interface WishFolder {
   productIds: number[];
 }
 
-// ─── 폴더 미리보기 이미지 그리드 ───────────────────────────────────────────
 function FolderPreview({ images }: { images: (string | null)[] }) {
   const count = images.length;
 
@@ -41,45 +40,30 @@ function FolderPreview({ images }: { images: (string | null)[] }) {
   }
 
   if (count === 1) {
-    return (
-        <img
-            src={images[0]!}
-            alt=""
-            className="w-full h-full object-cover"
-        />
-    );
+    return <img src={images[0]!} alt="" className="w-full h-full object-cover" />;
   }
 
   if (count < 4) {
-    // 2개: 좌우 분할
     return (
         <div className="w-full h-full grid grid-cols-2 gap-0.5">
           {images.slice(0, 2).map((img, i) =>
-              img ? (
-                  <img key={i} src={img} alt="" className="w-full h-full object-cover" />
-              ) : (
-                  <div key={i} className="w-full h-full bg-muted" />
-              )
+              img ? <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+                  : <div key={i} className="w-full h-full bg-muted" />
           )}
         </div>
     );
   }
 
-  // 4개: 2×2
   return (
       <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
         {images.slice(0, 4).map((img, i) =>
-            img ? (
-                <img key={i} src={img} alt="" className="w-full h-full object-cover" />
-            ) : (
-                <div key={i} className="w-full h-full bg-muted" />
-            )
+            img ? <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+                : <div key={i} className="w-full h-full bg-muted" />
         )}
       </div>
   );
 }
 
-// ─── 상수 ──────────────────────────────────────────────────────────────────
 const DEFAULT_FOLDER_ID = "default";
 
 const categories = [
@@ -100,9 +84,9 @@ const categoryIdMap: Record<string, string> = {
 };
 
 const searchDummyCategories = [
-  { id: "tops", name: "상의", iconImg: "/images/top.png", alias: [], subCategories: ["티셔츠/탑", "블라우스/셔츠", "니트/스웨터", "후드/맨투맨", "재킷/블레이저"] },
+  { id: "tops", name: "상의", iconImg: "/images/top.png", alias: [] as string[], subCategories: ["티셔츠/탑", "블라우스/셔츠", "니트/스웨터", "후드/맨투맨", "재킷/블레이저"] },
   { id: "bottoms", name: "하의", iconImg: "/images/bottom.png", alias: ["치마", "바지"], subCategories: ["팬츠/슬랙스", "스커트", "진/데님", "레깅스", "반바지"] },
-  { id: "dresses", name: "원피스/세트", iconImg: "/images/one_piece.png", alias: [], subCategories: ["원피스", "점프수트", "투피스세트"] },
+  { id: "dresses", name: "원피스/세트", iconImg: "/images/one_piece.png", alias: [] as string[], subCategories: ["원피스", "점프수트", "투피스세트"] },
   { id: "outerwear", name: "아우터", iconImg: "/images/outer.png", alias: ["겉옷", "잠바", "코트", "재킷", "가디건"], subCategories: ["코트", "재킷/점퍼", "가디건", "패딩"] },
   { id: "innerwear", name: "이너/언더웨어", iconImg: "/images/inner.png", alias: ["속옷", "잠옷"], subCategories: ["이너웨어", "속옷", "잠옷/홈웨어"] },
   { id: "sports", name: "스포츠/애슬레저", iconImg: "/images/sports.png", alias: ["스포츠", "운동복"], subCategories: ["스포츠탑", "스포츠레깅스", "트레이닝복", "스포츠세트"] },
@@ -137,15 +121,11 @@ function getChosung(str: string): string {
   return ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"][Math.floor(code / (21 * 28))];
 }
 
-
-
-// ─── localStorage 헬퍼 ──────────────────────────────────────────────────────
 function loadFolders(): WishFolder[] {
   try {
     const raw = localStorage.getItem("wishlistFolders");
     if (raw) return JSON.parse(raw);
   } catch {}
-  // 기존 wishlist 마이그레이션
   try {
     const old = localStorage.getItem("wishlist");
     if (old) {
@@ -167,23 +147,15 @@ function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-// ─── 메인 컴포넌트 ───────────────────────────────────────────────────────────
 export function Wishlist() {
   const [folders, setFolders] = useState<WishFolder[]>(loadFolders);
   const [allProducts, setAllProducts] = useState<ProductSummary[]>([]);
-
-  // 뷰: "folder" | "products"
   const [viewType, setViewType] = useState<"folder" | "grid" | "list">("folder");
-  // 현재 열려있는 폴더 id (null이면 폴더 목록)
   const [openFolderId, setOpenFolderId] = useState<string | null>(null);
-
-  // 폴더 이름 편집
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  // 새 폴더 생성 모드
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
@@ -197,6 +169,8 @@ export function Wishlist() {
   const [resultDropOpen, setResultDropOpen] = useState(false);
   const tabDropRef = useRef<HTMLDivElement>(null);
   const resultDropRef = useRef<HTMLDivElement>(null);
+  const newFolderInputRef = useRef<HTMLInputElement>(null);
+  const editingInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.get("/products").then(res => setAllProducts(res)).catch(() => {});
@@ -218,14 +192,15 @@ export function Wishlist() {
     };
   }, []);
 
-  // 폴더 저장 동기화
   useEffect(() => { saveFolders(folders); }, [folders]);
 
-  // 전체 찜 상품 ID 목록 (모든 폴더 합산 중복제거)
+  // 전체 찜 ID (모든 폴더 합산 중복제거)
   const allFavIds = [...new Set(folders.flatMap(f => f.productIds))];
 
-  // 현재 열린 폴더의 상품 ID
-  const currentFolderIds = openFolderId
+  // 현재 열린 폴더 상품 ID
+  // DEFAULT_FOLDER_ID("전체찜") 또는 null이면 → 전체 합산
+  // 그 외 폴더면 → 해당 폴더만
+  const currentFolderIds = openFolderId && openFolderId !== DEFAULT_FOLDER_ID
       ? (folders.find(f => f.id === openFolderId)?.productIds ?? [])
       : allFavIds;
 
@@ -245,26 +220,19 @@ export function Wishlist() {
     return inFolder && matchCategory && matchBrand && matchSearch;
   });
 
-  // 찜 해제 (모든 폴더에서 제거)
   const removeFromAll = (productId: number) => {
     setFolders(prev => prev.map(f => ({ ...f, productIds: f.productIds.filter(id => id !== productId) })));
   };
 
-  // 폴더에서만 제거
   const removeFromFolder = (folderId: string, productId: number) => {
     setFolders(prev => prev.map(f => f.id === folderId ? { ...f, productIds: f.productIds.filter(id => id !== productId) } : f));
   };
 
   const handleCategoryChange = (catId: string) => {
     setSelectedCategory(catId);
-    if (viewType === "folder") { setViewType("grid"); setOpenFolderId(DEFAULT_FOLDER_ID); }
+    if (viewType === "folder") { setViewType("grid"); setOpenFolderId(null); }
   };
 
-  // 폴더 생성 모달 ref
-  const newFolderInputRef = useRef<HTMLInputElement>(null);
-  const editingInputRef = useRef<HTMLInputElement>(null);
-
-  // 폴더 생성 (ref 방식)
   const createFolder = () => {
     const name = (newFolderInputRef.current?.value ?? "").trim();
     if (!name) return;
@@ -273,7 +241,6 @@ export function Wishlist() {
     setCreatingFolder(false);
   };
 
-  // 폴더 이름 수정 (ref 방식)
   const renameFolder = (id: string) => {
     const name = (editingInputRef.current?.value ?? "").trim();
     if (!name) return;
@@ -281,25 +248,23 @@ export function Wishlist() {
     setEditingFolderId(null);
   };
 
-  // 폴더 삭제 (기본 폴더 불가)
   const deleteFolder = (id: string) => {
     if (id === DEFAULT_FOLDER_ID) return;
     setFolders(prev => prev.filter(f => f.id !== id));
     if (openFolderId === id) setOpenFolderId(null);
   };
 
-  // 폴더 썸네일 이미지 추출
-  const getFolderImages = (folder: WishFolder) => {
-    const count = folder.productIds.length;
+  // 폴더 썸네일 이미지: 전체찜 폴더는 allFavIds 기준
+  const getFolderImages = (folder: WishFolder, products: ProductSummary[], favIds: number[]) => {
+    const ids = folder.id === DEFAULT_FOLDER_ID ? favIds : folder.productIds;
+    const count = ids.length;
     if (count === 0) return [];
     const needed = count === 1 ? 1 : count < 4 ? 2 : 4;
-    return folder.productIds.slice(0, needed).map(id => allProducts.find(p => p.productId === id)?.mainImageUrl ?? null);
+    return ids.slice(0, needed).map(id => products.find(p => p.productId === id)?.mainImageUrl ?? null);
   };
 
-  // 현재 폴더 정보
   const currentFolder = openFolderId ? folders.find(f => f.id === openFolderId) : null;
 
-  // ── 폴더 목록 뷰 ─────────────────────────────────────────────────────────
   const FolderListView = () => (
       <div>
         <div className="flex items-center justify-between mb-5">
@@ -316,23 +281,19 @@ export function Wishlist() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {folders.map((folder) => {
-            const images = getFolderImages(folder);
+            const images = getFolderImages(folder, allProducts, allFavIds);
             const isEditing = editingFolderId === folder.id;
             return (
                 <div key={folder.id} className="group bg-white border border-border rounded-xl overflow-hidden hover:shadow-md hover:border-primary/40 transition-all">
-                  {/* 썸네일 */}
                   <button
                       onClick={() => { if (!isEditing) { setOpenFolderId(folder.id); setViewType("grid"); } }}
                       className="w-full aspect-square overflow-hidden bg-muted block relative"
                   >
                     <FolderPreview images={images} />
-                    {/* 상품 수 뱃지 */}
                     <span className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full backdrop-blur-sm">
-                  {folder.productIds.length}개
-                </span>
+                      {folder.id === DEFAULT_FOLDER_ID ? allFavIds.length : folder.productIds.length}개
+                    </span>
                   </button>
-
-                  {/* 폴더 이름 + 액션 */}
                   <div className="px-3 py-2.5 flex items-center gap-1.5">
                     {isEditing ? (
                         <>
@@ -348,12 +309,12 @@ export function Wishlist() {
                         </>
                     ) : (
                         <>
-                    <span
-                        onClick={() => { setOpenFolderId(folder.id); setViewType("grid"); }}
-                        className="flex-1 text-sm font-medium text-foreground truncate cursor-pointer hover:text-primary transition-colors"
-                    >
-                      {folder.name}
-                    </span>
+                          <span
+                              onClick={() => { setOpenFolderId(folder.id); setViewType("grid"); }}
+                              className="flex-1 text-sm font-medium text-foreground truncate cursor-pointer hover:text-primary transition-colors"
+                          >
+                            {folder.name}
+                          </span>
                           <button
                               onClick={() => { setEditingFolderId(folder.id); setEditingName(folder.name); }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
@@ -378,7 +339,6 @@ export function Wishlist() {
       </div>
   );
 
-  // ── 상품 목록 뷰 (그리드/리스트) ─────────────────────────────────────────
   const ProductListView = () => (
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -409,7 +369,9 @@ export function Wishlist() {
                       <button
                           onClick={(e) => {
                             e.preventDefault();
-                            openFolderId ? removeFromFolder(openFolderId, product.productId) : removeFromAll(product.productId);
+                            openFolderId && openFolderId !== DEFAULT_FOLDER_ID
+                                ? removeFromFolder(openFolderId, product.productId)
+                                : removeFromAll(product.productId);
                           }}
                           className="absolute top-3 right-3 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm"
                       >
@@ -458,7 +420,9 @@ export function Wishlist() {
                             </div>
                           </div>
                           <button
-                              onClick={() => openFolderId ? removeFromFolder(openFolderId, product.productId) : removeFromAll(product.productId)}
+                              onClick={() => openFolderId && openFolderId !== DEFAULT_FOLDER_ID
+                                  ? removeFromFolder(openFolderId, product.productId)
+                                  : removeFromAll(product.productId)}
                               className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"
                           >
                             <Heart size={16} className="fill-red-500 text-red-500" />
@@ -510,6 +474,7 @@ export function Wishlist() {
               </div>
             </div>
         )}
+
         {/* 헤더 */}
         <div className="mb-8 flex items-center gap-3">
           {openFolderId && (
@@ -613,7 +578,6 @@ export function Wishlist() {
             )}
           </div>
 
-          {/* 뷰 전환 버튼 */}
           <div className="flex items-center gap-2">
             <button
                 onClick={() => { setViewType("folder"); setOpenFolderId(null); }}
@@ -623,14 +587,14 @@ export function Wishlist() {
               <FolderOpen size={18} />
             </button>
             <button
-                onClick={() => { setViewType("grid"); if (!openFolderId) setOpenFolderId(DEFAULT_FOLDER_ID); }}
+                onClick={() => { setViewType("grid"); setOpenFolderId(null); }}
                 className={`p-2.5 rounded-lg transition-colors ${viewType === "grid" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
                 title="그리드 보기"
             >
               <Grid3x3 size={18} />
             </button>
             <button
-                onClick={() => { setViewType("list"); if (!openFolderId) setOpenFolderId(DEFAULT_FOLDER_ID); }}
+                onClick={() => { setViewType("list"); setOpenFolderId(null); }}
                 className={`p-2.5 rounded-lg transition-colors ${viewType === "list" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
                 title="리스트 보기"
             >
@@ -639,12 +603,9 @@ export function Wishlist() {
           </div>
         </div>
 
-        {/* 본문 - 항상 사이드바 + 컨텐츠 2컬럼 */}
         <div className="grid grid-cols-[240px_1fr] gap-6">
           {/* Sidebar */}
           <div className="space-y-6">
-
-            {/* ── 카테고리 섹션 ── */}
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">카테고리</p>
               <div className="space-y-1">
@@ -661,7 +622,6 @@ export function Wishlist() {
               </div>
             </div>
 
-            {/* ── 브랜드 섹션 ── */}
             <div className="relative" ref={brandPanelRef}>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">브랜드</p>
               <button
@@ -672,10 +632,8 @@ export function Wishlist() {
                 {selectedBrand ? <X size={14} /> : <ChevronDown size={14} className={`transition-transform ${brandPanelOpen ? "rotate-180" : ""}`} />}
               </button>
 
-              {/* 브랜드 드롭다운 패널 */}
               {brandPanelOpen && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border rounded-lg shadow-xl z-30">
-                    {/* 초성 필터 */}
                     <div className="flex flex-wrap gap-1 p-2.5 border-b border-border">
                       {CHOSUNG.map((c) => (
                           <button key={c} onClick={() => { setBrandChosung(c); setBrandVisibleCount(10); }}
@@ -684,7 +642,6 @@ export function Wishlist() {
                           </button>
                       ))}
                     </div>
-                    {/* 브랜드 목록 */}
                     <div
                         ref={brandScrollRef}
                         onScroll={() => {
@@ -704,7 +661,7 @@ export function Wishlist() {
                         return visible.map((brand) => (
                             <button
                                 key={brand.name}
-                                onClick={() => { setSelectedBrand(brand.name); setBrandPanelOpen(false); if (viewType === "folder") { setViewType("grid"); setOpenFolderId(DEFAULT_FOLDER_ID); } }}
+                                onClick={() => { setSelectedBrand(brand.name); setBrandPanelOpen(false); if (viewType === "folder") { setViewType("grid"); setOpenFolderId(null); } }}
                                 className={`w-full flex items-center gap-2.5 px-3 py-2 border-b border-border last:border-0 transition-colors text-left ${selectedBrand === brand.name ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground"}`}
                             >
                               <div className="w-7 h-7 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -719,10 +676,9 @@ export function Wishlist() {
                   </div>
               )}
             </div>
-
           </div>
 
-          {/* 컨텐츠 영역 */}
+          {/* 컨텐츠 */}
           {viewType === "folder" ? <FolderListView /> : <ProductListView />}
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router";
 import api from "../api/axios";
 import {
@@ -12,6 +12,10 @@ import {
   ShoppingCart,
   Tag,
   Heart,
+  FolderOpen,
+  Check,
+  Plus,
+  X,
 } from "lucide-react";
 
 const categories = [
@@ -62,12 +66,34 @@ interface ProductSummary {
   createdAt: string;
 }
 
+type Folder = { id: string; name: string; productIds: number[] };
+
+function loadFolderData(): Folder[] {
+  try {
+    const raw = localStorage.getItem("wishlistFolders");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [{ id: "default", name: "전체 찜", productIds: [] }];
+}
+
+function saveFolderData(folders: Folder[]) {
+  localStorage.setItem("wishlistFolders", JSON.stringify(folders));
+}
+
 export function Home() {
   const [hoveredProduct, setHoveredProduct] = useState<number | null>(null);
-  const [bookmarks, setBookmarks] = useState<number[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [newProducts, setNewProducts] = useState<ProductSummary[]>([]);
   const [popularProducts, setPopularProducts] = useState<ProductSummary[]>([]);
+
+  const [folders, setFolders] = useState<Folder[]>(loadFolderData);
+  const [folderModalProductId, setFolderModalProductId] = useState<number | null>(null);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const newFolderInputRef = useRef<HTMLInputElement>(null);
+
+  const favorites = [...new Set(folders.flatMap(f => f.productIds))];
+  const allKnownProducts = [...newProducts, ...popularProducts];
 
   const prevSlide = useCallback(() => {
     setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
@@ -86,16 +112,168 @@ export function Home() {
     api.get("/products/popular").then(res => setPopularProducts(res)).catch(() => {});
   }, []);
 
-  const toggleBookmark = (id: number) => {
-    setBookmarks(prev =>
-        prev.includes(id) ? prev.filter(bid => bid !== id) : [...prev, id]
+  useEffect(() => {
+    if (creatingFolder) {
+      newFolderInputRef.current?.focus();
+    }
+  }, [creatingFolder]);
+
+  const handleHeartClick = (productId: number) => {
+    if (favorites.includes(productId)) {
+      const next = folders.map(f => ({ ...f, productIds: f.productIds.filter(id => id !== productId) }));
+      setFolders(next);
+      saveFolderData(next);
+    } else {
+      setFolderModalProductId(productId);
+    }
+  };
+
+  const addToFolder = (folderId: string) => {
+    const productId = folderModalProductId;
+    if (productId === null) return;
+    const next = folders.map(f =>
+        f.id === folderId && !f.productIds.includes(productId)
+            ? { ...f, productIds: [...f.productIds, productId] }
+            : f
     );
+    setFolders(next);
+    saveFolderData(next);
+    setFolderModalProductId(null);
+  };
+
+  const addFolder = () => {
+    const trimmed = newFolderName.trim();
+    if (!trimmed) {
+      setCreatingFolder(false);
+      return;
+    }
+    const newFolder: Folder = {
+      id: `folder_${Date.now()}`,
+      name: trimmed,
+      productIds: [],
+    };
+    const next = [...folders, newFolder];
+    setFolders(next);
+    saveFolderData(next);
+    setNewFolderName("");
+    setCreatingFolder(false);
   };
 
   const formatPrice = (price: number) => `₩${price.toLocaleString()}`;
 
   return (
       <div className="max-w-[1280px] mx-auto px-4 py-5">
+
+        {/* 폴더 선택 모달 */}
+        {folderModalProductId !== null && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => { setFolderModalProductId(null); setCreatingFolder(false); setNewFolderName(""); }}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Heart size={20} className="text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-foreground">폴더에 저장</h2>
+                    <p className="text-xs text-muted-foreground">저장할 폴더를 선택하세요</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 max-h-72 overflow-y-auto mb-5">
+                  {folders.map(folder => {
+                    const isAdded = folder.productIds.includes(folderModalProductId);
+                    const allFavIds = [...new Set(folders.flatMap(f => f.productIds))];
+                    const ids = folder.id === "default" ? allFavIds : folder.productIds;
+                    const needed = ids.length === 0 ? 0 : ids.length === 1 ? 1 : ids.length < 4 ? 2 : 4;
+                    const thumbImgs = ids.slice(0, needed).map(id => allKnownProducts.find(p => p.productId === id)?.mainImageUrl ?? null);
+                    return (
+                        <button
+                            key={folder.id}
+                            onClick={() => !isAdded && addToFolder(folder.id)}
+                            className={`flex flex-col rounded-xl border-2 overflow-hidden transition-all text-left ${isAdded ? "border-primary" : "border-border hover:border-primary"} ${isAdded ? "cursor-default" : "cursor-pointer"}`}
+                        >
+                          {/* 썸네일 */}
+                          <div className="w-full aspect-square bg-muted relative overflow-hidden">
+                            {thumbImgs.length === 0 ? (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Heart size={24} className="text-muted-foreground opacity-30" />
+                                </div>
+                            ) : thumbImgs.length === 1 ? (
+                                <img src={thumbImgs[0]!} alt="" className="w-full h-full object-cover" />
+                            ) : thumbImgs.length < 4 ? (
+                                <div className="w-full h-full grid grid-cols-2 gap-0.5">
+                                  {thumbImgs.slice(0, 2).map((img, i) =>
+                                      img ? <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+                                          : <div key={i} className="w-full h-full bg-muted" />
+                                  )}
+                                </div>
+                            ) : (
+                                <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
+                                  {thumbImgs.slice(0, 4).map((img, i) =>
+                                      img ? <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+                                          : <div key={i} className="w-full h-full bg-muted" />
+                                  )}
+                                </div>
+                            )}
+                            {isAdded && (
+                                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                  <Check size={24} className="text-primary" />
+                                </div>
+                            )}
+                          </div>
+                          {/* 폴더명 */}
+                          <div className="px-2 py-1.5">
+                            <p className={`text-xs font-medium truncate ${isAdded ? "text-primary" : "text-foreground"}`}>{folder.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{ids.length}개</p>
+                          </div>
+                        </button>
+                    );
+                  })}
+
+                  {/* 새 폴더 만들기 타일 */}
+                  {creatingFolder ? (
+                      <div className="flex flex-col rounded-xl border-2 border-primary overflow-hidden">
+                        <div className="w-full aspect-square bg-primary/5 flex items-center justify-center">
+                          <FolderOpen size={24} className="text-primary opacity-50" />
+                        </div>
+                        <div className="px-2 py-1.5 flex items-center gap-1">
+                          <input
+                              ref={newFolderInputRef}
+                              type="text"
+                              value={newFolderName}
+                              onChange={(e) => setNewFolderName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); addFolder(); }
+                                if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
+                              }}
+                              placeholder="폴더명"
+                              maxLength={20}
+                              className="w-full min-w-0 text-xs outline-none border-b border-primary/40 focus:border-primary bg-transparent"
+                          />
+                          <button onClick={addFolder} className="text-primary flex-shrink-0" title="추가">
+                            <Check size={14} />
+                          </button>
+                          <button onClick={() => { setCreatingFolder(false); setNewFolderName(""); }} className="text-muted-foreground flex-shrink-0" title="취소">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                  ) : (
+                      <button
+                          onClick={() => setCreatingFolder(true)}
+                          className="flex flex-col rounded-xl border-2 border-dashed border-border hover:border-primary transition-all text-left"
+                      >
+                        <div className="w-full aspect-square bg-muted/30 flex items-center justify-center">
+                          <Plus size={24} className="text-muted-foreground" />
+                        </div>
+                        <div className="px-2 py-1.5">
+                          <p className="text-xs font-medium text-muted-foreground">새 폴더</p>
+                        </div>
+                      </button>
+                  )}
+                </div>
+                <button onClick={() => { setFolderModalProductId(null); setCreatingFolder(false); setNewFolderName(""); }} className="w-full py-2.5 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors">닫기</button>
+              </div>
+            </div>
+        )}
 
         {/* Hero + Quick Links */}
         <div className="grid grid-cols-[1fr_200px] gap-4 mb-6">
@@ -208,10 +386,10 @@ export function Home() {
                     <div key={product.productId} onMouseEnter={() => setHoveredProduct(product.productId)} onMouseLeave={() => setHoveredProduct(null)}
                          className="bg-white rounded border border-border overflow-hidden hover:shadow-lg hover:border-primary/40 transition-all">
                       <Link to={`/products/${product.productId}`} className="block">
-                        <div className="relative overflow-hidden bg-muted">
+                        <div className="relative overflow-hidden bg-muted aspect-square">
                           {product.mainImageUrl
-                              ? <img src={product.mainImageUrl} alt={product.productName} className={`w-full h-40 object-cover transition-transform duration-300 ${hoveredProduct === product.productId ? "scale-105" : ""}`} />
-                              : <div className="w-full h-40 bg-muted flex items-center justify-center text-muted-foreground text-xs">이미지 없음</div>
+                              ? <img src={product.mainImageUrl} alt={product.productName} className={`w-full h-full object-cover transition-transform duration-300 ${hoveredProduct === product.productId ? "scale-105" : ""}`} />
+                              : <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">이미지 없음</div>
                           }
                           <div className="absolute top-2 right-2 bg-[#6B21A8] text-white text-[10px] px-1.5 py-0.5 rounded font-semibold">NEW</div>
                         </div>
@@ -223,8 +401,8 @@ export function Home() {
                         </div>
                       </Link>
                       <div className="px-3 pb-3 flex items-center justify-between">
-                        <button onClick={() => toggleBookmark(product.productId)} className="text-muted-foreground hover:text-primary transition-colors">
-                          <Heart size={14} className={bookmarks.includes(product.productId) ? "fill-red-500 text-red-500" : ""} />
+                        <button onClick={() => handleHeartClick(product.productId)} className="text-muted-foreground hover:text-primary transition-colors">
+                          <Heart size={14} className={favorites.includes(product.productId) ? "fill-red-500 text-red-500" : ""} />
                         </button>
                         <Link to="/cart" className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors text-xs">
                           <ShoppingCart size={12} /> 담기
