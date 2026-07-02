@@ -2,6 +2,8 @@ package kr.remerge.stylehub.domain.sourcing;
 
 import kr.remerge.stylehub.domain.sourcing.dto.BuyerSourcingResponse;
 import kr.remerge.stylehub.domain.sourcing.service.BuyerSourcingService;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
+import kr.remerge.stylehub.global.auth.security.LoginUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,9 +20,11 @@ public class BuyerSourcingController {
     // 회사 단위 소싱 요청 리스트
     @GetMapping("/requests")
     public ResponseEntity<List<BuyerSourcingResponse>> getBuyerRequests(
-            @RequestParam String type
+            @RequestParam String type,
+            @LoginUser AuthUser user
     ) {
-        return ResponseEntity.ok(buyerSourcingService.getBuyerRequests(type));
+        Integer buyerCompanyId = user.companyId();
+        return ResponseEntity.ok(buyerSourcingService.getBuyerRequests(buyerCompanyId, type));
     }
 
     // buyer 직접 취소 → WITHDRAWN

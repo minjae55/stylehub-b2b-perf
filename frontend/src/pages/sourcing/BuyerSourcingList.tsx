@@ -13,7 +13,7 @@ interface BuyerSourcingResponse {
   status: RequestStatus;
   productName: string;
   brandName: string | null;
-  subCategoryId: number | null;
+  categoryId: number | null;
   categoryName: string | null;
   needSample: "Y" | "N";
   unitPrice: number | null;
@@ -49,7 +49,9 @@ const STATUS_STYLE: Record<RequestStatus, string> = {
 const BASE_URL = "/api/sourcing/buyer";
 
 async function fetchBuyerRequests(type: SourcingType): Promise<BuyerSourcingResponse[]> {
-  const res = await fetch(`${BASE_URL}/requests?type=${type}`);
+  const res = await fetch(`${BASE_URL}/requests?type=${type}`, {
+    credentials: "include", // JWT 쿠키 포함 → 백엔드 @LoginUser가 companyId 추출해서 buyerCompanyId로 필터링
+  });
   if (!res.ok) throw new Error("소싱 요청 목록 조회 실패");
   return res.json();
 }

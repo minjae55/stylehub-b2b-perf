@@ -27,13 +27,12 @@ public class BuyerSourcingService {
     private final SourcingSupplierRepository sourcingSupplierRepository;
     private final CategoryRepository categoryRepository;
 
-    // TODO: 인증 붙으면 buyerCompanyId를 SecurityContext에서 추출
-    private static final Integer DUMMY_BUYER_COMPANY_ID = 3;
+
 
     @Transactional(readOnly = true)
-    public List<BuyerSourcingResponse> getBuyerRequests(String type) {
+    public List<BuyerSourcingResponse> getBuyerRequests(Integer buyerCompanyId, String type) {
         List<SourcingRequest> requests = sourcingRequestRepository
-                .findByBuyerCompanyIdAndTypeOrderByCreatedAtDesc(DUMMY_BUYER_COMPANY_ID, type);
+                .findByBuyerCompanyIdAndTypeOrderByCreatedAtDesc(buyerCompanyId, type);
 
         if (requests.isEmpty()) {
             return List.of();
@@ -52,9 +51,9 @@ public class BuyerSourcingService {
                         t -> t.get("cnt", Long.class).intValue()
                 ));
 
-        // subCategoryId로 카테고리명 일괄 조회 (쿼리 1번)
+        // CategoryId로 카테고리명 일괄 조회 (쿼리 1번)
         List<Integer> categoryIds = requests.stream()
-                .map(SourcingRequest::getSubCategoryId)
+                .map(SourcingRequest::getCategoryId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -70,8 +69,8 @@ public class BuyerSourcingService {
                 .map(request -> BuyerSourcingResponse.from(
                         request,
                         bidCountMap.getOrDefault(request.getSourcingRequestId(), 0),
-                        request.getSubCategoryId() != null
-                                ? categoryNameMap.get(request.getSubCategoryId())
+                        request.getCategoryId() != null
+                                ? categoryNameMap.get(request.getCategoryId())
                                 : null
                 ))
                 .toList();

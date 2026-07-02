@@ -6,10 +6,14 @@ import {
   ChevronRight, X, Truck, BadgeCheck,
   CircleDot, AlertTriangle, Loader2, Ban,
 } from "lucide-react";
+import { SourcingStatusStepper } from "./SourcingStatusStepper";
+
+// 소싱 요청 목록 경로 (QuoteDetail.tsx 등 다른 화면에서도 동일 경로 사용 중 - 하드코딩된 문자열이 여러 곳에 흩어지지 않도록 상수로 관리)
+const SOURCING_LIST_PATH = "/buyer/my-sourcing";
 
 // ── 타입 (백엔드 SourcingRequestDto 기준) ────────────────────────────────────
 // SourcingStatus enum → 한글 매핑
-type RequestStatus = "PENDING" | "QUOTED" | "TRADING" | "NEGOTIATING" | "CANCELLED" | "COMPLETED" | "WITHDRAWN";
+type RequestStatus = "PENDING" | "QUOTED" | "TRADING" | "NEGOTIATING" | "CANCELLED" | "COMPLETED" | "WITHDRAWN" | "EXPIRED";
 // SourcingSupplierStatus enum → 한글 매핑
 type BidStatus = "SUGGESTED" | "RECOMMENDED" | "QUOTED" | "DECLINED" | "EXPIRED";
 
@@ -44,7 +48,7 @@ export interface SourcingRequestDetail {
   status: RequestStatus;
   productName: string;
   brandName?: string;
-  subCategoryId?: number;
+  categoryId?: number;
   needSample: "Y" | "N";
   mainMaterial?: string;
   unitPrice?: number;
@@ -65,9 +69,10 @@ const REQUEST_STATUS_LABEL: Record<RequestStatus, string> = {
   QUOTED:      "견적수신",
   TRADING:     "거래중",
   NEGOTIATING: "협의중",
-  CANCELLED:   "취소됨",
+  CANCELLED:   "반려됨",
   COMPLETED:   "완료",
-  WITHDRAWN:   "취소됨",
+  WITHDRAWN:   "취소함",
+  EXPIRED:     "기한만료",
 };
 
 const REQUEST_STATUS_STYLE: Record<RequestStatus, string> = {
@@ -78,6 +83,7 @@ const REQUEST_STATUS_STYLE: Record<RequestStatus, string> = {
   CANCELLED:   "bg-red-50 text-red-500 border-red-200",
   COMPLETED:   "bg-green-50 text-green-600 border-green-200",
   WITHDRAWN:   "bg-secondary text-muted-foreground border-border",
+  EXPIRED:     "bg-secondary text-muted-foreground border-border",
 };
 
 const BID_STATUS_LABEL: Record<BidStatus, string> = {
@@ -247,8 +253,7 @@ function BidDetailModal({
             {!hasQuote ? (
                 <div className="py-8 text-center text-muted-foreground">
                   <div className="text-3xl mb-3">📋</div>
-                  <div className="font-medium mb-1">아직 견적이 제출되지 않았습니다</div>
-                  <div className="text-sm">공급사가 견적을 제출하면 내용을 확인할 수 있습니다.</div>
+                  <div className="font-medium mb-1">견적 정보를 불러올 수 없습니다</div>
                 </div>
             ) : (
                 <>
@@ -398,7 +403,6 @@ function SupplierCard({
   onSelectBid: (bid: BidDetail) => void;
   onNavigateNegotiation: () => void;
 }) {
-  const hasQuote = bid.quoteId != null;
   const budgetDiff = request.totalBudget && bid.totalAmount != null
       ? request.totalBudget - bid.totalAmount
       : null;
@@ -416,50 +420,40 @@ function SupplierCard({
             </span>
             </div>
             <div className="text-xs text-muted-foreground">
-              {hasQuote ? (
-                  <>
-                    {bid.totalAmount != null && `${(bid.totalAmount / 10000).toLocaleString()}만원`}
-                    {budgetDiff !== null && (
-                        <span className={`ml-1.5 font-semibold ${budgetDiff >= 0 ? "text-green-600" : "text-red-500"}`}>
-                    ({budgetDiff >= 0
-                            ? `▼ ${(budgetDiff / 10000).toLocaleString()}만`
-                            : `▲ ${(Math.abs(budgetDiff) / 10000).toLocaleString()}만`})
-                  </span>
-                    )}
-                  </>
-              ) : (
-                  <span className="text-muted-foreground">견적 대기 중</span>
+              {bid.totalAmount != null && `${(bid.totalAmount / 10000).toLocaleString()}만원`}
+              {budgetDiff !== null && (
+                  <span className={`ml-1.5 font-semibold ${budgetDiff >= 0 ? "text-green-600" : "text-red-500"}`}>
+                ({budgetDiff >= 0
+                      ? `▼ ${(budgetDiff / 10000).toLocaleString()}만`
+                      : `▲ ${(Math.abs(budgetDiff) / 10000).toLocaleString()}만`})
+              </span>
               )}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-            {hasQuote && (
-                <>
-                  {/* TODO: 거절 API 연동 (팀원 도메인) */}
-                  <button
-                      onClick={() => alert("TODO: 거절 API")}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-xs font-semibold transition-colors"
-                  >
-                    <XCircle size={12} /> 거절
-                  </button>
+            {/* TODO: 거절 API 연동 (팀원 도메인) */}
+            <button
+                onClick={() => alert("TODO: 거절 API")}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-xs font-semibold transition-colors"
+            >
+              <XCircle size={12} /> 거절
+            </button>
 
-                  {/* TODO: 승인/샘플요청 API 연동 (팀원 도메인) */}
-                  {request.needSample === "Y" ? (
-                      <button
-                          onClick={() => alert("TODO: 샘플 요청 API")}
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        <FlaskConical size={12} /> 샘플 요청
-                      </button>
-                  ) : (
-                      <button
-                          onClick={() => alert("TODO: 승인 API")}
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-green-200 text-green-600 hover:bg-green-50 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        <CheckCircle size={12} /> 승인
-                      </button>
-                  )}
-                </>
+            {/* TODO: 승인/샘플요청 API 연동 (팀원 도메인) */}
+            {request.needSample === "Y" ? (
+                <button
+                    onClick={() => alert("TODO: 샘플 요청 API")}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-semibold transition-colors"
+                >
+                  <FlaskConical size={12} /> 샘플 요청
+                </button>
+            ) : (
+                <button
+                    onClick={() => alert("TODO: 승인 API")}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-green-200 text-green-600 hover:bg-green-50 rounded-lg text-xs font-semibold transition-colors"
+                >
+                  <CheckCircle size={12} /> 승인
+                </button>
             )}
             <button
                 onClick={onNavigateNegotiation}
@@ -530,10 +524,10 @@ export function BuyerSourcingDetail() {
           <div className="font-bold text-foreground mb-1">소싱 요청을 불러올 수 없습니다</div>
           <div className="text-sm text-muted-foreground mb-6">{error ?? "알 수 없는 오류"}</div>
           <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(SOURCING_LIST_PATH)}
               className="px-4 py-2 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
           >
-            뒤로가기
+            소싱 요청 목록으로
           </button>
         </div>
     );
@@ -544,9 +538,10 @@ export function BuyerSourcingDetail() {
 
   return (
       <div className="max-w-[860px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
-        {/* 뒤로가기 */}
+        {/* 뒤로가기: 브라우저 히스토리(navigate(-1)) 대신 소싱 목록 경로로 명시적 이동
+            (알림 클릭 등 히스토리 없이 직접 진입했을 때도 항상 목록으로 가도록) */}
         <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(SOURCING_LIST_PATH)}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
         >
           <ArrowLeft size={15} /> 소싱 요청 목록
@@ -578,6 +573,11 @@ export function BuyerSourcingDetail() {
                   </button>
               )}
             </div>
+          </div>
+
+          {/* 진행 단계 */}
+          <div className="px-6 py-5 border-b border-border">
+            <SourcingStatusStepper status={request.status} needSample={request.needSample} />
           </div>
 
           {/* 핵심 수치 */}
@@ -694,17 +694,17 @@ export function BuyerSourcingDetail() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-foreground">접수된 견적</h2>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-mono font-bold ${(request.bids ?? []).length > 0 ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}>
-              {(request.bids ?? []).length}개사 · {quotedBids.length}건 제출
+              <span className={`text-xs px-2 py-0.5 rounded-full font-mono font-bold ${quotedBids.length > 0 ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}>
+              {quotedBids.length}건
             </span>
             </div>
           </div>
 
-          {(request.bids ?? []).length === 0 ? (
+          {quotedBids.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground bg-white border border-border rounded-xl">
                 <div className="text-4xl mb-3">📭</div>
                 <div className="font-medium mb-1">아직 접수된 견적이 없습니다</div>
-                <div className="text-sm">공급사들이 견적을 제출하면 이곳에 표시됩니다.</div>
+                <div className="text-sm">공급사가 견적을 제출하면 이곳에 표시됩니다.</div>
                 {request.status === "PENDING" && (
                     <div className="mt-4 inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-3 py-1.5">
                       <AlertTriangle size={11} /> 견적 수신까지 시간이 걸릴 수 있습니다
@@ -713,7 +713,7 @@ export function BuyerSourcingDetail() {
               </div>
           ) : (
               <div className="space-y-3">
-                {request.bids.map((bid) => (
+                {quotedBids.map((bid) => (
                     <SupplierCard
                         key={bid.sourcingSupplierId}
                         bid={bid}

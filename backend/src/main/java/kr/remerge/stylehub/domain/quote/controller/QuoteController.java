@@ -27,14 +27,13 @@ public class QuoteController {
 
     @GetMapping("/init/{sourcingRequestId}")
     public ResponseEntity<ApiResponse<SourcingRequestSellerDetailResponse>> getQuoteInit(
+            @LoginUser AuthUser authUser,
             @PathVariable Integer sourcingRequestId
     ) {
-
         SourcingRequestSellerDetailResponse response = sourcingRequestSellerDetailService
-                .getSellerSourcingDetail(sourcingRequestId);
+                .getSellerSourcingDetail(sourcingRequestId, authUser.companyId());
 
         return ResponseEntity.ok(ApiResponse.success(response));
-
     }
 
     @PostMapping
@@ -72,7 +71,7 @@ public class QuoteController {
                 request.status()
         );
 
-        return ResponseEntity.ok(ApiResponse.success(null));
+         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
 

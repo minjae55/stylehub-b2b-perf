@@ -19,5 +19,7 @@ public enum SourcingStatus {
     // 반려 (모든 공급사 거절 시 자동)
     CANCELLED,
     // 취소 (buyer 직접 취소)
-    WITHDRAWN
+    WITHDRAWN,
+    //기한 만료
+    EXPIRED
 }

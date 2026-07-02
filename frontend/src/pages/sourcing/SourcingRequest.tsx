@@ -1,25 +1,23 @@
-import { useState, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import {
-    CheckCircle, Upload, Package, Plus,
-    Trash2, FileText, ChevronRight, X,
+    Upload, Package, Plus,
+    FileText, ChevronRight, X,
 } from "lucide-react";
+import api from "@/api/axios";
+import { useAuthStore } from "@/store/useAuthStore";
 
-const DUMMY_BUYER = {
-    buyerId: 7,
-};
+// ── 카테고리 (부모 카테고리만 사용 - company_handled_categories 자동배정 기준과 통일) ──
+// 필드명은 백엔드 CategoryResponse record(domain/category/dto/response) 기준
+interface CategoryOption {
+    id: number;
+    name: string;
+    group: string;
+}
 
-const CATEGORY_MAP: Record<string, string[]> = {
-    "상의":           ["티셔츠", "블라우스", "니트", "셔츠", "후드/맨투맨", "기타 상의"],
-    "하의":           ["팬츠", "스커트", "데님", "레깅스", "기타 하의"],
-    "원피스/세트":    ["원피스", "투피스 세트", "점프수트", "기타"],
-    "아우터":         ["코트", "자켓", "가디건", "패딩", "기타 아우터"],
-    "이너/언더웨어":  ["이너웨어", "브라탑", "속옷 세트", "기타"],
-    "스포츠/애슬레저":["요가복", "러닝복", "트레이닝", "기타"],
-    "액세서리":       ["가방", "모자", "스카프", "기타 액세서리"],
-    "OEM/자체제작":   ["OEM", "ODM", "자체 브랜드", "기타"],
-};
-const MAIN_CATS = Object.keys(CATEGORY_MAP);
+async function fetchParentCategories(): Promise<CategoryOption[]> {
+    return api.get<CategoryOption[]>("/categories/parents");
+}
 
 type SourcingType = "READY" | "CUSTOM";
 
@@ -71,9 +69,7 @@ interface SourcingItem {
     needSample: "Y" | "N" | "";
     mainMaterial: string;
     brandName: string;
-    mainCategory: string;
-    subCategory: string;
-    subCategoryId: number | null;
+    categoryId: number | null;
     unitPrice: string;
     refUrl: string;
     readyOptions: ReadyOptionRow[];
@@ -93,9 +89,7 @@ const makeItem = (): SourcingItem => ({
     needSample: "",
     mainMaterial: "",
     brandName: "",
-    mainCategory: "",
-    subCategory: "",
-    subCategoryId: null,
+    categoryId: null,
     unitPrice: "",
     refUrl: "",
     readyOptions: [makeReadyOption()],
@@ -126,19 +120,15 @@ function buildOptionSummary(pairs: ReadyOptionPair[]) {
 }
 
 // ── API 호출 유틸 ─────────────────────────────────────────────────────
-const BASE_URL = "/api/sourcing";
+const BASE_URL = "/sourcing";
 
-async function postSourcingRequest(
-    buyerId: number,
-    item: SourcingItem
-): Promise<number> {
+async function postSourcingRequest(item: SourcingItem): Promise<number> {
     const body = {
-        buyerId,
         items: [{
             type: item.type,
             productName: item.productName,
             brandName: item.brandName || null,
-            subCategoryId: item.subCategoryId,
+            categoryId: item.categoryId,
             needSample: item.needSample,
             mainMaterial: item.mainMaterial || null,
             unitPrice: item.unitPrice ? Number(item.unitPrice) : null,
@@ -164,16 +154,8 @@ async function postSourcingRequest(
         }],
     };
 
-    const res = await fetch(`${BASE_URL}/requests`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
-
-    if (!res.ok) throw new Error(`소싱 요청 실패: ${res.status}`);
-
-    const data = await res.json();
-    return (data.sourcingRequestIds as number[])[0];
+    const data = await api.post<{ sourcingRequestIds: number[] }>(`${BASE_URL}/requests`, body);
+    return data.sourcingRequestIds[0];
 }
 
 async function uploadFiles(
@@ -186,12 +168,11 @@ async function uploadFiles(
     const formData = new FormData();
     files.forEach((f) => formData.append("files", f));
 
-    const res = await fetch(
+    await api.post(
         `${BASE_URL}/requests/${sourcingRequestId}/files?fileType=${fileType}`,
-        { method: "POST", body: formData }
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
     );
-
-    if (!res.ok) throw new Error(`파일 업로드 실패 (id: ${sourcingRequestId}): ${res.status}`);
 }
 
 // ── 유효성 검사 ───────────────────────────────────────────────────────
@@ -202,8 +183,7 @@ const isItemValid = (item: SourcingItem): boolean => {
         );
         return !!(
             item.productName &&
-            item.mainCategory &&
-            item.subCategory &&
+            item.categoryId &&
             item.unitPrice &&
             hasOptions &&
             item.needSample
@@ -212,19 +192,13 @@ const isItemValid = (item: SourcingItem): boolean => {
     if (item.type === "CUSTOM") {
         return !!(
             item.productName &&
-            item.mainCategory &&
-            item.subCategory &&
+            item.categoryId &&
             item.totalBudget &&
             item.workFiles.length > 0 &&
             item.needSample
         );
     }
     return false;
-};
-
-const getTotalQty = (item: SourcingItem): number => {
-    if (item.type === "READY") return sumReadyQty(item.readyOptions);
-    return sumCustomQty(item.customOptions);
 };
 
 // ── 메인 페이지 ───────────────────────────────────────────────────────
@@ -238,6 +212,7 @@ export function SourcingRequest() {
     const navigate = useNavigate();
     const location = useLocation();
     const prefill = (location.state as PrefillState) ?? {};
+    const user = useAuthStore((state) => state.user);
 
     const makeInitialItem = (): SourcingItem => {
         if (prefill.prefillItem) {
@@ -250,17 +225,35 @@ export function SourcingRequest() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const [categories, setCategories] = useState<CategoryOption[]>([]);
+    const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+    useEffect(() => {
+        fetchParentCategories()
+            .then(setCategories)
+            .catch((e) => {
+                console.error(e);
+                setError("카테고리 목록을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+            })
+            .finally(() => setCategoriesLoading(false));
+    }, []);
+
     const updateItem = (id: string, key: keyof SourcingItem, value: unknown) =>
         setItem((prev) => ({ ...prev, [key]: value }));
 
     const canSubmit = isItemValid(item) && !isLoading;
 
     const handleSubmit = async () => {
+        if (!user) {
+            setError("로그인이 필요합니다.");
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
 
         try {
-            const sourcingRequestId = await postSourcingRequest(DUMMY_BUYER.buyerId, item);
+            const sourcingRequestId = await postSourcingRequest(item);
 
             if (item.type === "READY" && item.refImageFile) {
                 await uploadFiles(sourcingRequestId, "REF_IMAGE", [item.refImageFile]);
@@ -279,7 +272,6 @@ export function SourcingRequest() {
 
     const imageRef = useRef<HTMLInputElement>(null);
     const workRef = useRef<HTMLInputElement>(null);
-    const subCats = item.mainCategory ? CATEGORY_MAP[item.mainCategory] : [];
 
     const inputCls = "w-full border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors bg-white";
 
@@ -291,6 +283,21 @@ export function SourcingRequest() {
             </label>
             {children}
         </div>
+    );
+
+    // 카테고리 선택: READY/CUSTOM 공통. 부모 카테고리 단일 선택만 지원 (자동배정 기준과 통일)
+    const categoryField = field("카테고리", true,
+        <select
+            value={item.categoryId ?? ""}
+            onChange={(e) => updateItem(item.id, "categoryId", e.target.value ? Number(e.target.value) : null)}
+            className={inputCls}
+            disabled={categoriesLoading}
+        >
+            <option value="">{categoriesLoading ? "불러오는 중..." : "선택하세요"}</option>
+            {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+        </select>
     );
 
     const handleWorkFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -430,36 +437,7 @@ export function SourcingRequest() {
                                 "(선택)"
                             )}
 
-                            <div className="grid grid-cols-2 gap-4">
-                                {field("대카테고리", true,
-                                    <select
-                                        value={item.mainCategory}
-                                        onChange={(e) => {
-                                            updateItem(item.id, "mainCategory", e.target.value);
-                                            updateItem(item.id, "subCategory", "");
-                                            updateItem(item.id, "subCategoryId", 6);
-                                        }}
-                                        className={inputCls}
-                                    >
-                                        <option value="">선택하세요</option>
-                                        {MAIN_CATS.map((c) => <option key={c}>{c}</option>)}
-                                    </select>
-                                )}
-                                {field("중카테고리", true,
-                                    <select
-                                        value={item.subCategory}
-                                        onChange={(e) => {
-                                            updateItem(item.id, "subCategory", e.target.value);
-                                            updateItem(item.id, "subCategoryId", 6);
-                                        }}
-                                        className={inputCls}
-                                        disabled={!item.mainCategory}
-                                    >
-                                        <option value="">선택하세요</option>
-                                        {(item.mainCategory ? CATEGORY_MAP[item.mainCategory] : []).map((c) => <option key={c}>{c}</option>)}
-                                    </select>
-                                )}
-                            </div>
+                            {categoryField}
 
                             {field("희망 단가", true,
                                 <div className="relative">
@@ -688,36 +666,7 @@ export function SourcingRequest() {
 
                     {item.type === "CUSTOM" && (
                         <>
-                            <div className="grid grid-cols-2 gap-4">
-                                {field("대카테고리", true,
-                                    <select
-                                        value={item.mainCategory}
-                                        onChange={(e) => {
-                                            updateItem(item.id, "mainCategory", e.target.value);
-                                            updateItem(item.id, "subCategory", "");
-                                            updateItem(item.id, "subCategoryId", null);
-                                        }}
-                                        className={inputCls}
-                                    >
-                                        <option value="">선택하세요</option>
-                                        {MAIN_CATS.map((c) => <option key={c}>{c}</option>)}
-                                    </select>
-                                )}
-                                {field("중카테고리", true,
-                                    <select
-                                        value={item.subCategory}
-                                        onChange={(e) => {
-                                            updateItem(item.id, "subCategory", e.target.value);
-                                            updateItem(item.id, "subCategoryId", 6);
-                                        }}
-                                        className={inputCls}
-                                        disabled={!item.mainCategory}
-                                    >
-                                        <option value="">선택하세요</option>
-                                        {subCats.map((c) => <option key={c}>{c}</option>)}
-                                    </select>
-                                )}
-                            </div>
+                            {categoryField}
 
                             {field("전체 예산", true,
                                 <div className="relative">

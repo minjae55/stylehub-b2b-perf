@@ -32,9 +32,23 @@ public class SupplierProfile {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    // 아직 프로필 행이 없는 셀러(첫 설정)를 위한 기본값 생성
+    public static SupplierProfile createDefault(Integer companyId) {
+        SupplierProfile profile = new SupplierProfile();
+        profile.companyId = companyId;
+        profile.sourcingType = SupplierSourcingType.NONE;
+        profile.autoAssignEnabled = false;
+        return profile;
+    }
+
     // 자동 배정 ON/OFF 토글
     public void toggleAutoAssign(boolean enabled) {
         this.autoAssignEnabled = enabled;
+    }
+
+    // 받을 소싱 타입 변경 (NONE / READY / CUSTOM / BOTH)
+    public void changeSourcingType(SupplierSourcingType sourcingType) {
+        this.sourcingType = sourcingType;
     }
 
     // sourcing_type이 요청 타입과 호환되는지 체크

@@ -20,7 +20,7 @@ public class SellerSourcingResponse {
     private String  type;
     private String  productName;
     private String  brandName;
-    private Integer subCategoryId;
+    private Integer categoryId;
     private String  needSample;
     private String  mainMaterial;
     private Long    unitPrice;
@@ -58,7 +58,7 @@ public class SellerSourcingResponse {
                 .type(req.getType())
                 .productName(req.getProductName())
                 .brandName(req.getBrandName())
-                .subCategoryId(req.getSubCategoryId())
+                .categoryId(req.getCategoryId())
                 .needSample(req.getNeedSample())
                 .mainMaterial(req.getMainMaterial())
                 .unitPrice(req.getUnitPrice())

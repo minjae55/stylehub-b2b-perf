@@ -7,13 +7,13 @@ import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingSupplierRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-import static reactor.netty.http.HttpConnectionLiveness.log;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SellerSourcingService {
@@ -21,15 +21,12 @@ public class SellerSourcingService {
     private final SourcingSupplierRepository sourcingSupplierRepository;
     private final SourcingRequestRepository sourcingRequestRepository;
 
-    // TODO: 인증 붙으면 company_id를 SecurityContext에서 추출
-    private static final Integer DUMMY_COMPANY_ID = 11;
-
     // current 탭: RECOMMENDED
     // my 탭: QUOTED
     @Transactional(readOnly = true)
-    public List<SellerSourcingResponse> getSellerRequests(String type, SourcingSupplierStatus status) {
+    public List<SellerSourcingResponse> getSellerRequests(Integer companyId, String type, SourcingSupplierStatus status) {
         return sourcingSupplierRepository
-                .findSellerRequests(DUMMY_COMPANY_ID, status, type)
+                .findSellerRequests(companyId, status, type)
                 .stream()
                 .map(SellerSourcingResponse::from)
                 .toList();
@@ -37,10 +34,10 @@ public class SellerSourcingService {
 
     // past 탭: DECLINED + EXPIRED
     @Transactional(readOnly = true)
-    public List<SellerSourcingResponse> getSellerPastRequests(String type) {
+    public List<SellerSourcingResponse> getSellerPastRequests(Integer companyId, String type) {
         return sourcingSupplierRepository
                 .findSellerPastRequests(
-                        DUMMY_COMPANY_ID,
+                        companyId,
                         List.of(SourcingSupplierStatus.DECLINED, SourcingSupplierStatus.EXPIRED),
                         type
                 )
@@ -51,12 +48,12 @@ public class SellerSourcingService {
 
     // 거절 + 전체 DECLINED 시 자동 반려
     @Transactional
-    public void decline(Integer sourcingSupplierId, String feedback) {
+    public void decline(Integer sourcingSupplierId, Integer companyId, String feedback) {
         SourcingSupplier supplier = sourcingSupplierRepository.findById(sourcingSupplierId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 배정 없음: " + sourcingSupplierId));
 
         // 본인 배정인지 확인
-        if (!supplier.getSellerCompanyId().equals(DUMMY_COMPANY_ID)) {
+        if (!supplier.getSellerCompanyId().equals(companyId)) {
             throw new IllegalArgumentException("권한 없음");
         }
 

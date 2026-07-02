@@ -16,7 +16,7 @@ public class BuyerSourcingResponse {
     private String status;
     private String productName;
     private String brandName;
-    private Integer subCategoryId;
+    private Integer categoryId;
     private String categoryName;   // 소분류 카테고리명 (categories.category_name)
     private String needSample;
     private Long unitPrice;
@@ -34,7 +34,7 @@ public class BuyerSourcingResponse {
                 .status(request.getStatus().name())
                 .productName(request.getProductName())
                 .brandName(request.getBrandName())
-                .subCategoryId(request.getSubCategoryId())
+                .categoryId(request.getCategoryId())
                 .categoryName(categoryName)
                 .needSample(request.getNeedSample())
                 .unitPrice(request.getUnitPrice())

@@ -1,4 +1,4 @@
-package kr.remerge.stylehub.domain.sourcing;
+package kr.remerge.stylehub.domain.sourcing.controller;
 
 import kr.remerge.stylehub.domain.sourcing.dto.SellerDeclineRequest;
 import kr.remerge.stylehub.domain.sourcing.dto.SellerSourcingResponse;
@@ -6,6 +6,9 @@ import kr.remerge.stylehub.domain.sourcing.dto.SourcingRequestSellerDetailRespon
 import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus;
 import kr.remerge.stylehub.domain.sourcing.service.SellerSourcingService;
 import kr.remerge.stylehub.domain.sourcing.service.SourcingRequestSellerDetailService;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
+import kr.remerge.stylehub.global.auth.security.LoginUser;
+import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,8 +16,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/sourcing/seller")
 @RequiredArgsConstructor
+@RequestMapping("/api/sourcing/seller")
 public class SellerSourcingController {
 
     private final SellerSourcingService sellerSourcingService;
@@ -22,37 +25,43 @@ public class SellerSourcingController {
 
     // current: RECOMMENDED / my: QUOTED
     @GetMapping("/requests")
-    public ResponseEntity<List<SellerSourcingResponse>> getSellerRequests(
+    public ResponseEntity<ApiResponse<List<SellerSourcingResponse>>> getSellerRequests(
+            @LoginUser AuthUser authUser,
             @RequestParam String type,
             @RequestParam(defaultValue = "RECOMMENDED") SourcingSupplierStatus status
     ) {
-        return ResponseEntity.ok(sellerSourcingService.getSellerRequests(type, status));
+        return ResponseEntity.ok(ApiResponse.success(
+                sellerSourcingService.getSellerRequests(authUser.companyId(), type, status)));
     }
 
     // past: DECLINED + EXPIRED
     @GetMapping("/requests/past")
-    public ResponseEntity<List<SellerSourcingResponse>> getSellerPastRequests(
+    public ResponseEntity<ApiResponse<List<SellerSourcingResponse>>> getSellerPastRequests(
+            @LoginUser AuthUser authUser,
             @RequestParam String type
     ) {
-        return ResponseEntity.ok(sellerSourcingService.getSellerPastRequests(type));
+        return ResponseEntity.ok(ApiResponse.success(
+                sellerSourcingService.getSellerPastRequests(authUser.companyId(), type)));
     }
 
     // 셀러용 소싱 요청 상세 조회 (다른 회사 견적은 포함하지 않음)
     @GetMapping("/requests/{sourcingRequestId}")
-    public ResponseEntity<SourcingRequestSellerDetailResponse> getSellerSourcingDetail(
+    public ResponseEntity<ApiResponse<SourcingRequestSellerDetailResponse>> getSellerSourcingDetail(
+            @LoginUser AuthUser authUser,
             @PathVariable Integer sourcingRequestId
     ) {
-        return ResponseEntity.ok(
-                sourcingRequestSellerDetailService.getSellerSourcingDetail(sourcingRequestId));
+        return ResponseEntity.ok(ApiResponse.success(
+                sourcingRequestSellerDetailService.getSellerSourcingDetail(sourcingRequestId, authUser.companyId())));
     }
 
     // 거절
     @PatchMapping("/suppliers/{sourcingSupplierId}/decline")
-    public ResponseEntity<Void> decline(
+    public ResponseEntity<ApiResponse<Void>> decline(
+            @LoginUser AuthUser authUser,
             @PathVariable Integer sourcingSupplierId,
             @RequestBody SellerDeclineRequest request
     ) {
-        sellerSourcingService.decline(sourcingSupplierId, request.getFeedback());
-        return ResponseEntity.ok().build();
+        sellerSourcingService.decline(sourcingSupplierId, authUser.companyId(), request.getFeedback());
+        return ResponseEntity.ok(ApiResponse.success());
     }
 }

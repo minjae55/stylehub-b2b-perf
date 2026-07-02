@@ -51,15 +51,17 @@ public class SupplierStatisticsService {
      * 자동 배정 알고리즘
      * 1. auto_assign_enabled = true 인 공급사 조회
      * 2. 요청 타입(READY/CUSTOM)과 호환되는 공급사 필터
-     * 3. 응답률 높은 순으로 정렬
-     * 4. 상위 N개 반환
+     * 3. 요청을 올린 바이어 회사 본인은 후보에서 제외 (같은 카테고리를 취급하는 셀러라도 자기 요청에 자기가 배정되면 안 됨)
+     * 4. 응답률 높은 순으로 정렬
+     * 5. 상위 N개 반환 (베테랑/콜드스타트 슬롯이 한쪽에서 부족하면 다른 쪽으로 백필해서 최대한 topN을 채움)
      */
     private static final int TOP_N = 5;
     private static final int COLD_START_THRESHOLD = 5; // 요청 수 이하면 신규로 봄
-    private static final int COLD_START_SLOT = 1;      // 신규 공급사 배정 슬롯 수
+    private static final int COLD_START_SLOT = 1;      // 신규 공급사 기본 배정 슬롯 수
 
     @Transactional(readOnly = true)
-    public List<Integer> getAutoAssignCandidates(String requestType, Integer subCategoryId, int topN) {
+    public List<Integer> getAutoAssignCandidates(
+            String requestType, Integer categoryId, Integer buyerCompanyId, int topN) {
         List<SupplierSourcingType> compatibleTypes = resolveCompatibleTypes(requestType);
 
         List<SupplierProfile> profiles = profileRepository
@@ -72,16 +74,17 @@ public class SupplierStatisticsService {
 
         List<Integer> companyIds = profiles.stream()
                 .map(SupplierProfile::getCompanyId)
+                .filter(id -> !id.equals(buyerCompanyId)) // 요청한 바이어 본인 회사는 후보에서 제외
                 .collect(Collectors.toList());
 
         List<Integer> categoryMatchIds = companyHandledCategoryRepository
-                .findCompanyIdsByCategoryId(subCategoryId);
+                .findCompanyIdsByCategoryId(categoryId);
         companyIds = companyIds.stream()
                 .filter(categoryMatchIds::contains)
                 .collect(Collectors.toList());
 
         if (companyIds.isEmpty()) {
-            log.warn("[AutoAssign] 카테고리 매칭 공급사 없음 - subCategoryId: {}", subCategoryId);
+            log.warn("[AutoAssign] 카테고리 매칭 공급사 없음 - CategoryId: {}", categoryId);
             return List.of();
         }
 
@@ -89,17 +92,17 @@ public class SupplierStatisticsService {
         List<SupplierStatistics> statsList = statisticsRepository
                 .findAllByCompanyIdInOrderByResponseRateDesc(companyIds);
 
-// statistics에 있는 company_id 목록
+        // statistics에 있는 company_id 목록
         List<Integer> statsCompanyIds = statsList.stream()
                 .map(SupplierStatistics::getCompanyId)
                 .collect(Collectors.toList());
 
-// statistics 없는 company_id → 자동으로 cold start 취급
+        // statistics 없는 company_id → 자동으로 cold start 취급
         List<Integer> noStatsIds = companyIds.stream()
                 .filter(id -> !statsCompanyIds.contains(id))
                 .collect(Collectors.toList());
 
-// cold start / 기존 분리
+        // cold start / 기존 분리
         List<Integer> coldStartIds = new ArrayList<>(noStatsIds); // statistics 없는 것 먼저
         statsList.stream()
                 .filter(s -> s.getTotalRequests() < COLD_START_THRESHOLD)
@@ -111,24 +114,32 @@ public class SupplierStatisticsService {
                 .map(SupplierStatistics::getCompanyId)
                 .collect(Collectors.toList());
 
-        // 기존 공급사 상위 (topN - 1)개
+        Collections.shuffle(coldStartIds);
+
+        // 1. 베테랑 상위 (topN - coldStartSlot)명 우선 채움
+        int veteranSlot = topN - COLD_START_SLOT;
         List<Integer> result = new ArrayList<>(
-                veteranIds.stream().limit(topN - COLD_START_SLOT).collect(Collectors.toList())
+                veteranIds.stream().limit(veteranSlot).collect(Collectors.toList())
         );
 
-        // cold start 랜덤 1개 추가
-        if (!coldStartIds.isEmpty()) {
-            Collections.shuffle(coldStartIds);
-            result.add(coldStartIds.get(0));
-        } else {
-            // cold start 없으면 기존 공급사로 채움
-            veteranIds.stream().skip(topN - COLD_START_SLOT).limit(COLD_START_SLOT)
-                    .forEach(result::add);
+        // 2. 콜드스타트 슬롯 채움 - 베테랑이 부족해서 자리가 남았으면 콜드스타트로 더 채움
+        //    (니치 카테고리처럼 베테랑이 적고 신규 공급사가 여러 명인 경우, 슬롯 하나만 쓰고 나머지를 비워두지 않도록)
+        int remainingAfterVeteran = topN - result.size();
+        result.addAll(coldStartIds.stream().limit(remainingAfterVeteran).collect(Collectors.toList()));
+
+        // 3. 그래도 안 채워졌으면(콜드스타트도 부족) 남은 베테랑으로 마저 채움
+        if (result.size() < topN) {
+            List<Integer> extraVeterans = veteranIds.stream()
+                    .skip(veteranSlot)
+                    .filter(id -> !result.contains(id))
+                    .limit(topN - result.size())
+                    .collect(Collectors.toList());
+            result.addAll(extraVeterans);
         }
 
-        log.info("[AutoAssign] 배정 완료 - veteran: {}, coldStart: {}",
-                result.size() - (coldStartIds.isEmpty() ? 0 : 1),
-                coldStartIds.isEmpty() ? 0 : 1);
+        long coldStartCount = result.stream().filter(coldStartIds::contains).count();
+        log.info("[AutoAssign] 배정 완료 - 총 {}명 (veteran: {}, coldStart: {})",
+                result.size(), result.size() - coldStartCount, coldStartCount);
 
         return result;
     }

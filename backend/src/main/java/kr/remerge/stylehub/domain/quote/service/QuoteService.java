@@ -11,6 +11,7 @@ import kr.remerge.stylehub.domain.quote.repository.QuoteItemRepository;
 import kr.remerge.stylehub.domain.quote.repository.QuoteRepository;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequest;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingSupplier;
+import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingStatus;
 import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingSupplierRepository;
@@ -83,6 +84,11 @@ public class QuoteService {
 
         supplier.quote(quote);
 
+        // 이 공급사의 배정 상태(SourcingSupplier)뿐 아니라 요청 전체 상태(SourcingRequest)도
+        // 첫 견적이 들어온 시점에 PENDING -> QUOTED로 전이해야 바이어 쪽에 "견적수신"으로 표시됨.
+        if (sourcingRequest.getStatus() == SourcingStatus.PENDING) {
+            sourcingRequest.quote();
+        }
         return QuoteCreateResponse.from(quote);
 
     }

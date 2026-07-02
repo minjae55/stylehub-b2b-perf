@@ -2,6 +2,9 @@ package kr.remerge.stylehub.domain.sourcing;
 
 import kr.remerge.stylehub.domain.sourcing.dto.SourcingRequestDto;
 import kr.remerge.stylehub.domain.sourcing.service.SourcingRequestService;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
+import kr.remerge.stylehub.global.auth.security.LoginUser;
+import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,11 +34,12 @@ public class SourcingController {
      * POST /api/sourcing/requests
      */
     @PostMapping("/requests")
-    public ResponseEntity<SourcingRequestDto.CreateResponse> createRequests(
+    public ResponseEntity<ApiResponse<SourcingRequestDto.CreateResponse>> createRequests(
+            @LoginUser AuthUser authUser,
             @RequestBody SourcingRequestDto.CreateRequest dto
     ) {
-        SourcingRequestDto.CreateResponse response = sourcingRequestService.createRequests(dto);
-        return ResponseEntity.ok(response);
+        SourcingRequestDto.CreateResponse response = sourcingRequestService.createRequests(authUser, dto);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**

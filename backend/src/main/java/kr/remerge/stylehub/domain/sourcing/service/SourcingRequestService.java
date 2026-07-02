@@ -11,6 +11,7 @@ import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingSupplierRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.common.ImageUploadService;
 import kr.remerge.stylehub.global.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -66,15 +67,13 @@ public class SourcingRequestService {
 
     // ── 1단계: JSON 데이터 저장 ─────────────────────────────────────
     @Transactional
-    public SourcingRequestDto.CreateResponse createRequests(SourcingRequestDto.CreateRequest dto) {
-        // TODO: 인증 붙으면 dto.getBuyerId() 대신 SecurityContext에서 추출
-        User buyer = userRepository.findById(dto.getBuyerId())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 바이어: " + dto.getBuyerId()));
+    public SourcingRequestDto.CreateResponse createRequests(AuthUser authUser, SourcingRequestDto.CreateRequest dto) {
+        User buyer = userRepository.findById(authUser.userId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 바이어: " + authUser.userId()));
 
         List<Integer> savedIds = new ArrayList<>();
 
         for (SourcingRequestDto.ItemRequest itemDto : dto.getItems()) {
-            // sourcing_no 생성: SR + yyyyMMddHHmmss + UUID 앞 6자리
             String sourcingNo = "SR"
                     + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
                     + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
@@ -87,7 +86,7 @@ public class SourcingRequestService {
                     .status(SourcingStatus.PENDING)
                     .productName(itemDto.getProductName())
                     .brandName(itemDto.getBrandName())
-                    .subCategoryId(itemDto.getSubCategoryId())
+                    .categoryId(itemDto.getCategoryId())
                     .needSample(itemDto.getNeedSample())
                     .mainMaterial(itemDto.getMainMaterial())
                     .unitPrice(itemDto.getUnitPrice())

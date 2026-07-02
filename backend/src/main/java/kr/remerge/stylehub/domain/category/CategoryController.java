@@ -22,4 +22,9 @@ public class CategoryController {
         List<CategoryResponse> responses = categoryService.getMainCategories();
         return ResponseEntity.ok(ApiResponse.success(responses));
     }
+
+    @GetMapping("/parents")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getParentCategories() {
+        return ResponseEntity.ok(ApiResponse.success(categoryService.getParentCategories()));
+    }
 }

@@ -65,8 +65,8 @@ public class SourcingRequest extends BaseEntity {
     @Column(name = "total_budget")
     private Long totalBudget;
 
-    @Column(name = "sub_category_id")
-    private Integer subCategoryId;
+    @Column(name = "category_id")
+    private Integer categoryId;
 
     @Lob
     private String detail;

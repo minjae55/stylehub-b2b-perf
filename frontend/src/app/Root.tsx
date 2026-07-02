@@ -272,8 +272,7 @@ export function Root() {
     const user = useAuthStore((state) => state.user);
     const clearUser = useAuthStore((state) => state.clearUser);
 
-    // TODO: JWT 연동 후 user.id로 교체
-    useNotification(1);
+    useNotification(user?.companyId ?? null);
 
     let dashboardPath = "/";
 

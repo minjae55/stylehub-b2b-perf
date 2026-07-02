@@ -79,4 +79,8 @@ public interface SourcingSupplierRepository extends JpaRepository<SourcingSuppli
     );
 
     Optional<SourcingSupplier> findBySourcingRequest_SourcingRequestIdAndSellerCompanyIdAndStatusIn(Integer sourcingRequestId, Integer companyId, List<SourcingSupplierStatus> suggested);
+
+    // SourcingSupplierRepository.java
+    Optional<SourcingSupplier> findBySourcingRequest_SourcingRequestIdAndSellerCompanyId(
+            Integer sourcingRequestId, Integer sellerCompanyId);
 }

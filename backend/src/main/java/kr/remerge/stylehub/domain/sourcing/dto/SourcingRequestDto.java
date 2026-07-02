@@ -29,7 +29,7 @@ public class SourcingRequestDto {
         private String type;                // "READY" | "CUSTOM"
         private String productName;
         private String brandName;
-        private Integer subCategoryId;
+        private Integer categoryId;
         private String needSample;          // "Y" | "N"
         private String mainMaterial;
 
@@ -74,7 +74,7 @@ public class SourcingRequestDto {
         private final String status;
         private final String productName;
         private final String brandName;
-        private final Integer subCategoryId;
+        private final Integer categoryId;
         private final String needSample;
         private final String mainMaterial;
         private final Long unitPrice;
@@ -101,7 +101,7 @@ public class SourcingRequestDto {
                     req.getStatus().name(),
                     req.getProductName(),
                     req.getBrandName(),
-                    req.getSubCategoryId(),
+                    req.getCategoryId(),
                     req.getNeedSample(),
                     req.getMainMaterial(),
                     req.getUnitPrice(),
@@ -119,7 +119,7 @@ public class SourcingRequestDto {
 
         private DetailResponse(
                 Integer sourcingRequestId, String sourcingNo, String type, String status,
-                String productName, String brandName, Integer subCategoryId,
+                String productName, String brandName, Integer CategoryId,
                 String needSample, String mainMaterial, Long unitPrice, String refUrl,
                 Long totalBudget, String detail, LocalDate deliveryDate, LocalDate expiryDate,
                 LocalDateTime createdAt, List<ItemResponse> items, List<FileResponse> files,
@@ -131,7 +131,7 @@ public class SourcingRequestDto {
             this.status = status;
             this.productName = productName;
             this.brandName = brandName;
-            this.subCategoryId = subCategoryId;
+            this.categoryId = CategoryId;
             this.needSample = needSample;
             this.mainMaterial = mainMaterial;
             this.unitPrice = unitPrice;
