@@ -78,8 +78,9 @@ public enum ErrorCode {
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_001", "주문을 찾을 수 없습니다."),
     INVALID_ORDER_STATUS(HttpStatus.BAD_REQUEST, "ORDER_002", "유효하지 않은 주문 상태입니다."),
     ORDER_CANCEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "ORDER_003", "취소할 수 없는 주문입니다."),
-    ORDER_ITEMS_NOT_READY(HttpStatus.CONFLICT, "ORDER_004", "모든 주문 상품의 출고 준비가 완료되지 않았습니다."
-    ),
+    ORDER_ITEMS_NOT_READY(HttpStatus.CONFLICT, "ORDER_004", "모든 주문 상품의 출고 준비가 완료되지 않았습니다."),
+    INVALID_RECEIVER_INFO(HttpStatus.BAD_REQUEST, "ORDER_005","수령인 이름과 연락처를 확인해 주세요."),
+    SAMPLE_ORDER_ALREADY_EXISTS(HttpStatus.CONFLICT,"ORDER_006","이미 진행 중인 샘플 주문이 있습니다."),
 
     // ───────────────────────────────────────────
     // 견적 (QUOTE)
@@ -87,6 +88,9 @@ public enum ErrorCode {
     QUOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "QUOTE_001", "견적서를 찾을 수 없습니다."),
     QUOTE_EXPIRED(HttpStatus.BAD_REQUEST, "QUOTE_002", "만료된 견적서입니다."),
     INVALID_QUOTE_STATUS(HttpStatus.BAD_REQUEST, "QUOTE_003", "변경할 수 없는 견적 상태입니다."),
+    QUOTE_SAMPLE_NOT_AVAILABLE(HttpStatus.BAD_REQUEST,"QUOTE_004","샘플 제공이 불가능한 견적서입니다."),
+    QUOTE_SAMPLE_ITEM_NOT_FOUND(HttpStatus.BAD_REQUEST,"QUOTE_005","결제할 샘플 품목이 없습니다."),
+
     // ───────────────────────────────────────────
     // 계약 (CONTRACT)
     // ───────────────────────────────────────────
@@ -99,6 +103,14 @@ public enum ErrorCode {
     // ───────────────────────────────────────────
     SAMPLE_OPTION_NOT_CONFIGURED(HttpStatus.BAD_REQUEST, "SOURCING_001", "선택한 옵션은 현재 샘플 주문을 이용할 수 없습니다."),
     SOURCING_NOT_FOUND(HttpStatus.NOT_FOUND, "SOURCING_002", "소싱 요청을 찾을 수 없습니다."),
+
+    // ───────────────────────────────────────────
+    // 결제 (PAYMENT)
+    // ───────────────────────────────────────────
+    PAYMENT_ORDER_MISMATCH(HttpStatus.BAD_REQUEST,"PAYMENT_001","결제 대상 주문 정보가 일치하지 않습니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST,"PAYMENT_002","결제 요청 금액과 실제 주문 금액이 일치하지 않습니다."),
+    PAYMENT_CONFIRM_RESULT_MISMATCH(HttpStatus.INTERNAL_SERVER_ERROR,"PAYMENT_003","결제 승인 결과가 주문 정보와 일치하지 않습니다."),
+    PAYMENT_ORDER_STATE_MISMATCH(HttpStatus.CONFLICT,"PAYMENT_004","함께 결제한 주문들의 상태가 일치하지 않습니다."),
 
     // ───────────────────────────────────────────
     // 카테고리 (CATEGORY)

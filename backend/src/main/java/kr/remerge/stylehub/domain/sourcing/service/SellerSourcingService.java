@@ -22,7 +22,7 @@ public class SellerSourcingService {
     private final SourcingRequestRepository sourcingRequestRepository;
 
     // TODO: 인증 붙으면 company_id를 SecurityContext에서 추출
-    private static final Integer DUMMY_COMPANY_ID = 11;
+    private static final Integer DUMMY_COMPANY_ID = 3;
 
     // current 탭: RECOMMENDED
     // my 탭: QUOTED

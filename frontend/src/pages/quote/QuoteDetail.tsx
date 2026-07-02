@@ -152,7 +152,7 @@ export function QuoteDetail({ role = "buyer" }: { role?: "buyer" | "seller" }) {
       approved:         { icon: <CheckCircle size={36} className="text-green-500" />,    bg: "bg-green-50",   title: "견적을 확정했습니다",       sub: "셀러가 확인 후 계약서를 작성해 전달할 예정입니다.",                                      cta: "/buyer/quotes", ctaLabel: "견적 목록 확인" },
       rejected:         { icon: <XCircle size={36} className="text-red-500" />,          bg: "bg-red-50",     title: "견적을 거절했습니다",       sub: "공급사에게 거절 알림이 전송되었습니다. 다른 견적을 계속 검토하세요.",                   cta: backPath,    ctaLabel: "소싱 목록으로" },
       negotiated:       { icon: <MessageCircle size={36} className="text-purple-500" />, bg: "bg-purple-50",  title: "협의 요청을 보냈습니다",    sub: "공급사가 검토 후 답변드립니다. 협의 내역은 소싱 요청 상세에서 확인할 수 있습니다.", cta: backPath,    ctaLabel: "소싱 목록으로" },
-      sample_requested: { icon: <FlaskConical size={36} className="text-amber-500" />,   bg: "bg-amber-50",   title: "샘플 결제를 진행해 주세요", sub: "샘플 결제 완료 후 진행 상황은 주문 내역에서 확인할 수 있습니다.",                  cta: "/checkout", ctaLabel: "샘플 결제하러 가기" },
+      sample_requested: { icon: <FlaskConical size={36} className="text-amber-500" />,   bg: "bg-amber-50",   title: "샘플 결제를 진행해 주세요", sub: "샘플 결제 완료 후 진행 상황은 주문 내역에서 확인할 수 있습니다.",                  cta: `/checkout?type=sample&quoteId=${quote.quoteId}`, ctaLabel: "샘플 결제하러 가기" },
     }[done];
 
     return (

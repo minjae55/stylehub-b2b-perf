@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { isAxiosError } from "axios";
 import {
   AlertCircle,
   Calendar,
@@ -90,17 +91,12 @@ type QuoteCreateResponse = {
   status: string;
 };
 
-// ─── 파싱 유틸 ──────────────────────────────────────────────────────────────
+type QuoteErrorResponse = {
+  message?: string;
+  data?: Record<string, string>;
+};
 
-function parseOptionSummary(optionSummary: string): QuoteOptionValueRow[] {
-  return optionSummary
-      .split("/")
-      .map((part) => {
-        const [optionName, optionValue] = part.split(":").map((s) => s.trim());
-        return { optionName: optionName ?? "", optionValue: optionValue ?? "" };
-      })
-      .filter((option) => option.optionName || option.optionValue);
-}
+// ─── 파싱 유틸 ──────────────────────────────────────────────────────────────
 
 function buildInitialForm(data: QuoteInitData): QuoteForm {
   return {
@@ -122,7 +118,7 @@ function buildInitialQuoteItems(data: QuoteInitData): QuoteItemRow[] {
   if (data.items.length === 0) return [makeDefaultQuoteItem()];
 
   return data.items.map((item) => ({
-    optionValues: parseOptionSummary(item.optionSummary),
+    optionValues: DEFAULT_OPTION_VALUES.map((option) => ({ ...option })),
     quantity: item.quantity ? String(item.quantity) : "",
     unitPrice: "",
   }));
@@ -132,7 +128,7 @@ function buildInitialSampleItems(data: QuoteInitData): SampleItemRow[] {
   if (data.needSample !== "Y") return [makeDefaultSampleItem()];
 
   return data.items.map((item) => ({
-    sampleName: item.optionSummary,
+    sampleName: data.productName,
     quantity: item.sampleQuantity ? String(item.sampleQuantity) : "1",
     unitPrice: "",
     memo: "",
@@ -142,8 +138,8 @@ function buildInitialSampleItems(data: QuoteInitData): SampleItemRow[] {
 // ─── 기본값 ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_OPTION_VALUES: QuoteOptionValueRow[] = [
-  { optionName: "색상", optionValue: "블랙" },
-  { optionName: "사이즈", optionValue: "M" },
+  { optionName: "색상", optionValue: "" },
+  { optionName: "사이즈", optionValue: "" },
 ];
 
 function makeDefaultQuoteItem(): QuoteItemRow {
@@ -228,6 +224,69 @@ function getValidUntil(validDays: string, customValidDays: string) {
   return validUntil.toISOString();
 }
 
+function preventInvalidNumberKey(event: KeyboardEvent<HTMLInputElement>) {
+  if (["-", "+", "e", "E"].includes(event.key)) {
+    event.preventDefault();
+  }
+}
+
+function validateQuoteForm(
+    requestId: string | undefined,
+    form: QuoteForm,
+    quoteItems: QuoteItemRow[],
+    sampleItems: SampleItemRow[]
+) {
+  const errors: string[] = [];
+
+  if (!requestId || !Number.isInteger(Number(requestId))) {
+    errors.push("소싱 요청 정보가 올바르지 않습니다.");
+  }
+  if (!form.productName.trim()) {
+    errors.push("상품명을 입력해주세요.");
+  }
+  if (toNumber(form.leadTimeDays) < 1) {
+    errors.push("예상 출고 소요일은 1일 이상이어야 합니다.");
+  }
+  if (form.shippingFee.trim() === "" || toNumber(form.shippingFee) < 0) {
+    errors.push("배송비는 0원 이상으로 입력해주세요.");
+  }
+  if (form.validDays === "custom" && toNumber(form.customValidDays) < 1) {
+    errors.push("견적 유효 기간은 1일 이상이어야 합니다.");
+  }
+
+  quoteItems.forEach((item, index) => {
+    const itemLabel = `품목 ${index + 1}`;
+
+    if (!buildOptionSummary(item.optionValues)) {
+      errors.push(`${itemLabel}의 옵션 정보를 입력해주세요.`);
+    }
+    if (toNumber(item.quantity) < 1) {
+      errors.push(`${itemLabel}의 수량은 1개 이상이어야 합니다.`);
+    }
+    if (item.unitPrice.trim() === "" || toNumber(item.unitPrice) < 0) {
+      errors.push(`${itemLabel}의 단가는 0원 이상으로 입력해주세요.`);
+    }
+  });
+
+  if (form.sampleAvailable === "AVAILABLE") {
+    sampleItems.forEach((sample, index) => {
+      const itemLabel = `샘플 ${index + 1}`;
+
+      if (!sample.sampleName.trim()) {
+        errors.push(`${itemLabel}의 샘플명을 입력해주세요.`);
+      }
+      if (toNumber(sample.quantity) < 1) {
+        errors.push(`${itemLabel}의 수량은 1개 이상이어야 합니다.`);
+      }
+      if (sample.unitPrice.trim() === "" || toNumber(sample.unitPrice) < 0) {
+        errors.push(`${itemLabel}의 단가는 0원 이상으로 입력해주세요.`);
+      }
+    });
+  }
+
+  return errors;
+}
+
 // ─── 서브 컴포넌트 ───────────────────────────────────────────────────────────
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -292,7 +351,7 @@ export function SellerQuoteWrite() {
   const navigate = useNavigate();
 
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitErrors, setSubmitErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [initData, setInitData] = useState<QuoteInitData | null>(null);
 
@@ -307,7 +366,7 @@ export function SellerQuoteWrite() {
     const loadQuoteInit = async () => {
       try {
         setLoading(true);
-        setSubmitError(null);
+        setSubmitErrors([]);
 
         const response =
             await api.get<SourcingDetailResponse>(
@@ -334,7 +393,7 @@ export function SellerQuoteWrite() {
         setSampleItems(buildInitialSampleItems(quoteInitData));
       } catch (error) {
         console.error("견적 작성 초기 정보 조회 실패", error);
-        setSubmitError("소싱 요청 정보를 불러오지 못했습니다.");
+        setSubmitErrors(["소싱 요청 정보를 불러오지 못했습니다."]);
       } finally {
         setLoading(false);
       }
@@ -464,8 +523,20 @@ export function SellerQuoteWrite() {
 
   // ── 제출 ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    const validationErrors = validateQuoteForm(
+        requestId,
+        form,
+        quoteItems,
+        sampleItems
+    );
+
+    if (validationErrors.length > 0) {
+      setSubmitErrors(validationErrors);
+      return;
+    }
+
     setSubmitting(true);
-    setSubmitError(null);
+    setSubmitErrors([]);
 
     const items = [
       ...quoteItemSnapshots,
@@ -497,7 +568,18 @@ export function SellerQuoteWrite() {
 
       navigate(`/seller/quotes/${quoteData.quoteId}`);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
+      if (isAxiosError<QuoteErrorResponse>(err)) {
+        const fieldErrors = Object.values(err.response?.data?.data ?? {});
+        setSubmitErrors(
+            fieldErrors.length > 0
+                ? [...new Set(fieldErrors)]
+                : [err.message || "견적서를 제출하지 못했습니다."]
+        );
+      } else {
+        setSubmitErrors([
+          err instanceof Error ? err.message : "견적서를 제출하지 못했습니다.",
+        ]);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -726,9 +808,15 @@ export function SellerQuoteWrite() {
                               <input
                                   type="number"
                                   value={item.quantity}
-                                  onChange={(event) => updateQuoteItem(itemIndex, "quantity", event.target.value)}
-                                  min="0"
-                                  placeholder="0"
+                                  onChange={(event) => {
+                                    const value = event.target.value;
+                                    if (value === "" || Number(value) >= 1) {
+                                      updateQuoteItem(itemIndex, "quantity", value);
+                                    }
+                                  }}
+                                  onKeyDown={preventInvalidNumberKey}
+                                  min="1"
+                                  placeholder="1"
                                   className={inputClass}
                               />
                             </div>
@@ -737,7 +825,13 @@ export function SellerQuoteWrite() {
                               <input
                                   type="number"
                                   value={item.unitPrice}
-                                  onChange={(event) => updateQuoteItem(itemIndex, "unitPrice", event.target.value)}
+                                  onChange={(event) => {
+                                    const value = event.target.value;
+                                    if (value === "" || Number(value) >= 0) {
+                                      updateQuoteItem(itemIndex, "unitPrice", value);
+                                    }
+                                  }}
+                                  onKeyDown={preventInvalidNumberKey}
                                   min="0"
                                   placeholder="0"
                                   className={inputClass}
@@ -785,7 +879,13 @@ export function SellerQuoteWrite() {
                               type="number"
                               min="1"
                               value={form.customValidDays}
-                              onChange={(event) => updateForm("customValidDays", event.target.value)}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                if (value === "" || Number(value) >= 1) {
+                                  updateForm("customValidDays", value);
+                                }
+                              }}
+                              onKeyDown={preventInvalidNumberKey}
                               placeholder="45"
                               className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                           />
@@ -819,7 +919,7 @@ export function SellerQuoteWrite() {
                       <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
                     바이어 샘플 불필요
                   </span>
-                  ) : (
+                  ) : form.sampleAvailable === "AVAILABLE" ? (
                       <button
                           type="button"
                           onClick={addSampleItem}
@@ -828,11 +928,15 @@ export function SellerQuoteWrite() {
                         <Plus size={14} />
                         샘플 추가
                       </button>
-                  )}
+                  ) : null}
                 </div>
 
                 {initData?.needSample === "N" ? (
                     <p className="text-sm text-slate-400">바이어가 샘플을 요청하지 않은 소싱입니다.</p>
+                ) : form.sampleAvailable === "UNAVAILABLE" ? (
+                    <p className="text-sm text-slate-400">
+                      샘플 제공 가능 여부를 ‘샘플 제공 가능’으로 변경하면 조건을 입력할 수 있습니다.
+                    </p>
                 ) : (
                     <div className="space-y-3">
                       {sampleItems.map((sample, sampleIndex) => {
@@ -872,10 +976,14 @@ export function SellerQuoteWrite() {
                                   <input
                                       type="number"
                                       value={sample.quantity}
-                                      onChange={(event) =>
-                                          updateSampleItem(sampleIndex, "quantity", event.target.value)
-                                      }
-                                      min="0"
+                                      onChange={(event) => {
+                                        const value = event.target.value;
+                                        if (value === "" || Number(value) >= 1) {
+                                          updateSampleItem(sampleIndex, "quantity", value);
+                                        }
+                                      }}
+                                      onKeyDown={preventInvalidNumberKey}
+                                      min="1"
                                       className={inputClass}
                                   />
                                 </div>
@@ -884,9 +992,13 @@ export function SellerQuoteWrite() {
                                   <input
                                       type="number"
                                       value={sample.unitPrice}
-                                      onChange={(event) =>
-                                          updateSampleItem(sampleIndex, "unitPrice", event.target.value)
-                                      }
+                                      onChange={(event) => {
+                                        const value = event.target.value;
+                                        if (value === "" || Number(value) >= 0) {
+                                          updateSampleItem(sampleIndex, "unitPrice", value);
+                                        }
+                                      }}
+                                      onKeyDown={preventInvalidNumberKey}
                                       min="0"
                                       placeholder="0"
                                       className={inputClass}
@@ -922,8 +1034,14 @@ export function SellerQuoteWrite() {
                     <input
                         type="number"
                         value={form.leadTimeDays}
-                        onChange={(event) => updateForm("leadTimeDays", event.target.value)}
-                        min="0"
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (value === "" || Number(value) >= 1) {
+                            updateForm("leadTimeDays", value);
+                          }
+                        }}
+                        onKeyDown={preventInvalidNumberKey}
+                        min="1"
                         className={inputClass}
                     />
                   </div>
@@ -947,7 +1065,13 @@ export function SellerQuoteWrite() {
                     <input
                         type="number"
                         value={form.shippingFee}
-                        onChange={(event) => updateForm("shippingFee", event.target.value)}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (value === "" || Number(value) >= 0) {
+                            updateForm("shippingFee", value);
+                          }
+                        }}
+                        onKeyDown={preventInvalidNumberKey}
                         min="0"
                         className={inputClass}
                     />
@@ -968,11 +1092,18 @@ export function SellerQuoteWrite() {
               </section>
 
               {/* 에러 메시지 */}
-              {submitError && (
+              {submitErrors.length > 0 && (
                   <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                    <div className="flex gap-3 text-xs leading-5 text-red-700">
+                    <div className="flex gap-3 text-sm leading-5 text-red-700">
                       <AlertCircle size={15} className="mt-0.5 shrink-0" />
-                      <span>{submitError}</span>
+                      <div>
+                        <p className="font-bold">입력 내용을 확인해주세요.</p>
+                        <ul className="mt-2 space-y-1">
+                          {submitErrors.map((error) => (
+                              <li key={error}>- {error}</li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </div>
               )}

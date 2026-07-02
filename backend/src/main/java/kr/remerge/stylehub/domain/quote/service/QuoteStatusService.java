@@ -5,7 +5,7 @@ import kr.remerge.stylehub.domain.quote.entity.Quote;
 import kr.remerge.stylehub.domain.quote.repository.QuoteRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.enumtype.UserRole;
-import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.domain.user.support.UserReader;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -21,16 +21,13 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class QuoteStatusService {
 
-    private final UserRepository userRepository;
+    private final UserReader userReader;
     private final QuoteRepository quoteRepository;
 
     @Transactional
     public void updateStatus(Integer userId, Integer quoteId, String newStatus) {
 
-        User actor = userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new BusinessException(ErrorCode.USER_NOT_FOUND)
-                );
+        User actor = userReader.getUser(userId);
 
         Quote quote = quoteRepository.findById(quoteId)
                 .orElseThrow(() ->
