@@ -24,6 +24,20 @@ const certConfig: Record<CertKey, { label: string; bg: string; border: string; c
   "섬유품질":  { label: "섬유품질 적합",    bg: "#EEF2FF", border: "#C7D2FE", color: "#3730A3", iconBg: "#4338CA", icon: <CheckCircle size={11} /> },
 };
 
+// [추가] 상품 등록 시 사용하는 인증서 이름(certName) → CertBadge 키 매핑
+const certNameToKeyMap: Record<string, CertKey> = {
+  "KC 인증": "KC",
+  "어린이제품 안전인증": "어린이안전",
+  "환경부 환경마크": "환경마크",
+  "GR 우수재활용제품": "GRS",
+  "섬유품질표시 적합": "섬유품질",
+  "OEKO-TEX Standard 100": "OEKO-TEX",
+  "GOTS (유기농 섬유)": "GOTS",
+  "Recycled Content (GRS)": "GRS",
+  "비건 인증": "비건",
+  "Fair Trade": "Fair Trade",
+};
+
 function CertBadge({ certKey }: { certKey: CertKey }) {
   const c = certConfig[certKey];
   if (!c) return null;
@@ -61,6 +75,13 @@ function saveFolderData(folders: Folder[]) {
   localStorage.setItem("wishlistFolders", JSON.stringify(folders));
 }
 
+// [추가] 옵션 name/value 쌍 타입
+interface OptionValue {
+  optionName: string;
+  optionValue: string;
+  sortOrder: number;
+}
+
 interface ProductDetailData {
   productId: number;
   sellerId: number;
@@ -87,6 +108,7 @@ interface ProductDetailData {
   whiteLabel: boolean;
   createdAt: string;
   updatedAt: string;
+  certifications?: { certName: string }[]; // [추가] 백엔드 DetailResponse에 필드 추가 필요 (아래 설명 참고)
   options: {
     productOptionId: number;
     optionLabel: string;
@@ -95,6 +117,7 @@ interface ProductDetailData {
     additionalPrice: number;
     restockAlertQuantity: number;
     isActive: boolean;
+    optionValues: OptionValue[]; // [추가]
     images: {
       productImageId: number;
       imageUrl: string;
@@ -110,7 +133,8 @@ export function ProductDetail() {
 
   const [product, setProduct] = useState<ProductDetailData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedOptionIdx, setSelectedOptionIdx] = useState(0);
+  const [selectedOptionIdx, setSelectedOptionIdx] = useState(0); // 레거시(옵션값 없는 상품) 폴백용
+  const [selectedValues, setSelectedValues] = useState<Record<string, string>>({}); // [추가] 옵션 그룹별 선택값
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -127,6 +151,16 @@ export function ProductDetail() {
   const productId = product?.productId ?? null;
   const isFavorite = productId !== null && favorites.includes(productId);
 
+  // [수정] 자동 캐러셀 useEffect는 early return보다 반드시 위에 있어야 함 (Hook 개수/순서 일관성 유지)
+  const allImagesForEffect = product?.options.flatMap(opt => opt.images).sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
+  useEffect(() => {
+    if (allImagesForEffect.length <= 1) return;
+    const timer = setInterval(() => {
+      setSelectedImage(i => (i + 1) % allImagesForEffect.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [allImagesForEffect.length, selectedImage]);
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
@@ -134,6 +168,17 @@ export function ProductDetail() {
         .then(res => {
           setProduct(res);
           setQuantity(res.moq ?? 1);
+          // [추가] 옵션값이 구조화되어 있으면 첫 옵션 조합으로 초기 선택
+          const first = res.options?.[0];
+          if (first?.optionValues?.length > 0) {
+            const initial: Record<string, string> = {};
+            first.optionValues.forEach((v: OptionValue) => { initial[v.optionName] = v.optionValue; });
+            setSelectedValues(initial);
+          } else {
+            setSelectedValues({});
+          }
+          setSelectedOptionIdx(0);
+          setSelectedImage(0);
         })
         .catch(() => alert("상품 정보를 불러오지 못했습니다."))
         .finally(() => setLoading(false));
@@ -180,12 +225,54 @@ export function ProductDetail() {
 
   const allImages = product.options.flatMap(opt => opt.images).sort((a, b) => a.sortOrder - b.sortOrder);
   const mainImages = allImages.length > 0 ? allImages : [];
-  const selectedOption = product.options[selectedOptionIdx] ?? null;
+
+  // [추가] 모든 옵션이 구조화된 optionValues를 갖고 있으면 그룹 선택 UI 사용, 아니면 기존 플랫 버튼 방식 폴백
+  const hasStructuredOptions = product.options.length > 0 && product.options.every(o => o.optionValues && o.optionValues.length > 0);
+
+  // [추가] 옵션 그룹 이름 목록 (예: ["색상", "마루세트"]) — 등장 순서 유지
+  const optionGroupNames: string[] = hasStructuredOptions
+      ? Array.from(new Set(product.options.flatMap(o => o.optionValues.map(v => v.optionName))))
+      : [];
+
+  // [추가] 그룹별 선택 가능한 값 목록 (예: {색상: ["옐로우","핑크"], 마루세트: ["상의만"]})
+  const optionGroupValues: Record<string, string[]> = {};
+  optionGroupNames.forEach(name => {
+    optionGroupValues[name] = Array.from(new Set(
+        product.options.flatMap(o => o.optionValues.filter(v => v.optionName === name).map(v => v.optionValue))
+    ));
+  });
+
+  // [추가] 현재 선택된 조합(selectedValues)과 정확히 일치하는 옵션(SKU) 찾기
+  const matchedOptionIdx = hasStructuredOptions
+      ? product.options.findIndex(o =>
+          o.optionValues.length === Object.keys(selectedValues).length &&
+          o.optionValues.every(v => selectedValues[v.optionName] === v.optionValue)
+      )
+      : selectedOptionIdx;
+
+  const selectedOption = hasStructuredOptions
+      ? (matchedOptionIdx >= 0 ? product.options[matchedOptionIdx] : null)
+      : (product.options[selectedOptionIdx] ?? null);
+
   const total = (product.unitPrice + (selectedOption?.additionalPrice ?? 0)) * quantity;
+
+  // [추가] 등록된 인증서 이름을 뱃지 키로 변환, 중복 제거
+  const certBadgeKeys: CertKey[] = Array.from(new Set(
+      (product.certifications ?? [])
+          .map(c => certNameToKeyMap[c.certName])
+          .filter((k): k is CertKey => !!k)
+  ));
 
   const updateQuantity = (delta: number) => {
     const next = quantity + delta;
     if (next >= product.moq) setQuantity(next);
+  };
+
+  // [추가] 이미지 슬라이더 전용 이동 함수 — 수동 클릭 시에도 이 함수를 거치도록 통일 (자동 전환 타이머는 selectedImage 변경마다 재시작됨)
+  const goToImage = (index: number) => {
+    if (mainImages.length === 0) return;
+    const next = ((index % mainImages.length) + mainImages.length) % mainImages.length;
+    setSelectedImage(next);
   };
 
   const handleAddToCart = async () => {
@@ -293,13 +380,13 @@ export function ProductDetail() {
               {mainImages.length > 1 && (
                   <>
                     <button
-                        onClick={() => setSelectedImage(i => (i - 1 + mainImages.length) % mainImages.length)}
+                        onClick={() => goToImage(selectedImage - 1)}
                         className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
                     >
                       <ChevronLeft size={18} />
                     </button>
                     <button
-                        onClick={() => setSelectedImage(i => (i + 1) % mainImages.length)}
+                        onClick={() => goToImage(selectedImage + 1)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
                     >
                       <ChevronRight size={18} />
@@ -308,7 +395,7 @@ export function ProductDetail() {
                       {mainImages.map((_, i) => (
                           <button
                               key={i}
-                              onClick={() => setSelectedImage(i)}
+                              onClick={() => goToImage(i)}
                               className={`rounded-full transition-all ${i === selectedImage ? "w-5 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}`}
                           />
                       ))}
@@ -321,7 +408,7 @@ export function ProductDetail() {
                   {mainImages.map((img, i) => (
                       <button
                           key={img.productImageId}
-                          onClick={() => setSelectedImage(i)}
+                          onClick={() => goToImage(i)}
                           className={`border-2 rounded overflow-hidden transition-colors ${selectedImage === i ? "border-primary" : "border-border hover:border-primary/40"}`}
                       >
                         <img src={img.imageUrl} alt={`${product.productName} ${i + 1}`} className="w-full h-24 object-cover" />
@@ -345,6 +432,10 @@ export function ProductDetail() {
                   {product.whiteLabel && (
                       <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded font-semibold">화이트라벨</span>
                   )}
+                  {/* [추가] 보유 인증서 뱃지 */}
+                  {certBadgeKeys.map(key => (
+                      <CertBadge key={key} certKey={key} />
+                  ))}
                 </div>
                 <h1 className="text-2xl font-bold text-foreground leading-tight mb-2">{product.productName}</h1>
                 {product.productEngName && (
@@ -374,29 +465,76 @@ export function ProductDetail() {
               <div className="text-sm text-muted-foreground mb-5">최소 주문 수량: {product.moq.toLocaleString()}벌</div>
 
               <div className="space-y-4">
-                {product.options.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">옵션 선택</label>
-                      <div className="flex flex-wrap gap-2">
-                        {product.options.map((opt, i) => (
-                            <button
-                                key={opt.productOptionId}
-                                onClick={() => setSelectedOptionIdx(i)}
-                                className={`px-3 py-1.5 text-xs rounded border transition-colors ${
-                                    selectedOptionIdx === i
-                                        ? "bg-primary text-white border-primary"
-                                        : "border-border text-foreground hover:border-primary hover:text-primary"
-                                }`}
-                            >
-                              {opt.optionLabel}
-                              {opt.additionalPrice > 0 && <span className="ml-1 opacity-70">(+₩{opt.additionalPrice.toLocaleString()})</span>}
-                            </button>
-                        ))}
-                      </div>
-                      {selectedOption && (
-                          <p className="text-xs text-muted-foreground mt-1">재고: {selectedOption.stockQuantity.toLocaleString()}벌</p>
+                {/* [수정] 옵션 선택 — 그룹(옵션명)별로 벨류 버튼을 보여주는 방식. 구조화된 값이 없는 레거시 상품은 기존 플랫 버튼으로 폴백 */}
+                {hasStructuredOptions ? (
+                    <div className="space-y-4">
+                      {optionGroupNames.map(name => (
+                          <div key={name}>
+                            <label className="block text-sm font-medium text-foreground mb-2">{name}</label>
+                            <div className="flex flex-wrap gap-2">
+                              {optionGroupValues[name].map(value => {
+                                const isSelected = selectedValues[name] === value;
+                                // 이 값을 선택했을 때, 현재 선택 중인 다른 그룹 값들과 조합했을 때 실제로 존재하는 SKU인지 확인
+                                const candidate = { ...selectedValues, [name]: value };
+                                const exists = product.options.some(o =>
+                                    o.optionValues.length === Object.keys(candidate).length &&
+                                    o.optionValues.every(v => candidate[v.optionName] === v.optionValue)
+                                );
+                                return (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        disabled={!exists}
+                                        onClick={() => setSelectedValues(prev => ({ ...prev, [name]: value }))}
+                                        className={`px-3 py-1.5 text-xs rounded border transition-colors ${
+                                            isSelected
+                                                ? "bg-primary text-white border-primary"
+                                                : exists
+                                                    ? "border-border text-foreground hover:border-primary hover:text-primary"
+                                                    : "border-border text-muted-foreground opacity-40 cursor-not-allowed"
+                                        }`}
+                                    >
+                                      {value}
+                                    </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                      ))}
+                      {selectedOption ? (
+                          <p className="text-xs text-muted-foreground">
+                            재고: {selectedOption.stockQuantity.toLocaleString()}벌
+                            {selectedOption.additionalPrice > 0 && <> · 추가금 +₩{selectedOption.additionalPrice.toLocaleString()}</>}
+                          </p>
+                      ) : (
+                          <p className="text-xs text-red-500">선택하신 조합은 현재 판매하지 않는 옵션입니다.</p>
                       )}
                     </div>
+                ) : (
+                    product.options.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-2">옵션 선택</label>
+                          <div className="flex flex-wrap gap-2">
+                            {product.options.map((opt, i) => (
+                                <button
+                                    key={opt.productOptionId}
+                                    onClick={() => setSelectedOptionIdx(i)}
+                                    className={`px-3 py-1.5 text-xs rounded border transition-colors ${
+                                        selectedOptionIdx === i
+                                            ? "bg-primary text-white border-primary"
+                                            : "border-border text-foreground hover:border-primary hover:text-primary"
+                                    }`}
+                                >
+                                  {opt.optionLabel}
+                                  {opt.additionalPrice > 0 && <span className="ml-1 opacity-70">(+₩{opt.additionalPrice.toLocaleString()})</span>}
+                                </button>
+                            ))}
+                          </div>
+                          {selectedOption && (
+                              <p className="text-xs text-muted-foreground mt-1">재고: {selectedOption.stockQuantity.toLocaleString()}벌</p>
+                          )}
+                        </div>
+                    )
                 )}
 
                 <div>

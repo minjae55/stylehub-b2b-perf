@@ -4,7 +4,7 @@ import api from "../../api/axios";
 import {
   Shirt, Tag, LayoutGrid, Store, Settings, Ruler, Palette,
   Award, FileText, Image, ChevronLeft, X, AlertCircle,
-  CheckCircle, CloudUpload, Upload, Plus, Trash2, Star
+  CheckCircle, CloudUpload, Upload, Plus, Trash2, Star, RotateCcw
 } from "lucide-react";
 
 // 중분류 id 매핑 (DB categories 테이블 기준)
@@ -71,8 +71,16 @@ const certGroups = [
   { label: "소재 / 환경 인증", items: ["OEKO-TEX Standard 100", "GOTS (유기농 섬유)", "Recycled Content (GRS)", "비건 인증", "Fair Trade"] },
 ];
 
+// [추가] 라벨옵션 그룹 타입 (예: 색상 - 블랙/화이트)
+interface LabelOptionGroup {
+  id: string;
+  name: string;
+  values: string[];
+}
+
 interface ProductOption {
   optionLabel: string;
+  labelOptions: LabelOptionGroup[]; // [추가]
   sku: string;
   stockQuantity: string;
   additionalPrice: string;
@@ -230,14 +238,164 @@ function CertUploadModal({
   );
 }
 
+// [추가] 라벨옵션 행마다 돌아가면서 보여줄 예시 (네임/벨류 쌍)
+const labelOptionExamples = [
+  { name: "색상", value: "블랙" },
+  { name: "사이즈", value: "M" },
+  { name: "패턴", value: "스트라이프" },
+  { name: "핏", value: "오버사이즈" },
+];
+
+// [추가] 옵션 라벨 빌더 컴포넌트
+// 사용 흐름: "라벨옵션 추가"(상시 활성)로 [네임][벨류] 행 추가 → 같은 행 안에서 "벨류 추가"를 누르면 벨류 인풋이 옆으로 하나 더 생김 (예: 색상 | 블랙 | 화이트 | 네이비)
+function LabelOptionBuilder({
+                              groups,
+                              onChange,
+                            }: {
+  groups: LabelOptionGroup[];
+  onChange: (groups: LabelOptionGroup[]) => void;
+}) {
+  const updateGroupName = (id: string, name: string) =>
+      onChange(groups.map((g) => (g.id === id ? { ...g, name } : g)));
+
+  const updateGroupValue = (id: string, idx: number, value: string) =>
+      onChange(
+          groups.map((g) =>
+              g.id === id ? { ...g, values: g.values.map((v, i) => (i === idx ? value : v)) } : g
+          )
+      );
+
+  const addValueInput = (id: string) =>
+      onChange(groups.map((g) => (g.id === id ? { ...g, values: [...g.values, ""] } : g)));
+
+  const removeValueInput = (id: string, idx: number) =>
+      onChange(
+          groups.map((g) =>
+              g.id === id ? { ...g, values: g.values.filter((_, i) => i !== idx) } : g
+          )
+      );
+
+  const addGroup = () =>
+      onChange([
+        ...groups,
+        { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name: "", values: [""] },
+      ]);
+
+  const removeGroup = (id: string) => onChange(groups.filter((g) => g.id !== id));
+
+  return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-xs font-medium text-foreground">
+            옵션 라벨 <span className="text-red-500">*</span>
+          </label>
+          <button
+              type="button"
+              onClick={addGroup}
+              className="flex items-center gap-1 text-xs text-primary border border-primary rounded px-2.5 py-1 hover:bg-primary hover:text-white transition-colors"
+          >
+            <Plus size={12} /> 라벨옵션 추가
+          </button>
+        </div>
+
+        {/* 라벨옵션 행 목록 — 각 행: 네임 인풋 + 벨류 인풋(들) + 벨류추가 버튼 */}
+        <div className="space-y-2">
+          {groups.map((g, groupIdx) => {
+            const example = labelOptionExamples[groupIdx % labelOptionExamples.length];
+            return (
+                <div key={g.id} className="flex items-center gap-2 flex-wrap">
+                  <input
+                      type="text"
+                      value={g.name}
+                      onChange={(e) => updateGroupName(g.id, e.target.value)}
+                      placeholder={`예) ${example.name}`}
+                      className="border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors w-28"
+                  />
+                  {g.values.map((val, idx) => (
+                      <div key={idx} className="flex items-center gap-1">
+                        <input
+                            type="text"
+                            value={val}
+                            onChange={(e) => updateGroupValue(g.id, idx, e.target.value)}
+                            placeholder={`예) ${example.value}`}
+                            className="border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors w-28"
+                        />
+                        {g.values.length > 1 && (
+                            <button
+                                type="button"
+                                onClick={() => removeValueInput(g.id, idx)}
+                                className="text-muted-foreground hover:text-red-500 transition-colors"
+                            >
+                              <X size={13} />
+                            </button>
+                        )}
+                      </div>
+                  ))}
+                  <button
+                      type="button"
+                      onClick={() => addValueInput(g.id)}
+                      className="flex items-center gap-1 text-xs text-primary border border-primary rounded px-2.5 py-2 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+                  >
+                    <Plus size={12} /> 벨류 추가
+                  </button>
+                  {groups.length > 1 && (
+                      <button
+                          type="button"
+                          onClick={() => removeGroup(g.id)}
+                          className="text-muted-foreground hover:text-red-500 transition-colors ml-1"
+                          title="라벨옵션 삭제"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                  )}
+                </div>
+            );
+          })}
+        </div>
+      </div>
+  );
+}
+
 const initialForm = {
   productName: "", engName: "", season: "", mainCategory: "", subCategory: "",
   moq: "", unitPrice: "", leadTime: "", mainMaterial: "",
-  description: "", careInstruction: "", oemAvailable: false, sampleAvailable: false, whiteLabel: false,
+  description: "", careInstruction: "", returnPolicy: "", oemAvailable: false, sampleAvailable: false, whiteLabel: false,
+};
+
+const newLabelOptionGroup = (): LabelOptionGroup => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name: "", values: [""],
+});
+
+// [추가] 같은 이름(트림 기준)의 라벨옵션 그룹이 여러 개 생기면 하나로 자동 병합
+// 예: "옵션"이라는 이름으로 그룹을 두 번 만들어도 → values를 합쳐 그룹 하나로 정리 (중복 값 제거)
+const mergeLabelOptionGroups = (groups: LabelOptionGroup[]): LabelOptionGroup[] => {
+  const merged: LabelOptionGroup[] = [];
+  const indexByName = new Map<string, number>();
+
+  for (const g of groups) {
+    const key = g.name.trim();
+    if (key && indexByName.has(key)) {
+      // 이미 같은 이름의 그룹이 있으면 값만 합치고(중복/빈값 제거) 이 그룹은 버림
+      const targetIdx = indexByName.get(key)!;
+      const combined = [...merged[targetIdx].values, ...g.values];
+      const seen = new Set<string>();
+      const uniqueValues = combined.filter(v => {
+        const trimmed = v.trim();
+        if (!trimmed || seen.has(trimmed)) return false;
+        seen.add(trimmed);
+        return true;
+      });
+      merged[targetIdx] = { ...merged[targetIdx], values: uniqueValues.length > 0 ? uniqueValues : [""] };
+    } else {
+      merged.push(g);
+      if (key) indexByName.set(key, merged.length - 1);
+    }
+  }
+  return merged;
 };
 
 const newOption = (): ProductOption => ({
-  optionLabel: "", sku: "", stockQuantity: "", additionalPrice: "0", restockAlertQuantity: "",
+  optionLabel: "", labelOptions: [newLabelOptionGroup()], sku: "", stockQuantity: "", additionalPrice: "0", restockAlertQuantity: "",
 });
 
 export function SellerProductRegister() {
@@ -314,6 +472,23 @@ export function SellerProductRegister() {
 
   const updateOption = (idx: number, field: keyof ProductOption, value: string) =>
       setOptions(prev => prev.map((o, i) => i === idx ? { ...o, [field]: value } : o));
+
+  // [수정] 라벨옵션 그룹 변경 → 같은 이름 그룹 자동 병합 → optionLabel 문자열 자동 조합 (예: "색상: 블랙, 화이트 / 사이즈: S, M"), 빈 값은 제외
+  const updateLabelOptions = (idx: number, groups: LabelOptionGroup[]) => {
+    const mergedGroups = mergeLabelOptionGroups(groups); // [추가] 같은 이름 그룹 자동 병합
+    setOptions(prev => prev.map((o, i) =>
+        i === idx
+            ? {
+              ...o,
+              labelOptions: mergedGroups,
+              optionLabel: mergedGroups
+                  .filter(g => g.name.trim() && g.values.some(v => v.trim()))
+                  .map(g => `${g.name.trim()}: ${g.values.filter(v => v.trim()).join(", ")}`)
+                  .join(" / "),
+            }
+            : o
+    ));
+  };
 
   const addOption = () => setOptions(prev => [...prev, newOption()]);
   const removeOption = (idx: number) => setOptions(prev => prev.filter((_, i) => i !== idx));
@@ -471,6 +646,7 @@ export function SellerProductRegister() {
       mainMaterial: form.mainMaterial,
       description: form.description,
       careInstruction: form.careInstruction,
+      returnPolicy: form.returnPolicy || null,
       productUrl: detailPdfUrl ?? null,
       oemAvailable: form.oemAvailable,
       sampleAvailable: form.sampleAvailable,
@@ -482,6 +658,25 @@ export function SellerProductRegister() {
         stockQuantity: o.stockQuantity ? parseInt(o.stockQuantity) : 0,
         additionalPrice: o.additionalPrice ? parseInt(o.additionalPrice) : 0,
         restockAlertQuantity: o.restockAlertQuantity ? parseInt(o.restockAlertQuantity) : null,
+        // [수정] labelOptions(그룹+값들)를 자동 병합 후 name/value 쌍 배열로 펼쳐서 전송 (혹시 모를 중복 방지)
+        // 예: 색상:[옐로우,핑크] / 마루세트:[상의만]
+        //  -> [{optionName:"색상",optionValue:"옐로우"},{optionName:"색상",optionValue:"핑크"},{optionName:"마루세트",optionValue:"상의만"}]
+        optionValues: (() => {
+          const raw = mergeLabelOptionGroups(o.labelOptions)
+              .filter(g => g.name.trim())
+              .flatMap(g =>
+                  g.values
+                      .filter(v => v.trim())
+                      .map(v => ({ optionName: g.name.trim(), optionValue: v.trim() }))
+              );
+          const seenPairs = new Set<string>();
+          return raw.filter(pair => {
+            const key = `${pair.optionName}::${pair.optionValue}`;
+            if (seenPairs.has(key)) return false;
+            seenPairs.add(key);
+            return true;
+          });
+        })(),
       })),
       certifications: Object.values(certFiles).map((c) => ({
         certName: c.certName,
@@ -817,7 +1012,7 @@ export function SellerProductRegister() {
                 <Plus size={13} /> 옵션 추가
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">옵션 라벨은 조합명(예: 블랙/M)으로 입력하세요.</p>
+            <p className="text-xs text-muted-foreground mb-4">라벨/벨류를 입력해 옵션 조합을 구성하세요. (예: 색상 - 블랙/화이트)</p>
             <div className="space-y-4">
               {options.map((opt, optIdx) => (
                   <div key={optIdx} className="border border-border rounded-lg p-4">
@@ -831,8 +1026,11 @@ export function SellerProductRegister() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
-                        <label className="block text-xs font-medium text-foreground mb-1">옵션 라벨 <span className="text-red-500">*</span></label>
-                        <input type="text" value={opt.optionLabel} onChange={(e) => updateOption(optIdx, "optionLabel", e.target.value)} placeholder="예: 블랙/M" className="w-full border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors" />
+                        {/* [수정] 옵션 라벨 텍스트 인풋 → LabelOptionBuilder로 교체 */}
+                        <LabelOptionBuilder
+                            groups={opt.labelOptions}
+                            onChange={(groups) => updateLabelOptions(optIdx, groups)}
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-foreground mb-1">재고 수량 <span className="text-red-500">*</span></label>
@@ -985,11 +1183,24 @@ export function SellerProductRegister() {
             </div>
           </div>
 
+          {/* 10. 반품 정책 */}
+          <div className="bg-white border border-border rounded-lg p-6">
+            <SectionTitle icon={<RotateCcw size={17} />}>반품 정책</SectionTitle>
+            <textarea
+                value={form.returnPolicy}
+                onChange={(e) => update("returnPolicy", e.target.value)}
+                rows={3}
+                placeholder="예: 단순 변심에 의한 반품은 상품 수령 후 7일 이내 가능하며, 왕복 배송비는 바이어 부담입니다. 불량/오배송의 경우 전액 셀러 부담으로 처리합니다."
+                className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary resize-none transition-colors"
+            />
+          </div>
+
           {/* 하단 버튼 */}
           <div className="flex items-center justify-between pb-4">
             <Link to="/seller" className="border border-border text-foreground hover:border-primary hover:text-primary px-8 py-3 rounded text-sm font-medium transition-colors">취소</Link>
             <div className="flex gap-3">
-              <button type="button" className="border border-primary text-primary hover:bg-secondary px-6 py-3 rounded text-sm font-semibold transition-colors">임시저장</button>
+              <button type="button" className="border border-primary text-primary hover:bg-secondary px-6 py-3 rounded text-sm font-semibold transition-colors">임시저장
+              </button>
               <button type="button" onClick={handleRegisterSubmit} className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded text-sm font-semibold transition-colors flex items-center gap-2">
                 <Shirt size={16} /> 제품 등록 신청
               </button>

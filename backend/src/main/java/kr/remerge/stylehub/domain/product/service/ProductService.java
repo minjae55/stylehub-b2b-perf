@@ -9,9 +9,11 @@ import kr.remerge.stylehub.domain.product.entity.Product;
 import kr.remerge.stylehub.domain.product.entity.ProductCertification;
 import kr.remerge.stylehub.domain.product.entity.ProductImage;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
+import kr.remerge.stylehub.domain.product.entity.ProductOptionValue;
 import kr.remerge.stylehub.domain.product.repository.ProductCertificationRepository;
 import kr.remerge.stylehub.domain.product.repository.ProductImageRepository;
 import kr.remerge.stylehub.domain.product.repository.ProductOptionRepository;
+import kr.remerge.stylehub.domain.product.repository.ProductOptionValueRepository;
 import kr.remerge.stylehub.domain.product.repository.ProductRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
@@ -23,6 +25,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList; // [추가]
 import java.util.List;
 
 @Service
@@ -35,6 +38,7 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final ProductOptionRepository productOptionRepository;
+    private final ProductOptionValueRepository productOptionValueRepository; // [추가]
     private final ProductImageRepository productImageRepository;
     private final ProductCertificationRepository productCertificationRepository;
 
@@ -86,6 +90,22 @@ public class ProductService {
                         .build();
                 ProductOption saved = productOptionRepository.save(option);
                 if (firstSavedOption == null) firstSavedOption = saved;
+
+                // [추가] 옵션 name/value 쌍 저장 (예: 색상-옐로우, 색상-핑크, 마루세트-상의만)
+                if (optReq.optionValues() != null && !optReq.optionValues().isEmpty()) {
+                    int sortOrder = 0;
+                    for (ProductDto.OptionValueRequest ov : optReq.optionValues()) {
+                        productOptionValueRepository.save(
+                                ProductOptionValue.builder()
+                                        .productOption(saved)
+                                        .optionName(ov.optionName())
+                                        .optionValue(ov.optionValue())
+                                        .sortOrder(sortOrder++)
+                                        .createdAt(LocalDateTime.now())
+                                        .build()
+                        );
+                    }
+                }
             }
         }
 
@@ -102,11 +122,12 @@ public class ProductService {
         }
 
         // 인증서 저장
+        List<ProductCertification> savedCertifications = new ArrayList<>(); // [추가]
         if (request.certifications() != null && !request.certifications().isEmpty()) {
             for (ProductDto.CertificationRequest cert : request.certifications()) {
                 if (cert.fileUrls() != null) {
                     for (String fileUrl : cert.fileUrls()) {
-                        productCertificationRepository.save(
+                        ProductCertification savedCert = productCertificationRepository.save(
                                 ProductCertification.builder()
                                         .product(savedProduct)
                                         .certName(cert.certName())
@@ -115,12 +136,13 @@ public class ProductService {
                                         .expiryMonth(cert.expiryMonth())
                                         .build()
                         );
+                        savedCertifications.add(savedCert); // [추가]
                     }
                 }
             }
         }
 
-        return ProductDto.DetailResponse.from(savedProduct);
+        return ProductDto.DetailResponse.from(savedProduct, savedCertifications); // [수정] 인증서 목록 전달
     }
 
     // [READ] 전체 상품 목록
@@ -137,7 +159,8 @@ public class ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
         product.increaseViewCount();
-        return ProductDto.DetailResponse.from(product);
+        List<ProductCertification> certifications = productCertificationRepository.findByProduct_ProductId(productId); // [추가]
+        return ProductDto.DetailResponse.from(product, certifications); // [수정]
     }
 
     // [READ] 내 상품 목록 (셀러용)
@@ -171,7 +194,8 @@ public class ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
         product.update(request);
-        return ProductDto.DetailResponse.from(product);
+        List<ProductCertification> certifications = productCertificationRepository.findByProduct_ProductId(productId); // [추가]
+        return ProductDto.DetailResponse.from(product, certifications); // [수정]
     }
 
     // [DELETE] 상품 삭제

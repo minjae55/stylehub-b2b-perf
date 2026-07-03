@@ -4,6 +4,8 @@ import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.product.entity.Product;
 import kr.remerge.stylehub.domain.product.entity.ProductImage;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
+import kr.remerge.stylehub.domain.product.entity.ProductOptionValue; // [추가]
+import kr.remerge.stylehub.domain.product.entity.ProductCertification; // [추가]
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -54,7 +56,16 @@ public class ProductDto {
             String sku,
             Integer stockQuantity,
             Long additionalPrice,
-            Integer restockAlertQuantity
+            Integer restockAlertQuantity,
+            List<OptionValueRequest> optionValues // [추가] 옵션 name/value 쌍 목록 (예: 색상-옐로우, 마루세트-상의만)
+    ) {}
+
+    // ───────────────────────────────────────────
+    // [CREATE] 옵션 name/value 쌍 요청 [추가]
+    // ───────────────────────────────────────────
+    public record OptionValueRequest(
+            String optionName,
+            String optionValue
     ) {}
 
     // ───────────────────────────────────────────
@@ -107,9 +118,11 @@ public class ProductDto {
             Boolean whiteLabel,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
-            List<OptionResponse> options
+            List<OptionResponse> options,
+            List<CertificationResponse> certifications // [추가]
     ) {
-        public static DetailResponse from(Product p) {
+        // [수정] 인증서 목록을 함께 받도록 파라미터 추가
+        public static DetailResponse from(Product p, List<ProductCertification> certifications) {
             return new DetailResponse(
                     p.getProductId(),
                     p.getSeller().getUserId(),
@@ -136,7 +149,27 @@ public class ProductDto {
                     p.getWhiteLabel(),
                     p.getCreatedAt(),
                     p.getUpdatedAt(),
-                    p.getOptions().stream().map(OptionResponse::from).toList()
+                    p.getOptions().stream().map(OptionResponse::from).toList(),
+                    certifications.stream().map(CertificationResponse::from).toList() // [추가]
+            );
+        }
+    }
+
+    // ───────────────────────────────────────────
+    // [RESPONSE] 인증서 [추가]
+    // ───────────────────────────────────────────
+    public record CertificationResponse(
+            String certName,
+            String fileUrl,
+            Integer expiryYear,
+            Integer expiryMonth
+    ) {
+        public static CertificationResponse from(ProductCertification cert) {
+            return new CertificationResponse(
+                    cert.getCertName(),
+                    cert.getFileUrl(),
+                    cert.getExpiryYear(),
+                    cert.getExpiryMonth()
             );
         }
     }
@@ -203,7 +236,8 @@ public class ProductDto {
             Long additionalPrice,
             Integer restockAlertQuantity,
             Boolean isActive,
-            List<ImageResponse> images
+            List<ImageResponse> images,
+            List<OptionValueResponse> optionValues // [추가]
     ) {
         public static OptionResponse from(ProductOption opt) {
             return new OptionResponse(
@@ -214,7 +248,25 @@ public class ProductDto {
                     opt.getAdditionalPrice(),
                     opt.getRestockAlertQuantity(),
                     opt.getIsActive(),
-                    opt.getImages().stream().map(ImageResponse::from).toList()
+                    opt.getImages().stream().map(ImageResponse::from).toList(),
+                    opt.getOptionValues().stream().map(OptionValueResponse::from).toList() // [추가]
+            );
+        }
+    }
+
+    // ───────────────────────────────────────────
+    // [RESPONSE] 옵션 name/value 쌍 [추가]
+    // ───────────────────────────────────────────
+    public record OptionValueResponse(
+            String optionName,
+            String optionValue,
+            Integer sortOrder
+    ) {
+        public static OptionValueResponse from(ProductOptionValue ov) {
+            return new OptionValueResponse(
+                    ov.getOptionName(),
+                    ov.getOptionValue(),
+                    ov.getSortOrder()
             );
         }
     }
