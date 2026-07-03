@@ -5,7 +5,7 @@ import kr.remerge.stylehub.domain.quote.entity.Quote;
 import kr.remerge.stylehub.domain.quote.repository.QuoteRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.enumtype.UserRole;
-import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.domain.user.support.UserReader;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -20,11 +20,11 @@ import java.util.List;
 public class QuoteSellerService {
 
     private final QuoteRepository quoteRepository;
-    private final UserRepository userRepository;
+    private final UserReader userReader;
 
     public List<QuoteSellerListResponse> getQuoteList(Integer userId) {
 
-        User seller = findUser(userId);
+        User seller = userReader.getCompanyUser(userId);
 
         List<Quote> quotes;
 
@@ -45,17 +45,5 @@ public class QuoteSellerService {
                 .toList();
 
     }
-
-    private User findUser(Integer userId) {
-        User seller = userRepository.findByIdWithCompany(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        if (seller.getCompany() == null) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
-
-        return seller;
-    }
-
 
 }

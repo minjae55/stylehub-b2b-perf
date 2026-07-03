@@ -36,9 +36,7 @@ public class OrderStatusService {
                 );
 
         if (hasInvalidStatus) {
-            throw new BusinessException(
-                    ErrorCode.INVALID_ORDER_STATUS
-            );
+            throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
         }
 
         List<OrderLog> logs = orders.stream()

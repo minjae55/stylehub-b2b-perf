@@ -122,10 +122,15 @@ public class SettlementService {
                 .limit(10)
                 .map(order -> {
                     SettlementDashboard.RecentPayment row = new SettlementDashboard.RecentPayment();
-                    row.setSettlementId(order.getOrderNo());
+                    row.setSettlementId(order.getOrderId());
+                    row.setOrderNo(order.getOrderNo());
                     row.setCreatedAt(order.getCreatedAt() != null ? order.getCreatedAt().toString() : null);
+                    row.setBuyerId(order.getBuyer() != null ? order.getBuyer().getUserId() : null); // 💡 User PK 필드명 확인
+                    row.setSellerId(order.getSellerCompany() != null ? order.getSellerCompany().getCompanyId() : null); // 💡 Company PK 필드명 확인
                     row.setSellerCompanyName(order.getSellerCompanyName());
                     row.setTotalAmount(order.getTotalAmount());
+                    row.setPlatformFee(order.getPlatformFee());
+                    row.setFinalAmount(order.getTotalAmount() - order.getPlatformFee());
                     row.setStatus(order.getStatus() != null ? order.getStatus().name() : null);
                     return row;
                 })

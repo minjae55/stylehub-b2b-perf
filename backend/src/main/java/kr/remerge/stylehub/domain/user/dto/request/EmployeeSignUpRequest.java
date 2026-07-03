@@ -44,12 +44,13 @@ public record EmployeeSignUpRequest(
         List<Integer> preferredCategoryIds
 ) {
     public User toUserEntity(Company company, String encodedPassword, UserRole userRole, BusinessRole businessRole) {
+        String cleanPhone = this.phone.replaceAll("[^0-9]", "");
         return User.builder()
                 .company(company)
                 .email(email)
                 .password(encodedPassword)
                 .name(name)
-                .phone(phone)
+                .phone(cleanPhone)
                 .role(userRole)
                 .businessRole(businessRole)
                 .status(UserStatus.PENDING)

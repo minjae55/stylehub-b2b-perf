@@ -7,7 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import kr.remerge.stylehub.global.auth.security.CustomUserDetailsService;
+import kr.remerge.stylehub.global.auth.AuthService;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
@@ -31,7 +31,7 @@ resolveToken()                                 # 쿠키(accessToken)에서 토�
     ↓
 jwtProvider.validateToken()                    # 유효한지 검증
     ↓
-customUserDetailsService.loadUserByUserId()    # 토큰 내부의 userId로 유저 로드
+AuthService.loadUserByUserId()    # 토큰 내부의 userId로 유저 로드
     ↓
 SecurityContextHolder에 인증 정보 저장
     ↓
@@ -55,7 +55,7 @@ React에서 감지
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
-    private final CustomUserDetailsService customUserDetailsService;
+    private final AuthService authService;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -78,7 +78,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 Integer userId = jwtProvider.getUserId(token);
 
                 // 5. userId로 DB에서 유저 정보 로드
-                UserDetails userDetails = customUserDetailsService.loadUserByUserId(userId);
+                UserDetails userDetails = authService.loadUserByUserId(userId);
 
                 // 6. 인증 객체 생성
                 UsernamePasswordAuthenticationToken authentication =

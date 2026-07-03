@@ -5,12 +5,14 @@ import { formatPhoneNumber } from "@/pages/auth/register/shared";
 import {
     checkEmailDuplicate,
     checkPhoneDuplicate,
+    uploadFile,
+} from "@/api/auth/auth.service";
+import {
     sendEmailChangeOtp,
     sendPhoneChangeOtp,
-    uploadFile,
     verifyEmailChangeOtp,
     verifyPhoneChangeOtp,
-} from "@/api/auth/auth.service";
+} from "@/api/user/user.service";
 import { updateProfileInfo, verifyGatePassword } from "@/api/user/user.service";
 import { OtpVerificationPanel } from "@/app/components/ui/otp-vertification-panel";
 import { toast } from "sonner";
@@ -121,12 +123,17 @@ function useEmailChangeOtp(email: string, isChanged: boolean) {
                 if (requestRef.current !== email) return;
                 setStatus("available");
             } catch (error: any) {
+                // FIX 1: requestEmailRef(존재하지 않는 변수) → requestRef로 수정.
+                // 원래 코드는 여기서 ReferenceError가 터져서 catch가 통째로 죽었음.
                 if (requestRef.current !== email) return;
-                const err: ErrorResponse = error?.response?.data;
-                if (err?.status === 409 || error?.response?.status === 409 || err?.code === "DUPLICATE_EMAIL") {
+                const errorData: ErrorResponse | undefined = error?.response?.data;
+                if (error?.response?.status === 409 || errorData?.code === "DUPLICATE_EMAIL") {
                     setStatus("duplicate");
                 } else {
                     setStatus("idle");
+                    toast.error("중복확인 실패", {
+                        description: errorData?.message || "중복확인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+                    });
                 }
             }
         }, DEBOUNCE_MS);
@@ -229,8 +236,10 @@ function usePhoneChangeOtp(phone: string, isChanged: boolean) {
                 setStatus("available");
             } catch (error: any) {
                 if (requestRef.current !== cleaned) return;
-                const err: ErrorResponse = error?.response?.data;
-                if (err?.status === 409 || error?.response?.status === 409 || err?.code === "DUPLICATE_PHONE_NUMBER") {
+                // FIX 3: err?.status는 백엔드가 절대 안 내려주는 필드라 항상 false.
+                // error?.response?.status(진짜 HTTP 상태코드)만 남기고 타입도 옵셔널로 수정.
+                const err: ErrorResponse | undefined = error?.response?.data;
+                if (error?.response?.status === 409 || err?.code === "DUPLICATE_PHONE_NUMBER") {
                     setStatus("duplicate");
                 } else {
                     // 중복확인 API 에러 시 진행 허용 (프로필은 관대하게)
@@ -305,11 +314,13 @@ export function ProfileTab() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const imgRef = useRef<HTMLInputElement>(null);
 
-    // isChanged 계산 — 훅보다 먼저 해야 훅에 넘길 수 있음
-    const isEmailChanged = !!user && user.email !== form.email;
-    const isPhoneChanged = !!user && stripHyphen(user.phone || "") !== stripHyphen(form.phone);
+    const [isEmailDirty, setIsEmailDirty] = useState(false);
+    const [isPhoneDirty, setIsPhoneDirty] = useState(false);
 
-    // isChanged를 훅에 직접 넘겨서 진입 시 불필요한 중복확인 차단
+    const isEmailChanged = !!user && user.email !== form.email && isEmailDirty;
+    const isPhoneChanged = !!user && stripHyphen(user.phone || "") !== stripHyphen(form.phone) && isPhoneDirty;
+
+    // 훅에 조정한 변경 여부 전달
     const emailOtp = useEmailChangeOtp(form.email, isEmailChanged);
     const phoneOtp = usePhoneChangeOtp(form.phone, isPhoneChanged);
 
@@ -319,6 +330,9 @@ export function ProfileTab() {
                 email: user.email || "",
                 phone: formatPhoneNumber(user.phone || ""),
             });
+            // 유저 정보가 처음 세팅되거나 바뀔 때는 감지 플래그 초기화 (API 자동 호출 방지)
+            setIsEmailDirty(false);
+            setIsPhoneDirty(false);
         }
     }, [user]);
 
@@ -328,16 +342,28 @@ export function ProfileTab() {
     };
 
     const handleEmailChange = (v: string) => {
+        const isActuallyChanged = !!user && user.email !== v.trim();
+
+        setIsEmailDirty(isActuallyChanged);
+
         set({ email: v });
         emailOtp.reset();
     };
 
     const handlePhoneChange = (v: string) => {
-        set({ phone: formatPhoneNumber(v) });
+        const formattedValue = formatPhoneNumber(v);
+
+        const currentCleaned = stripHyphen(formattedValue);
+        const originalCleaned = !!user ? stripHyphen(user.phone || "") : "";
+
+        const isNumberActuallyChanged = originalCleaned !== currentCleaned;
+        setIsPhoneDirty(isNumberActuallyChanged);
+
+        set({ phone: formattedValue });
         phoneOtp.reset();
     };
 
-    const handleGateVerify = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleGateVerify = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!gatePassword.trim() || verifyingGate) return;
         setVerifyingGate(true);
@@ -370,18 +396,25 @@ export function ProfileTab() {
 
             const updatedUser = await updateProfileInfo({
                 email:           form.email,
-                phone:           stripHyphen(form.phone), // 하이픈 제거 후 전송
+                phone:           stripHyphen(form.phone),
                 profileImageUrl: uploadedUrl,
             });
-
-            setUser(updatedUser);
+            if (user) {
+                setUser({
+                    ...user,
+                    ...updatedUser
+                });
+            }
             setSaved(true);
             setImageFile(null);
             emailOtp.reset();
             phoneOtp.reset();
+            // 💡 저장 성공 후 플래그 다시 꺼주기
+            setIsEmailDirty(false);
+            setIsPhoneDirty(false);
             setTimeout(() => setSaved(false), 2500);
         } catch (error: any) {
-            const errors = error.response?.data?.fieldErrors;
+            const errors = error.response?.data?.data;
             if (errors) setFieldErrors(errors);
             else toast.error("저장 실패", { description: error.response?.data?.message || "정보 수정 중 오류가 발생했습니다." });
         } finally {

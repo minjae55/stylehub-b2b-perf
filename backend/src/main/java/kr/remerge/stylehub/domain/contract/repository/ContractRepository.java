@@ -10,4 +10,6 @@ public interface ContractRepository extends JpaRepository<Contract, Integer> {
     boolean existsByQuote_QuoteId(Integer quoteId);
 
     Optional<Contract> findByQuote_QuoteId(Integer quoteId);
+
+    Optional<Contract> findByContractIdAndQuote_Buyer_UserId(Integer contractId, Integer buyerId);
 }

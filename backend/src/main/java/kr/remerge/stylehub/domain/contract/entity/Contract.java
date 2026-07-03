@@ -157,6 +157,42 @@ public class Contract {
         this.contractHash = contractHash;
     }
 
+    public void updateDraft(
+            LocalDate deliveryDate,
+            String paymentTerms,
+            String returnPolicy,
+            String specialTerms
+    ) {
+        if (this.status != ContractStatus.DRAFT) {
+            throw new IllegalStateException(
+                    "초안 상태의 계약서만 수정할 수 있습니다."
+            );
+        }
+
+        if (deliveryDate == null) {
+            throw new IllegalArgumentException(
+                    "납품 예정일은 필수입니다."
+            );
+        }
+
+        if (paymentTerms == null || paymentTerms.isBlank()) {
+            throw new IllegalArgumentException(
+                    "결제 조건은 필수입니다."
+            );
+        }
+
+        if (returnPolicy == null || returnPolicy.isBlank()) {
+            throw new IllegalArgumentException(
+                    "반품·교환 조건은 필수입니다."
+            );
+        }
+
+        this.deliveryDate = deliveryDate;
+        this.paymentTerms = paymentTerms;
+        this.returnPolicy = returnPolicy;
+        this.specialTerms = specialTerms;
+    }
+
     public static Contract createDraftFromQuote(
             Quote quote,
             String contractNo,

@@ -81,40 +81,51 @@ export function ProtectedLayout() {
     if (!user) {
         return <Navigate to="/auth" replace/>;
     }
-
+// ───────────────────────────────────────────
+    // Step 4. 역할(role) 및 비즈니스 권한 기반 접근 제어
     // ───────────────────────────────────────────
-    // Step 4. 역할(role) 기반 접근 제어
-    // 라우터의 handle: { role: "BUYER" | "SELLER" } 설정을 읽어서 권한 체크
-    // ADMIN은 모든 경로 접근 허용
-    // ───────────────────────────────────────────
-    if (user.role !== "ADMIN") {
 
-        // 안전 조치: 하위/상위 매칭된 모든 라우트를 순회하며 handle에 걸려있는 권한 정보 수집
-        const activeRoles = matches
-            .map((m) => (m.handle as any)?.roles)
-            .find((roles) => Array.isArray(roles) && roles.length > 0);
+    // 라우터 handle에 걸려있는 권한 배열 또는 단일 role 수집
+    const requiredRoles = matches
+        .map((m) => (m.handle as any)?.roles)
+        .find((roles) => Array.isArray(roles) && roles.length > 0);
 
-        const activeRole = matches
-            .map((m) => (m.handle as any)?.role)
-            .find((role) => typeof role === "string" && role.trim() !== "");
+    const requiredRole = matches
+        .map((m) => (m.handle as any)?.role)
+        .find((role) => typeof role === "string" && role.trim() !== "");
 
-        // 현재 유저의 비즈니스 역할 권한 범위 (안전하게 fallback 처리)
-        const userBizRole = user.businessRole || "";
+    // 1. [어드민 전용 라우트 체크] 라우터가 오직 ADMIN만 요구하는 경우
+    // handle: { role: "ADMIN" } 또는 handle: { roles: ["ADMIN"] } 설정 대응
+    const isPageForAdminOnly = requiredRole === "ADMIN" || requiredRoles?.includes("ADMIN");
 
-        // 1) 배열 형태 권한 설정(roles: ["SELLER", "BOTH"])이 상위/하위 라우트 중 하나라도 발견된 경우
-        if (activeRoles) {
-            if (!activeRoles.includes(userBizRole)) {
-                alert("접근 권한이 없습니다.");
-                return <Navigate to="/" replace />;
-            }
+    if (isPageForAdminOnly) {
+        if (user.role !== "ADMIN") {
+            alert("관리자만 접근할 수 있는 페이지입니다.");
+            return <Navigate to="/" replace />;
         }
+        return <Outlet />; // ADMIN이 맞으면 즉시 통과
+    }
 
-        // 2) 단일 문자열 형태 권한 설정(role: "SELLER")만 발견된 경우 (기존 코드 하위 호환)
-        else if (activeRole) {
-            if (userBizRole !== activeRole) {
-                alert("접근 권한이 없습니다.");
-                return <Navigate to="/" replace />;
-            }
+    // 2. 최고 관리자(ADMIN)는 일반 비즈니스(BUYER/SELLER) 페이지를 무조건 프리패스
+    if (user.role === "ADMIN") {
+        return <Outlet />;
+    }
+
+    // 3. ADMIN이 아닌 일반 유저(PRESIDENT, EMPLOYEE 등)의 비즈니스 권한 체크
+    const userBizRole = user.businessRole || "";
+
+    // Case A: 라우터에 배열 형태 권한 설정이 있을 때 (예: roles: ["SELLER", "BOTH"])
+    if (requiredRoles) {
+        if (!requiredRoles.includes(userBizRole)) {
+            alert("해당 기능에 대한 접근 권한이 없습니다.");
+            return <Navigate to="/" replace />;
+        }
+    }
+    // Case B: 라우터에 단일 문자열 권한 설정이 있을 때 (예: role: "SELLER")
+    else if (requiredRole) {
+        if (userBizRole !== requiredRole) {
+            alert("해당 기능에 대한 접근 권한이 없습니다.");
+            return <Navigate to="/" replace />;
         }
     }
 

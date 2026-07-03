@@ -26,6 +26,7 @@ import {
     type DaumAddressResult,
     Field,
     FileUpload,
+    formatBusinessNumber,
     formatPhoneNumber,
     inputCls,
     type RegisterFormData,
@@ -43,17 +44,20 @@ interface StepPresidentBusinessProps {
     isBusinessVerified: boolean;
     setIsBusinessVerified: (v: boolean) => void;
     role: Role;
+    fieldErrors?: Record<string, string>;
 }
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────────────────
 
 export function StepPresidentBusiness({
-                                          form, set, isBusinessVerified, setIsBusinessVerified, role,
+                                          form, set, isBusinessVerified, setIsBusinessVerified, role, fieldErrors
                                       }: StepPresidentBusinessProps) {
     const [ocrLoading, setOcrLoading] = useState(false);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [addressModalOpen, setAddressModalOpen] = useState(false);
+    const isValidRepresentativePhone = !form.representativePhone ||
+        /^(0[2-9]\d{1,2}-\d{3,4}-\d{4}|01[016789]-\d{3,4}-\d{4})$/.test(form.representativePhone);
 
     // 주소 선택 후 상세주소 입력창으로 자동 포커스 이동시키기 위한 ref
     const addressDetailRef = useRef<HTMLInputElement>(null);
@@ -168,6 +172,9 @@ export function StepPresidentBusiness({
                     className={`${inputCls} ${errorMessage ? "border-red-400 focus:ring-red-200" : ""}`}
                     disabled={isBusinessVerified}
                 />
+                {fieldErrors?.companyName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.companyName}</p>
+                )}
             </Field>
 
             <Field label="대표자명" required>
@@ -179,6 +186,9 @@ export function StepPresidentBusiness({
                     className={`${inputCls} ${errorMessage ? "border-red-400 focus:ring-red-200" : ""}`}
                     disabled={isBusinessVerified}
                 />
+                {fieldErrors?.representativeName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.representativeName}</p>
+                )}
             </Field>
 
             <Field label="개업일자" required hint="사업자등록증에 기재된 개업연월일을 선택해주세요.">
@@ -189,6 +199,9 @@ export function StepPresidentBusiness({
                     className={`${inputCls} ${errorMessage ? "border-red-400 focus:ring-red-200" : ""}`}
                     disabled={isBusinessVerified}
                 />
+                {fieldErrors?.openDate && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.openDate}</p>
+                )}
             </Field>
 
             {/* 사업자번호 + 국세청 조회 버튼 */}
@@ -197,7 +210,7 @@ export function StepPresidentBusiness({
                     <input
                         type="text"
                         value={form.businessNumber}
-                        onChange={(e) => handleInputChange({businessNumber: e.target.value})}
+                        onChange={(e) => handleInputChange({ businessNumber: formatBusinessNumber(e.target.value) })}
                         placeholder="000-00-00000"
                         maxLength={12}
                         className={`${inputCls} ${
@@ -231,6 +244,9 @@ export function StepPresidentBusiness({
                     <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
                         <Building2 size={12}/> 국세청 및 업종 검증이 완료되었습니다. 이제 다음 단계로 갈 수 있습니다.
                     </p>
+                )}
+                {fieldErrors?.businessNumber && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.businessNumber}</p>
                 )}
             </Field>
 
@@ -277,6 +293,15 @@ export function StepPresidentBusiness({
                     disabled={!form.address}
                     className={`${inputCls} disabled:opacity-50 disabled:cursor-not-allowed`}
                 />
+                {fieldErrors?.address && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.address}</p>
+                )}
+                {fieldErrors?.addressDetail && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.addressDetail}</p>
+                )}
+                {fieldErrors?.zipcode && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.zipcode}</p>
+                )}
             </Field>
 
             {/* 회사 대표전화 */}
@@ -297,6 +322,14 @@ export function StepPresidentBusiness({
                     maxLength={13}
                     className={inputCls}
                 />
+                {form.representativePhone && !isValidRepresentativePhone && (
+                    <p className="text-xs text-amber-600 mt-1">
+                        올바른 전화번호 형식이 아닙니다. (예: 02-1234-5678, 010-1234-5678)
+                    </p>
+                )}
+                {fieldErrors?.representativePhone && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.representativePhone}</p>
+                )}
             </Field>
 
             {/* 다음 우편번호 검색 모달 */}
@@ -313,7 +346,7 @@ export function StepPresidentBusiness({
                     <p className="text-xs text-amber-700 leading-relaxed">
                         일부 업태·업종은 셀러 가입이 제한됩니다.{" "}
                         <Link to="/restricted-businesses" className="text-amber-800 font-semibold underline">
-                            가입 불가 업태/업종 확인하기 →
+                            가입 불가 업태/업종 확인하기
                         </Link>
                     </p>
                 </div>

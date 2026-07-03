@@ -18,8 +18,11 @@ import {
 
 type CartItem = {
   cartItemId: number;
+
   productId: number;
   productOptionId: number;
+
+  imageUrl: string;
   productName: string;
   optionLabel: string;
   options: Array<{
@@ -100,113 +103,6 @@ function calculateShippingFee(selectedItems: CartItem[]) {
     return totalShippingFee + (isFreeShipping ? 0 : shippingFee);
   }, 0);
 }
-
-const demoCartItems: CartItem[] = [
-  {
-    cartItemId: -1,
-    productId: 101,
-    productOptionId: 1001,
-    productName: "베이직 크롭 반팔 티셔츠",
-    optionLabel: "블랙 / M",
-    options: [{ optionName: "색상", optionValue: "블랙" }, { optionName: "사이즈", optionValue: "M" }],
-    unitPrice: 5500,
-    moq: 100,
-    quantity: 100,
-    stockQuantity: 240,
-    totalPrice: 550000,
-    isChecked: true,
-    sampleAvailable: true,
-    sampleMaxQuantity: 3,
-    sellerId: 11,
-    sellerName: "스타일컴퍼니",
-    shippingFee: 5000,
-    freeShippingThreshold: 800000,
-    cartType: "NORMAL",
-  },
-  {
-    cartItemId: -2,
-    productId: 102,
-    productOptionId: 1002,
-    productName: "핀턱 와이드 슬랙스",
-    optionLabel: "차콜 / L",
-    options: [{ optionName: "색상", optionValue: "차콜" }, { optionName: "사이즈", optionValue: "L" }],
-    unitPrice: 12800,
-    moq: 20,
-    quantity: 20,
-    stockQuantity: 80,
-    totalPrice: 256000,
-    isChecked: true,
-    sampleAvailable: true,
-    sampleMaxQuantity: 2,
-    sellerId: 11,
-    sellerName: "스타일컴퍼니",
-    shippingFee: 5000,
-    freeShippingThreshold: 800000,
-    cartType: "NORMAL",
-  },
-  {
-    cartItemId: -3,
-    productId: 201,
-    productOptionId: 2001,
-    productName: "썸머 린넨 셔츠",
-    optionLabel: "아이보리 / FREE",
-    options: [{ optionName: "색상", optionValue: "아이보리" }, { optionName: "사이즈", optionValue: "FREE" }],
-    unitPrice: 9200,
-    moq: 50,
-    quantity: 50,
-    stockQuantity: 120,
-    totalPrice: 460000,
-    isChecked: true,
-    sampleAvailable: false,
-    sellerId: 22,
-    sellerName: "동대문 어패럴",
-    shippingFee: 3500,
-    freeShippingThreshold: 600000,
-    cartType: "NORMAL",
-  },
-  {
-    cartItemId: -4,
-    productId: 202,
-    productOptionId: 2002,
-    productName: "셔링 밴딩 롱스커트",
-    optionLabel: "베이지 / FREE",
-    options: [{ optionName: "색상", optionValue: "베이지" }, { optionName: "사이즈", optionValue: "FREE" }],
-    unitPrice: 10500,
-    moq: 10,
-    quantity: 10,
-    stockQuantity: 60,
-    totalPrice: 105000,
-    isChecked: true,
-    sampleAvailable: true,
-    sampleMaxQuantity: 2,
-    sellerId: 22,
-    sellerName: "동대문 어패럴",
-    shippingFee: 3500,
-    freeShippingThreshold: 600000,
-    cartType: "NORMAL",
-  },
-  {
-    cartItemId: -5,
-    productId: 301,
-    productOptionId: 3001,
-    productName: "프리미엄 트위드 재킷",
-    optionLabel: "핑크 / S",
-    options: [{ optionName: "색상", optionValue: "핑크" }, { optionName: "사이즈", optionValue: "S" }],
-    unitPrice: 24800,
-    moq: 10,
-    quantity: 10,
-    stockQuantity: 20,
-    totalPrice: 248000,
-    isChecked: true,
-    sampleAvailable: true,
-    sampleMaxQuantity: 1,
-    sellerId: 33,
-    sellerName: "서울 부티크 도매",
-    shippingFee: 3000,
-    freeShippingThreshold: 0,
-    cartType: "NORMAL",
-  },
-];
 
 export function Cart() {
   const navigate = useNavigate();
@@ -827,9 +723,13 @@ function CartProductCard({
         <div className="pt-8">
           <Checkbox checked={selected} onClick={onToggle} disabled={blocked} />
         </div>
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-300">
-          <Package size={32} />
-        </div>
+       <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
+         <img
+           src={item.imageUrl}
+           alt={item.productName}
+           className="h-full w-full object-cover"
+         />
+       </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-4">
@@ -841,7 +741,7 @@ function CartProductCard({
                     type="button"
                     onClick={onAddSample}
                     disabled={sampleAdded || isAddingSample}
-                    className="inline-flex h-6 shrink-0 items-center justify-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 text-[11px] font-bold text-amber-700 transition hover:border-amber-400 hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                    className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 text-xs font-bold text-amber-700 transition hover:border-amber-400 hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
                   >
                     {isAddingSample ? (
                       <Loader2 size={11} className="animate-spin" />
@@ -850,7 +750,7 @@ function CartProductCard({
                     ) : (
                       <FlaskConical size={11} />
                     )}
-                    {isAddingSample ? "추가 중" : sampleAdded ? "샘플 담김" : "샘플 주문"}
+                    {isAddingSample ? "추가 중" : sampleAdded ? "샘플 담김" : "샘플 주문 담기"}
                   </button>
                 )}
               </div>

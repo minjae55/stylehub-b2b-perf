@@ -44,4 +44,11 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     boolean existsByEmailAndName(String email, String name);
 
     boolean existsByPhone(String phone);
+
+    // 기본 주소지
+    @Query("select u from User u " +
+            "left join fetch u.defaultShippingAddress " +
+            "left join fetch u.defaultReceivingAddress " +
+            "where u.userId = :userId")
+    Optional<User> findByIdWithAddresses(@Param("userId") Integer userId);
 }

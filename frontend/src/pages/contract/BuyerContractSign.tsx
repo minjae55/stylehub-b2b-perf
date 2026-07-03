@@ -1,571 +1,628 @@
-import { useState, useRef, useEffect } from "react";
-import { Link, useParams, useNavigate } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams } from "react-router";
 import {
-  ChevronLeft, FileText, PenLine, CheckCircle, AlertCircle,
-  Package, Truck, Calendar, RotateCcw, Shield, Download, X,
-  Clock, Eye,
+  AlertCircle,
+  Calendar,
+  CheckCircle,
+  ChevronLeft,
+  Clock,
+  FileText,
+  LoaderCircle,
+  Package,
+  PenLine,
+  RotateCcw,
+  ShieldCheck,
+  Truck,
 } from "lucide-react";
+import api from "@/api/axios";
 
-// ── 더미 계약 데이터 (셀러가 이미 작성·서명한 상태) ──────────────────
-const contractData: Record<string, {
-  orderId: string;
-  createdAt: string;
-  sellerSignedAt: string;        // 셀러 서명 완료 시각
-  sellerSignImage: string;       // 셀러 서명 이미지 (base64 or URL)
-  validUntil: string;
-  buyer:  { name: string; business: string; businessNumber: string };
-  seller: { name: string; business: string; businessNumber: string };
-  product: {
-    name: string; category: string; material: string;
-    detail: string; image: string;
-  };
-  sizes: { color: string; size: string; quantity: number; unitPrice: number }[];
-  shippingFee: number;
-  leadTime: string;
-  deliveryDate: string;
-  sampleRequired: boolean;
-  returnPolicy: string;
-  specialTerms: string;
-}> = {
-  "ORD-2024-0901": {
-    orderId: "ORD-2024-0901",
-    createdAt: "2024.05.20",
-    sellerSignedAt: "2024.05.20 14:32",
-    sellerSignImage: "",          // 실제로는 셀러 서명 base64
-    validUntil: "2024.05.27",
-    buyer:  { name: "김민재",  business: "스타일마켓㈜",   businessNumber: "123-45-67890" },
-    seller: { name: "이지은",  business: "르블랑 어패럴", businessNumber: "987-65-43210" },
-    product: {
-      name: "여성 린넨 오버핏 블라우스 (주문제작)",
-      category: "상의 > 블라우스",
-      material: "린넨 100%",
-      detail: "오버핏 실루엣, 뒷면 버튼 디테일, 드롭숄더 라인. 바이어 제공 작업지시서 기준 제작.",
-      image: "https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=240&h=240&fit=crop",
-    },
-    sizes: [
-      { color: "화이트", size: "S", quantity: 30, unitPrice: 14000 },
-      { color: "화이트", size: "M", quantity: 50, unitPrice: 14000 },
-      { color: "화이트", size: "L", quantity: 40, unitPrice: 14000 },
-      { color: "베이지", size: "S", quantity: 20, unitPrice: 14000 },
-      { color: "베이지", size: "M", quantity: 40, unitPrice: 14000 },
-      { color: "베이지", size: "L", quantity: 20, unitPrice: 14000 },
-    ],
-    shippingFee: 0,
-    leadTime: "14일",
-    deliveryDate: "2024.06.10",
-    sampleRequired: true,
-    returnPolicy: "불량·오제작에 한해 수령 후 7일 이내 전량 교환 또는 환불. 단순 변심 반품 불가.",
-    specialTerms: "샘플 확인 후 바이어 승인 시 본 생산 진행. 샘플 제작 기간 3~5일 별도 소요.",
-  },
+type ContractStatus =
+  | "DRAFT"
+  | "SELLER_SIGNED"
+  | "BUYER_SIGNED"
+  | "COMPLETED"
+  | "CANCELED"
+  | "EXPIRED";
+
+type ContractItem = {
+  contractItemId: number;
+  productName: string;
+  optionSummary: string | null;
+  material: string | null;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
 };
 
-// ── 서명 캔버스 ───────────────────────────────────────────────────────
+type BuyerContractDetail = {
+  contractId: number;
+  contractNo: string;
+  quoteId: number;
+  quoteNo: string;
+  status: ContractStatus;
+  buyerCompanyName: string;
+  buyerBusinessNumber: string;
+  sellerCompanyName: string;
+  sellerBusinessNumber: string;
+  productName: string;
+  material: string | null;
+  deliveryCompany: string | null;
+  shippingFee: number;
+  leadTimeDays: number;
+  validUntil: string;
+  contractAmount: number;
+  deliveryDate: string;
+  paymentTerms: string;
+  returnPolicy: string;
+  specialTerms: string | null;
+  createdAt: string;
+  sellerSignedAt: string | null;
+  buyerSignedAt: string | null;
+  completedAt: string | null;
+  items: ContractItem[];
+};
+
+function formatPrice(value: number) {
+  return `${value.toLocaleString("ko-KR")}원`;
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 function SignatureCanvas({
-  label, value, onChange,
+  value,
+  onChange,
 }: {
-  label: string; value: string; onChange: (dataUrl: string) => void;
+  value: string;
+  onChange: (value: string) => void;
 }) {
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const isDrawing  = useRef(false);
-  const [isEmpty, setIsEmpty] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawing = useRef(false);
 
   useEffect(() => {
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    ctx.strokeStyle = "#1a2e1a";
-    ctx.lineWidth   = 2;
-    ctx.lineCap     = "round";
-    ctx.lineJoin    = "round";
+    const context = canvasRef.current?.getContext("2d");
+    if (!context) return;
+
+    context.strokeStyle = "#172019";
+    context.lineWidth = 2;
+    context.lineCap = "round";
+    context.lineJoin = "round";
   }, []);
 
-  const getPos = (e: React.MouseEvent | React.TouchEvent) => {
+  const getPosition = (event: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current!;
-    const rect   = canvas.getBoundingClientRect();
-    const sx = canvas.width  / rect.width;
-    const sy = canvas.height / rect.height;
-    if ("touches" in e) return { x: (e.touches[0].clientX - rect.left) * sx, y: (e.touches[0].clientY - rect.top) * sy };
-    return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+    const rect = canvas.getBoundingClientRect();
+    const pointer = "touches" in event ? event.touches[0] : event;
+
+    return {
+      x: (pointer.clientX - rect.left) * (canvas.width / rect.width),
+      y: (pointer.clientY - rect.top) * (canvas.height / rect.height),
+    };
   };
 
-  const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
+  const startDrawing = (event: React.MouseEvent | React.TouchEvent) => {
+    event.preventDefault();
+    const context = canvasRef.current?.getContext("2d");
+    if (!context) return;
+
+    const position = getPosition(event);
     isDrawing.current = true;
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    const { x, y } = getPos(e);
-    ctx.beginPath(); ctx.moveTo(x, y);
+    context.beginPath();
+    context.moveTo(position.x, position.y);
   };
 
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
+  const draw = (event: React.MouseEvent | React.TouchEvent) => {
+    event.preventDefault();
     if (!isDrawing.current) return;
-    const ctx = canvasRef.current!.getContext("2d")!;
-    const { x, y } = getPos(e);
-    ctx.lineTo(x, y); ctx.stroke();
-    setIsEmpty(false);
+
+    const context = canvasRef.current?.getContext("2d");
+    if (!context) return;
+
+    const position = getPosition(event);
+    context.lineTo(position.x, position.y);
+    context.stroke();
   };
 
-  const endDraw = () => {
+  const finishDrawing = () => {
+    if (!isDrawing.current || !canvasRef.current) return;
+
     isDrawing.current = false;
-    if (canvasRef.current) onChange(canvasRef.current.toDataURL());
+    onChange(canvasRef.current.toDataURL("image/png"));
   };
 
   const clear = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height);
-    setIsEmpty(true);
+
+    canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
     onChange("");
   };
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-          <PenLine size={14} className="text-primary" />{label}
-        </label>
-        {!isEmpty && (
-          <button onClick={clear} className="text-xs text-muted-foreground hover:text-red-500 flex items-center gap-1 transition-colors">
-            <X size={12} /> 다시 서명
+      <div className="mb-2 flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+          <PenLine size={15} className="text-primary" />
+          손 서명
+        </span>
+        {value && (
+          <button
+            type="button"
+            onClick={clear}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-rose-600"
+          >
+            <RotateCcw size={12} />
+            다시 서명
           </button>
         )}
       </div>
-      <div className={`relative border-2 rounded-lg overflow-hidden transition-colors ${value ? "border-primary" : "border-dashed border-border"}`}>
+      <div className="relative overflow-hidden rounded-lg border-2 border-dashed border-slate-300 bg-white">
         <canvas
-          ref={canvasRef} width={600} height={160}
-          onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
-          onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
-          className="w-full h-28 cursor-crosshair bg-white touch-none"
+          ref={canvasRef}
+          width={720}
+          height={180}
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={finishDrawing}
+          onMouseLeave={finishDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={finishDrawing}
+          className="h-32 w-full touch-none cursor-crosshair"
         />
-        {isEmpty && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-xs text-muted-foreground/60">이 곳에 서명해 주세요</p>
-          </div>
+        {!value && (
+          <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-slate-400">
+            이 영역에 서명해 주세요
+          </p>
         )}
-        {value && <div className="absolute bottom-2 right-2"><CheckCircle size={16} className="text-primary" /></div>}
       </div>
     </div>
   );
 }
 
-// ── 메인 페이지 ──────────────────────────────────────────────────────
 export function BuyerContractSign() {
-  const { orderId } = useParams<{ orderId: string }>();
-  const navigate    = useNavigate();
-  const contract    = orderId ? contractData[orderId] : null;
+  const { contractId } = useParams<{ contractId: string }>();
+  const [contract, setContract] = useState<BuyerContractDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [signatureText, setSignatureText] = useState("");
+  const [signatureImage, setSignatureImage] = useState("");
+  const [agreements, setAgreements] = useState({
+    specification: false,
+    returnPolicy: false,
+    final: false,
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
-  const [buyerSign,    setBuyerSign]    = useState("");
-  const [agreedSpec,   setAgreedSpec]   = useState(false);
-  const [agreedReturn, setAgreedReturn] = useState(false);
-  const [agreedTerms,  setAgreedTerms]  = useState(false);
-  const [signed,       setSigned]       = useState(false);
-  const [showReject,   setShowReject]   = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
+  useEffect(() => {
+    const parsedContractId = Number(contractId);
 
-  const canSign = buyerSign && agreedSpec && agreedReturn && agreedTerms;
+    if (!Number.isInteger(parsedContractId) || parsedContractId <= 0) {
+      setLoadError("유효하지 않은 계약서입니다.");
+      setIsLoading(false);
+      return;
+    }
 
-  if (!contract) {
+    const loadContract = async () => {
+      try {
+        setLoadError("");
+        const response = await api.get<BuyerContractDetail>(
+          `/buyer/contracts/${parsedContractId}`,
+        );
+        setContract(response);
+      } catch (error) {
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "계약서를 불러오지 못했습니다.",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadContract();
+  }, [contractId]);
+
+  const uploadSignature = async () => {
+    const imageResponse = await fetch(signatureImage);
+    const blob = await imageResponse.blob();
+    const file = new File(
+      [blob],
+      `buyer-contract-signature-${contract?.contractId}.png`,
+      { type: "image/png" },
+    );
+    const formData = new FormData();
+
+    formData.append("file", file);
+    formData.append("folder", "contract-signatures");
+
+    return api.post<string>("/common/image/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  };
+
+  const canSign =
+    contract?.status === "SELLER_SIGNED"
+    && signatureText.trim().length > 0
+    && signatureImage.length > 0
+    && agreements.specification
+    && agreements.returnPolicy
+    && agreements.final
+    && !isSubmitting;
+
+  const handleSign = async () => {
+    if (!contract || !canSign) return;
+
+    try {
+      setIsSubmitting(true);
+      setSubmitError("");
+
+      const signatureImageUrl = await uploadSignature();
+
+      await api.post(`/buyer/contracts/${contract.contractId}/sign`, {
+        signatureText: signatureText.trim(),
+        signatureImageUrl,
+      });
+
+      const completedAt = new Date().toISOString();
+      setContract({
+        ...contract,
+        status: "COMPLETED",
+        buyerSignedAt: completedAt,
+        completedAt,
+      });
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "계약서 서명에 실패했습니다.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
     return (
-      <div className="max-w-[720px] mx-auto px-4 py-16 text-center">
-        <FileText size={48} className="mx-auto mb-4 opacity-30 text-muted-foreground" />
-        <h2 className="text-xl font-bold text-foreground mb-2">계약서를 찾을 수 없습니다</h2>
-        <p className="text-muted-foreground mb-5">주문번호를 확인해 주세요.</p>
-        <Link to="/buyer/orders" className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded font-semibold text-sm transition-colors">
-          주문 목록으로
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <LoaderCircle size={28} className="animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!contract || loadError) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16 text-center">
+        <AlertCircle size={42} className="mx-auto mb-4 text-rose-500" />
+        <h1 className="text-xl font-bold text-slate-950">계약서를 확인할 수 없습니다</h1>
+        <p className="mt-2 text-sm text-slate-500">{loadError}</p>
+        <Link
+          to="/buyer/quotes"
+          className="mt-6 inline-flex rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-white"
+        >
+          견적 목록으로
         </Link>
       </div>
     );
   }
 
-  const subtotal  = contract.sizes.reduce((s, sz) => s + sz.quantity * sz.unitPrice, 0);
-  const total     = subtotal + contract.shippingFee;
-  const totalQty  = contract.sizes.reduce((s, sz) => s + sz.quantity, 0);
-
-  // ── 서명 완료 화면 ──
-  if (signed) {
-    return (
-      <div className="max-w-[600px] mx-auto px-4 py-16 text-center">
-        <div className="bg-white border border-border rounded-lg p-10">
-          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5">
-            <CheckCircle size={36} className="text-green-500" />
-          </div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">계약 체결 완료</h2>
-          <p className="text-sm text-muted-foreground mb-1">양측 서명이 완료되어 계약이 확정되었습니다.</p>
-          <p className="text-sm text-muted-foreground mb-8">이제 결제를 진행해 주세요.</p>
-          <div className="bg-secondary border border-border rounded-lg px-5 py-4 text-sm text-left space-y-2 mb-8">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">주문번호</span>
-              <span className="font-mono font-semibold text-foreground">{contract.orderId}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">셀러 서명</span>
-              <span className="text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> {contract.sellerSignedAt}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">바이어 서명</span>
-              <span className="text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> {new Date().toLocaleString("ko-KR")}</span>
-            </div>
-            <div className="flex justify-between border-t border-border pt-2">
-              <span className="text-muted-foreground">계약 금액</span>
-              <span className="font-bold text-foreground">₩{total.toLocaleString()}</span>
-            </div>
-          </div>
-          <div className="flex gap-3 justify-center">
-            <button className="border border-border text-foreground hover:border-primary hover:text-primary px-5 py-2.5 rounded text-sm font-medium transition-colors flex items-center gap-2">
-              <Download size={14} /> 계약서 PDF 저장
-            </button>
-            <button
-              onClick={() => navigate(`/checkout?orderId=${contract.orderId}&type=custom`)}
-              className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded font-semibold text-sm transition-colors"
-            >
-              결제 진행하기 →
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const totalQuantity = contract.items.reduce(
+    (sum, item) => sum + item.quantity,
+    0,
+  );
+  const isCompleted = contract.status === "COMPLETED";
+  const canDisplaySignForm = contract.status === "SELLER_SIGNED";
 
   return (
-    <div className="max-w-[760px] mx-auto px-4 py-8">
-      {/* Back */}
-      <Link to="/buyer/orders" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mb-5">
-        <ChevronLeft size={14} /> 주문 목록으로
-      </Link>
+    <div className="min-h-screen bg-slate-50 px-4 py-8">
+      <div className="mx-auto max-w-[980px]">
+        <Link
+          to="/buyer/quotes"
+          className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-primary"
+        >
+          <ChevronLeft size={15} />
+          견적 목록으로
+        </Link>
 
-      {/* Header */}
-      <div className="bg-gradient-to-r from-[#1a2e1a] to-[#2d4a35] text-white rounded-lg p-6 mb-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Eye size={20} />
-              <h1 className="text-xl font-bold">계약서 검토 및 서명</h1>
-            </div>
-            <p className="text-sm text-white/70">
-              셀러가 작성한 계약 내용을 확인하고 서명해 주세요.
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-white/60 mb-0.5">계약 금액</div>
-            <div className="text-2xl font-bold">₩{total.toLocaleString()}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 셀러 서명 완료 배너 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-5 flex items-center gap-3">
-        <CheckCircle size={16} className="text-blue-500 flex-shrink-0" />
-        <div className="text-xs text-blue-700">
-          <span className="font-semibold">{contract.seller.business}</span>이(가){" "}
-          <span className="font-mono">{contract.sellerSignedAt}</span>에 서명을 완료했습니다.
-          내용을 검토 후 서명해 주세요.
-        </div>
-      </div>
-
-      {/* 유효기간 경고 */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-5 flex items-center gap-2 text-xs text-amber-700">
-        <Clock size={13} className="flex-shrink-0" />
-        서명 유효 기간: <strong className="ml-1">{contract.validUntil}</strong>까지. 기한 내 서명하지 않으면 계약이 자동 취소됩니다.
-      </div>
-
-      <div className="space-y-5">
-
-        {/* 계약 당사자 */}
-        <section className="bg-white border border-border rounded-lg overflow-hidden">
-          <div className="px-5 py-4 border-b border-border bg-secondary/30">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <FileText size={15} className="text-primary" /> 계약 당사자
-            </h2>
-          </div>
-          <div className="grid grid-cols-2 divide-x divide-border">
-            <div className="px-5 py-4">
-              <div className="text-xs text-muted-foreground mb-2 font-medium">발주자 (바이어)</div>
-              <div className="font-semibold text-foreground text-sm">{contract.buyer.business}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{contract.buyer.name}</div>
-              <div className="text-xs text-muted-foreground font-mono mt-0.5">사업자 {contract.buyer.businessNumber}</div>
-            </div>
-            <div className="px-5 py-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="text-xs text-muted-foreground font-medium">수주자 (셀러)</div>
-                <span className="text-xs bg-green-100 text-green-700 border border-green-200 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                  <CheckCircle size={10} /> 서명 완료
-                </span>
-              </div>
-              <div className="font-semibold text-foreground text-sm">{contract.seller.business}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{contract.seller.name}</div>
-              <div className="text-xs text-muted-foreground font-mono mt-0.5">사업자 {contract.seller.businessNumber}</div>
-            </div>
-          </div>
-        </section>
-
-        {/* 제품 스펙 */}
-        <section className="bg-white border border-border rounded-lg overflow-hidden">
-          <div className="px-5 py-4 border-b border-border bg-secondary/30">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <Package size={15} className="text-primary" /> 제품 스펙
-            </h2>
-          </div>
-          <div className="px-5 py-4 space-y-3 text-sm">
-            <div className="flex gap-4">
-              <img
-                src={contract.product.image}
-                alt={contract.product.name}
-                className="w-28 h-28 rounded-lg object-cover border border-border flex-shrink-0"
-                onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/112x112/f3f4f6/9ca3af?text=NO+IMG"; }}
-              />
-              <div className="grid grid-cols-2 gap-3 flex-1">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-0.5">상품명</div>
-                  <div className="font-medium text-foreground">{contract.product.name}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-0.5">카테고리</div>
-                  <div className="text-foreground">{contract.product.category}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-0.5">소재</div>
-                  <div className="text-foreground">{contract.product.material}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-0.5">샘플 제작</div>
-                  <div className={contract.sampleRequired ? "text-primary font-medium" : "text-muted-foreground"}>
-                    {contract.sampleRequired ? "필요 (본생산 전 승인)" : "불필요"}
-                  </div>
-                </div>
-              </div>
-            </div>
+        <header className="mb-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-xs text-muted-foreground mb-0.5">제작 상세</div>
-              <div className="bg-secondary/40 rounded px-3 py-2 text-xs leading-relaxed text-foreground">{contract.product.detail}</div>
+              <div className="mb-2 flex items-center gap-2">
+                <FileText size={20} className="text-primary" />
+                <h1 className="text-xl font-bold text-slate-950">계약서 검토 및 서명</h1>
+              </div>
+              <p className="font-mono text-sm font-semibold text-slate-700">
+                {contract.contractNo}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                견적번호 {contract.quoteNo}
+              </p>
+            </div>
+            <div className="rounded-lg border border-primary/20 bg-secondary px-4 py-3 text-right">
+              <p className="text-xs font-bold text-primary">계약 금액</p>
+              <p className="mt-1 text-xl font-black text-slate-950">
+                {formatPrice(contract.contractAmount)}
+              </p>
             </div>
           </div>
+        </header>
 
-          {/* 수량 그리드 */}
-          <div className="border-t border-border px-5 py-4">
-            <div className="text-xs font-medium text-muted-foreground mb-3">컬러·사이즈별 수량</div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left text-muted-foreground font-medium pb-1.5 pr-4">컬러</th>
-                    <th className="text-left text-muted-foreground font-medium pb-1.5 pr-4">사이즈</th>
-                    <th className="text-right text-muted-foreground font-medium pb-1.5 pr-4">수량</th>
-                    <th className="text-right text-muted-foreground font-medium pb-1.5 pr-4">단가</th>
-                    <th className="text-right text-muted-foreground font-medium pb-1.5">금액</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {contract.sizes.map((sz, i) => (
-                    <tr key={i} className="border-b border-border/40 last:border-0">
-                      <td className="py-1.5 pr-4 text-foreground">{sz.color}</td>
-                      <td className="py-1.5 pr-4 font-medium text-foreground">{sz.size}</td>
-                      <td className="py-1.5 pr-4 text-right">{sz.quantity}장</td>
-                      <td className="py-1.5 pr-4 text-right text-muted-foreground">₩{sz.unitPrice.toLocaleString()}</td>
-                      <td className="py-1.5 text-right font-medium">₩{(sz.quantity * sz.unitPrice).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-3 pt-3 border-t border-border space-y-1 text-sm">
-              <div className="flex justify-between text-muted-foreground">
-                <span>총 수량</span><span>{totalQty}장</span>
-              </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>상품 금액</span><span>₩{subtotal.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>택배비</span>
-                <span>{contract.shippingFee === 0 ? "무료" : `₩${contract.shippingFee.toLocaleString()}`}</span>
-              </div>
-              <div className="flex justify-between font-bold text-foreground border-t border-border pt-2 text-base">
-                <span>계약 총액</span><span>₩{total.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 납기 및 배송 */}
-        <section className="bg-white border border-border rounded-lg overflow-hidden">
-          <div className="px-5 py-4 border-b border-border bg-secondary/30">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <Truck size={15} className="text-primary" /> 납기 및 배송
-            </h2>
-          </div>
-          <div className="px-5 py-4 grid grid-cols-2 gap-4 text-sm">
+        {isCompleted ? (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4">
+            <CheckCircle size={20} className="mt-0.5 shrink-0 text-green-600" />
             <div>
-              <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1"><Calendar size={11} /> 제작 소요일</div>
-              <div className="font-semibold text-foreground">{contract.leadTime}</div>
+              <p className="font-bold text-green-900">계약 체결이 완료되었습니다</p>
+              <p className="mt-1 text-sm text-green-700">
+                바이어 서명 {formatDateTime(contract.buyerSignedAt)}
+              </p>
             </div>
+          </div>
+        ) : (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <ShieldCheck size={20} className="mt-0.5 shrink-0 text-blue-600" />
             <div>
-              <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1"><Truck size={11} /> 납기 예정일</div>
-              <div className="font-semibold text-foreground">{contract.deliveryDate}</div>
+              <p className="font-bold text-blue-900">셀러 서명 완료</p>
+              <p className="mt-1 text-sm text-blue-700">
+                {contract.sellerCompanyName} · {formatDateTime(contract.sellerSignedAt)}
+              </p>
             </div>
           </div>
-        </section>
+        )}
 
-        {/* 반품·특약 */}
-        <section className="bg-white border border-border rounded-lg overflow-hidden">
-          <div className="px-5 py-4 border-b border-border bg-secondary/30">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <RotateCcw size={15} className="text-primary" /> 반품·교환 정책 및 특약사항
-            </h2>
-          </div>
-          <div className="px-5 py-4 space-y-3 text-sm">
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">반품·교환 정책</div>
-              <div className="bg-secondary/40 rounded px-3 py-2 text-xs leading-relaxed text-foreground">{contract.returnPolicy}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">특약사항</div>
-              <div className="bg-secondary/40 rounded px-3 py-2 text-xs leading-relaxed text-foreground">{contract.specialTerms}</div>
-            </div>
-          </div>
-        </section>
-
-        {/* 셀러 서명 확인 */}
-        <section className="bg-white border border-border rounded-lg overflow-hidden">
-          <div className="px-5 py-4 border-b border-border bg-secondary/30">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <PenLine size={15} className="text-primary" /> 셀러 서명 확인
-            </h2>
-          </div>
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex-1">
-                <div className="text-xs text-muted-foreground mb-0.5">수주자</div>
-                <div className="text-sm font-semibold text-foreground">{contract.seller.name} · {contract.seller.business}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-muted-foreground mb-0.5">서명 일시</div>
-                <div className="text-xs font-mono text-foreground">{contract.sellerSignedAt}</div>
-              </div>
-            </div>
-            {/* 셀러 서명 영역 — 읽기 전용 */}
-            <div className="border border-border rounded-lg bg-secondary/20 h-20 flex items-center justify-center">
-              {contract.sellerSignImage
-                ? <img src={contract.sellerSignImage} alt="셀러 서명" className="h-full object-contain" />
-                : (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <CheckCircle size={14} className="text-green-500" />
-                    전자서명 완료 (보안상 미표시)
-                  </div>
-                )
-              }
-            </div>
-          </div>
-        </section>
-
-        {/* 동의 체크박스 */}
-        <section className="bg-white border border-border rounded-lg p-5 space-y-3">
-          <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
-            <Shield size={15} className="text-primary" /> 계약 내용 동의
-          </h2>
-          {[
-            { state: agreedSpec,   set: setAgreedSpec,   label: "위 계약 내용(제품 스펙, 수량, 금액)을 확인하였으며 이에 동의합니다." },
-            { state: agreedReturn, set: setAgreedReturn, label: "납기일, 배송 조건 및 반품·교환 정책을 확인하였으며 이에 동의합니다." },
-            { state: agreedTerms,  set: setAgreedTerms,  label: "특약사항을 확인하였으며, 본 계약의 법적 효력에 동의합니다." },
-          ].map((item, i) => (
-            <label key={i} className="flex items-start gap-3 cursor-pointer group">
-              <div className={`w-5 h-5 mt-0.5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${item.state ? "bg-primary border-primary" : "border-border group-hover:border-primary/50"}`}>
-                {item.state && <CheckCircle size={13} className="text-white" />}
-              </div>
-              <input type="checkbox" checked={item.state} onChange={(e) => item.set(e.target.checked)} className="hidden" />
-              <span className="text-sm text-foreground leading-relaxed">{item.label}</span>
-            </label>
-          ))}
-        </section>
-
-        {/* 바이어 서명 */}
-        <section className="bg-white border border-border rounded-lg p-5">
-          <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
-            <PenLine size={15} className="text-primary" /> 바이어 서명
-          </h2>
-          <SignatureCanvas
-            label={`발주자 서명 — ${contract.buyer.name} (${contract.buyer.business})`}
-            value={buyerSign}
-            onChange={setBuyerSign}
-          />
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <AlertCircle size={11} />
-            서명은 법적 효력이 있는 전자서명으로 처리됩니다.
-          </div>
-        </section>
-
-        {/* 버튼 */}
-        <div className="flex gap-3 justify-between pb-8">
-          <button
-            onClick={() => setShowReject(true)}
-            className="border border-red-300 text-red-600 hover:bg-red-50 px-6 py-2.5 rounded text-sm font-medium transition-colors flex items-center gap-2"
-          >
-            <X size={14} /> 계약 거절
-          </button>
-          <div className="flex gap-3">
-            <Link
-              to="/buyer/orders"
-              className="border border-border text-foreground hover:border-primary hover:text-primary px-6 py-2.5 rounded text-sm font-medium transition-colors"
-            >
-              나중에 하기
-            </Link>
-            <button
-              onClick={() => setSigned(true)}
-              disabled={!canSign}
-              className="bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-8 py-2.5 rounded font-semibold text-sm transition-colors flex items-center gap-2"
-            >
-              <PenLine size={15} /> 서명 완료 및 계약 체결
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 계약 거절 모달 */}
-      {showReject && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-lg w-full max-w-md p-6">
-            <h3 className="font-bold text-foreground text-base mb-1 flex items-center gap-2">
-              <X size={16} className="text-red-500" /> 계약 거절
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              거절 사유를 입력하면 셀러에게 전달됩니다. 거절 후 재견적 요청이 가능합니다.
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">거절 사유</label>
-                <select className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-primary bg-white">
-                  <option>단가 조정 필요</option>
-                  <option>납기일 조정 필요</option>
-                  <option>스펙 변경 필요</option>
-                  <option>기타</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">상세 내용</label>
-                <textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  rows={3}
-                  placeholder="셀러에게 전달할 내용을 입력해 주세요."
-                  className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-primary resize-none"
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <main className="space-y-5">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-950">
+                <FileText size={16} className="text-primary" />
+                계약 당사자
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <PartyInfo
+                  label="바이어"
+                  companyName={contract.buyerCompanyName}
+                  businessNumber={contract.buyerBusinessNumber}
+                />
+                <PartyInfo
+                  label="셀러"
+                  companyName={contract.sellerCompanyName}
+                  businessNumber={contract.sellerBusinessNumber}
                 />
               </div>
+            </section>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-950">
+                <Package size={16} className="text-primary" />
+                계약 상품
+              </h2>
+              <div className="space-y-3">
+                {contract.items.map((item) => (
+                  <div
+                    key={item.contractItemId}
+                    className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-[minmax(0,1fr)_auto]"
+                  >
+                    <div>
+                      <p className="font-bold text-slate-900">{item.productName}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {[item.optionSummary, item.material].filter(Boolean).join(" · ") || "옵션 정보 없음"}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <p className="text-xs text-slate-500">
+                        {item.quantity.toLocaleString()}개 × {formatPrice(item.unitPrice)}
+                      </p>
+                      <p className="mt-1 font-black text-slate-950">
+                        {formatPrice(item.totalPrice)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-950">
+                <Truck size={16} className="text-primary" />
+                납품 및 계약 조건
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InfoBox icon={<Calendar size={14} />} label="납품 예정일" value={formatDate(contract.deliveryDate)} />
+                <InfoBox icon={<Clock size={14} />} label="리드타임" value={`${contract.leadTimeDays}일`} />
+                <InfoBox label="결제 조건" value={contract.paymentTerms} />
+                <InfoBox label="배송사" value={contract.deliveryCompany || "협의 예정"} />
+              </div>
+              <TermsBlock label="반품·교환 조건" value={contract.returnPolicy} />
+              {contract.specialTerms && (
+                <TermsBlock label="특약사항" value={contract.specialTerms} />
+              )}
+            </section>
+
+            {canDisplaySignForm && (
+              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-950">
+                  <PenLine size={16} className="text-primary" />
+                  바이어 서명
+                </h2>
+                <label className="mb-4 block">
+                  <span className="mb-1.5 block text-sm font-bold text-slate-800">서명자명</span>
+                  <input
+                    value={signatureText}
+                    onChange={(event) => setSignatureText(event.target.value)}
+                    maxLength={100}
+                    placeholder="서명자명을 입력하세요"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-primary"
+                  />
+                </label>
+                <SignatureCanvas value={signatureImage} onChange={setSignatureImage} />
+
+                <div className="mt-5 space-y-3 border-t border-slate-100 pt-5">
+                  <Agreement
+                    checked={agreements.specification}
+                    onChange={(checked) =>
+                      setAgreements((current) => ({ ...current, specification: checked }))
+                    }
+                    label="계약 상품과 수량, 단가를 확인했습니다."
+                  />
+                  <Agreement
+                    checked={agreements.returnPolicy}
+                    onChange={(checked) =>
+                      setAgreements((current) => ({ ...current, returnPolicy: checked }))
+                    }
+                    label="납품 및 반품·교환 조건을 확인했습니다."
+                  />
+                  <Agreement
+                    checked={agreements.final}
+                    onChange={(checked) =>
+                      setAgreements((current) => ({ ...current, final: checked }))
+                    }
+                    label="계약 내용에 동의하며 전자서명을 진행합니다."
+                  />
+                </div>
+
+                {submitError && (
+                  <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+                    {submitError}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  disabled={!canSign}
+                  onClick={handleSign}
+                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                >
+                  {isSubmitting ? (
+                    <LoaderCircle size={16} className="animate-spin" />
+                  ) : (
+                    <PenLine size={16} />
+                  )}
+                  {isSubmitting ? "서명 처리 중..." : "계약서 서명 완료"}
+                </button>
+              </section>
+            )}
+          </main>
+
+          <aside className="lg:sticky lg:top-6 lg:self-start">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-bold text-slate-950">계약 요약</h2>
+              <dl className="mt-4 space-y-3 text-sm">
+                <SummaryRow label="상품 종류" value={`${contract.items.length}건`} />
+                <SummaryRow label="총 수량" value={`${totalQuantity.toLocaleString()}개`} />
+                <SummaryRow label="상품 금액" value={formatPrice(contract.contractAmount - contract.shippingFee)} />
+                <SummaryRow label="배송비" value={formatPrice(contract.shippingFee)} />
+              </dl>
+              <div className="mt-4 flex items-end justify-between border-t border-slate-100 pt-4">
+                <span className="text-sm font-bold text-slate-700">계약 금액</span>
+                <span className="text-xl font-black text-primary">
+                  {formatPrice(contract.contractAmount)}
+                </span>
+              </div>
+              <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+                유효기간 {formatDate(contract.validUntil)}
+              </p>
             </div>
-            <div className="flex gap-2 mt-5">
-              <button
-                onClick={() => setShowReject(false)}
-                className="flex-1 border border-border text-foreground hover:border-primary hover:text-primary text-sm py-2.5 rounded font-medium transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={() => { setShowReject(false); navigate("/buyer/orders"); }}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm py-2.5 rounded font-semibold transition-colors"
-              >
-                거절 전송
-              </button>
-            </div>
-          </div>
+          </aside>
         </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+function PartyInfo({
+  label,
+  companyName,
+  businessNumber,
+}: {
+  label: string;
+  companyName: string;
+  businessNumber: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-bold text-primary">{label}</p>
+      <p className="mt-1 font-bold text-slate-950">{companyName}</p>
+      <p className="mt-1 text-xs text-slate-500">{businessNumber}</p>
+    </div>
+  );
+}
+
+function InfoBox({
+  icon,
+  label,
+  value,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+        {icon}
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-bold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function TermsBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="mt-3 rounded-lg border border-slate-200 p-4">
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{value}</p>
+    </div>
+  );
+}
+
+function Agreement({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-0.5 h-4 w-4"
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="font-bold text-slate-900">{value}</dd>
     </div>
   );
 }

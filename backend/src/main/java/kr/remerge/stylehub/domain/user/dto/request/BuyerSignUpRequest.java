@@ -30,6 +30,11 @@ public record BuyerSignUpRequest(
         )
         String name,
 
+        @NotBlank(message = "휴대폰 번호는 필수 입력 항목입니다.")
+        @Pattern(
+                regexp = "^01(?:0|1|[6-9])(?:\\d{3}|\\d{4})\\d{4}$",
+                message = "올바른 휴대폰 번호 형식이 아닙니다. 숫자만 입력해 주세요."
+        )
         String phone,
 
         @NotBlank(message = "사업자등록번호를 입력해주세요.")
@@ -52,11 +57,12 @@ public record BuyerSignUpRequest(
         List<Integer> preferredCategoryIds
 ) {
     public Company toCompanyEntity() {
+        String cleanRepresentativePhone = this.representativePhone.replaceAll("[^0-9]", "");
         return Company.builder()
                 .name(companyName)
                 .businessNumber(businessNumber)
                 .representativeName(representativeName)
-                .representativePhone(representativePhone)
+                .representativePhone(cleanRepresentativePhone)
                 .address(address)
                 .addressDetail(addressDetail)
                 .businessLicenseUrl(businessLicenseUrl)
@@ -66,12 +72,13 @@ public record BuyerSignUpRequest(
     }
 
     public User toUserEntity(Company company, String encodedPassword, UserRole userRole, BusinessRole businessRole) {
+        String cleanPhone = this.phone.replaceAll("[^0-9]", "");
         return User.builder()
                 .company(company)
                 .email(email)
                 .password(encodedPassword)
                 .name(name)
-                .phone(phone)
+                .phone(cleanPhone)
                 .role(userRole)
                 .businessRole(businessRole)
                 .status(UserStatus.PENDING)

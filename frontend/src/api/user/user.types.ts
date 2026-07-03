@@ -1,32 +1,44 @@
-// auth.types.ts에 있는 검증된 유저 타입을 그대로 가져와 연결합니다.
+// ───────────────────────────────────────────
+// 회원 정보 변경 인증 (Profile OTP)
+// ───────────────────────────────────────────
+export interface ChangeEmailOtpRequest { target: string; }
+export interface VerifyEmailOtpRequest { target: string; otpCode: string; }
+export interface ChangePhoneOtpRequest { target: string; }
+export interface VerifyPhoneOtpRequest { target: string; otpCode: string; }
+export interface UpdateProfilePayload { email: string; phone: string; profileImageUrl: string | null; }
 
-/**
- * 프로필 및 회원 정보 수정 요청 (PATCH /users/me)에 사용되는 객체입니다.
- */
-export interface UpdateProfileRequest {
-    email: string;
-    phone: string | null; // auth.types.ts의 스펙(string | null)과 싱크를 맞춤
-    profileImageUrl: string | null;
+// ───────────────────────────────────────────
+// 기본 배송, 발송, 반품 주소지 관리 (API 통신용 스펙)
+// ───────────────────────────────────────────
+
+export type DefaultType = "return" | "shipping" | "receiving";
+
+/** 1. 백엔드 API에서 내려주는 주소 객체 */
+export interface AddressResponse {
+    addressId: number;
+    companyId: number;
+    addressName: string;
+    zipcode: string;
+    address: string;
+    addressDetail: string;
+    createdAt: string;
+    deletedAt: string | null;
 }
 
-/**
- * 1. 정보 수정 전 비밀번호 검증 요청 객체
- */
-export interface VerifyPasswordRequest {
-    currentPassword: string;
+/** 2. 주소 등록(POST) 및 수정(PUT) 시 Request Body 스펙 */
+export interface AddressPayload {
+    addressName: string;
+    zipcode: string;
+    address: string;
+    addressDetail: string;
 }
 
-/**
- * 2. 새 이메일/핸드폰 인증번호(OTP) 발송 요청 객체
- */
-export interface SendChangeOtpRequest {
-    targetValue: string; // 새 이메일 주소 또는 새 핸드폰 번호
-}
+/** 3. 기본 설정값 단건 조회 응답 스펙 */
+export interface CompanyDefaultsResponse { returnAddressId: number | null; }
+export interface UserDefaultsResponse    { shippingAddressId: number | null; receivingAddressId: number | null; }
 
-/**
- * 3. 발송된 인증번호 검증 요청 객체
- */
-export interface VerifyChangeOtpRequest {
-    targetValue: string; // 새 이메일 주소 또는 새 핸드폰 번호
-    otpCode: string;     // 유저가 입력한 인증번호 6자리
+/** 4. 기본지 변경 요청용 페이로드 (PATCH) */
+export interface UpdateDefaultAddressRequest {
+    addressId: number;
+    defaultType: DefaultType;
 }

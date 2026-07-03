@@ -31,7 +31,7 @@ public class OrderLog extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
-    private kr.remerge.stylehub.domain.order.entity.Order order;
+    private Order order;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "log_type", nullable = false, length = 30)

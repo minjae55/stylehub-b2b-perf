@@ -4,6 +4,7 @@ import kr.remerge.stylehub.domain.cart.entity.CartItem;
 import kr.remerge.stylehub.domain.cart.enumtype.CartType;
 import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.product.entity.Product;
+import kr.remerge.stylehub.domain.product.entity.ProductImage;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
 
 import java.util.List;
@@ -16,6 +17,7 @@ public record CartResponse(
         Integer productOptionId,
         Integer companyId,
 
+        String imageUrl,
         String productName,
         String optionLabel,
         List<CartOptionResponse> options,
@@ -29,18 +31,21 @@ public record CartResponse(
         Long baseShippingFee,
         Long freeShippingThreshold,
 
-
         Boolean sampleAvailable,
         Long samplePrice,
         Integer sampleMaxQuantity,
         Boolean isChecked,
         CartType cartType
+
+
 ) {
 
     public static CartResponse from(CartItem cartItem) {
         ProductOption productOption = cartItem.getProductOption();
         Product product = productOption.getProduct();
+
         Company company = product.getCompany();
+        String imageUrl =  getImageUrl(productOption);
 
         List<CartOptionResponse> options = getCartOptionResponses(productOption);
 
@@ -52,10 +57,12 @@ public record CartResponse(
 
         return new CartResponse(
                 cartItem.getCartItemId(),
+
                 product.getProductId(),
                 productOption.getProductOptionId(),
                 company.getCompanyId(),
 
+                imageUrl,
                 product.getProductName(),
                 productOption.getOptionLabel(),
                 options,
@@ -75,6 +82,17 @@ public record CartResponse(
                 cartItem.getIsChecked(),
                 cartItem.getCartType()
         );
+    }
+
+    private static String getImageUrl(ProductOption productOption) {
+
+        List<ProductImage> images = productOption.getImages();
+
+        if (images.isEmpty()) {
+            return null;
+        }
+
+        return images.get(0).getImageUrl();
     }
 
     private static List<CartOptionResponse> getCartOptionResponses(ProductOption productOption) {

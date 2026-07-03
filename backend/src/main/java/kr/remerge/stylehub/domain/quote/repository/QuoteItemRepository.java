@@ -8,4 +8,6 @@ import java.util.List;
 public interface QuoteItemRepository extends JpaRepository<QuoteItem, Integer> {
 
     List<QuoteItem> findByQuote_QuoteId(Integer quoteId);
+
+    List<QuoteItem> findByQuote_QuoteIdAndIsSampleTrue(Integer quoteId);
 }

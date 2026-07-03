@@ -69,7 +69,6 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getMe(
             @LoginUser AuthUser user) {
-
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }

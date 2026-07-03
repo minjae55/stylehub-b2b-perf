@@ -59,12 +59,10 @@ function useEmailVerify(email: string) {
     const isChecking = status === "checking";
     const isAvailable = status === "available";
     const isDuplicate = status === "duplicate";
-    // sending 도 포함해야 발송 버튼 누른 직후~응답 오기 전까지도 잠금 유지됨
     const codeSent = status === "sending" || status === "sent";
 
     const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-    // 실시간 중복확인 (디바운스) — email 값이 바뀔 때만 실행됨 (status는 의존성에서 제외)
     useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -88,8 +86,8 @@ function useEmailVerify(email: string) {
                 setStatus("available");
             } catch (error: any) {
                 if (requestEmailRef.current !== email) return;
-                const errorData: ErrorResponse = error?.response?.data;
-                if (errorData?.status === 409 || error?.response?.status === 409 || errorData?.code === "DUPLICATE_EMAIL") {
+                const errorData: ErrorResponse | undefined = error?.response?.data;
+                if (error?.response?.status === 409 || errorData?.code === "DUPLICATE_EMAIL") {
                     setStatus("duplicate");
                 } else {
                     setStatus("idle");
@@ -133,7 +131,7 @@ function useEmailVerify(email: string) {
         } catch (error: any) {
             // 재발송 실패면 sent 상태 유지, 최초 발송 실패면 available로 복귀
             setStatus(isResend ? "sent" : "available");
-            const errorData: ErrorResponse = error?.response?.data;
+            const errorData: ErrorResponse | undefined = error?.response?.data;
             toast.error("발송 실패", {description: errorData?.message || "인증 코드 발송에 실패했습니다."});
         } finally {
             setSending(false);
@@ -148,7 +146,7 @@ function useEmailVerify(email: string) {
             setStatus("verified"); // → isVerified 즉시 true, 부모 useEffect로 실시간 전파
             toast.success("이메일 인증 완료!");
         } catch (error: any) {
-            const errorData: ErrorResponse = error?.response?.data;
+            const errorData: ErrorResponse | undefined = error?.response?.data;
             setVerifyError(errorData?.message || "코드가 올바르지 않거나 만료되었습니다.");
         } finally {
             setVerifying(false);
@@ -230,12 +228,16 @@ function usePhoneVerify(phone: string) {
                 setStatus("available");
             } catch (error: any) {
                 if (requestPhoneRef.current !== cleaned) return;
-                const errorData: ErrorResponse = error?.response?.data;
+                const errorData: ErrorResponse | undefined = error?.response?.data;
                 // 409 Conflict 이거나 특정 코드 매핑 시 중복으로 판정
-                if (errorData?.status === 409 || error?.response?.status === 409 || errorData?.code === "DUPLICATE_PHONE_NUMBER") {
+                if (error?.response?.status === 409 || errorData?.code === "DUPLICATE_PHONE_NUMBER") {
                     setStatus("duplicate");
                 } else {
                     setStatus("idle");
+                    // 이메일 중복확인과 동일하게 실패 사유를 사용자에게 알림
+                    toast.error("중복확인 실패", {
+                        description: errorData?.message || "중복확인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+                    });
                 }
             }
         }, DUPLICATE_CHECK_DEBOUNCE_MS);
@@ -268,7 +270,7 @@ function usePhoneVerify(phone: string) {
             toast.success(isResend ? "인증번호를 재발송했습니다." : "인증번호를 발송했습니다.");
         } catch (error: any) {
             setStatus(isResend ? "sent" : "idle");
-            const errorData: ErrorResponse = error?.response?.data;
+            const errorData: ErrorResponse | undefined = error?.response?.data;
             toast.error("발송 실패", {description: errorData?.message || "인증번호 발송에 실패했습니다."});
         } finally {
             setSending(false);
@@ -284,7 +286,7 @@ function usePhoneVerify(phone: string) {
             setStatus("verified"); // → isVerified 즉시 true, 부모 useEffect로 실시간 전파
             toast.success("휴대폰 인증 완료!");
         } catch (error: any) {
-            const errorData: ErrorResponse = error?.response?.data;
+            const errorData: ErrorResponse | undefined = error?.response?.data;
             setVerifyError(errorData?.message || "번호가 올바르지 않거나 만료되었습니다.");
         } finally {
             setVerifying(false);
@@ -318,12 +320,13 @@ interface StepAccountProps {
     set: (partial: Partial<RegisterFormData>) => void;
     setIsEmailVerified: (v: boolean) => void;
     setIsPhoneVerified: (v: boolean) => void;
+    fieldErrors?: Record<string, string>;
 }
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────────────────
 
 export function StepAccount({
-                                form, set, setIsEmailVerified, setIsPhoneVerified,
+                                form, set, setIsEmailVerified, setIsPhoneVerified, fieldErrors
                             }: StepAccountProps) {
     const [showPw, setShowPw] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
@@ -475,6 +478,9 @@ export function StepAccount({
                         <CheckCircle2 size={12}/> 이메일 인증이 완료되었습니다.
                     </p>
                 )}
+                {fieldErrors?.email && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.email}</p>
+                )}
             </Field>
 
             {/* 비밀번호 입력 */}
@@ -503,6 +509,9 @@ export function StepAccount({
                 )}
 
                 <PasswordStrengthBar password={form.password}/>
+                {fieldErrors?.password && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.password}</p>
+                )}
             </Field>
 
             {/* 비밀번호 확인 */}
@@ -527,6 +536,9 @@ export function StepAccount({
                 </div>
                 {pwMismatch && (
                     <p className="text-xs text-red-500 mt-1">비밀번호가 일치하지 않습니다.</p>
+                )}
+                {fieldErrors?.confirmPassword && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.confirmPassword}</p>
                 )}
             </Field>
 
@@ -555,6 +567,9 @@ export function StepAccount({
                     <p className="text-xs text-amber-600 mt-1">
                         이름은 한글 1~5자 또는 영문 2~20자(공백 포함)로 입력해 주세요.
                     </p>
+                )}
+                {fieldErrors?.name && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.name}</p>
                 )}
             </Field>
 
@@ -643,6 +658,9 @@ export function StepAccount({
                     <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
                         <CheckCircle2 size={12}/> 휴대폰 인증이 완료되었습니다.
                     </p>
+                )}
+                {fieldErrors?.phone && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.phone}</p>
                 )}
             </Field>
         </div>

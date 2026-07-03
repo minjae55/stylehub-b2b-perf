@@ -11,25 +11,51 @@ import reactor.core.publisher.Mono;
 public class TossPaymentsClient {
     private final WebClient tossWebClient;
 
-    public PaymentResult confirm(PaymentConfirmRequest dto) {
+    public PaymentResult confirm(PaymentConfirmRequest request) {
+
+        TossConfirmRequest tossRequest = new TossConfirmRequest(
+                request.paymentKey(),
+                request.orderId(),
+                request.amount()
+        );
+
         return tossWebClient.post()
                 .uri("/v1/payments/confirm")
-                .bodyValue(dto)
+                .bodyValue(tossRequest)
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, response ->
                         response.bodyToMono(String.class)
                                 .flatMap(errorBody -> {
-                                    if (errorBody.contains("ALREADY_PROCESSED_PAYMENT")) {
-                                        return Mono.error(new AlreadyProcessedPaymentException());
+                                    if (errorBody.contains(
+                                            "ALREADY_PROCESSED_PAYMENT"
+                                    )) {
+                                        return Mono.error(
+                                                new AlreadyProcessedPaymentException()
+                                        );
                                     }
-                                    return Mono.error(new RuntimeException("결제 승인 실패(4xx): " + errorBody));
+
+                                    return Mono.error(
+                                            new RuntimeException(
+                                                    "결제 승인에 실패했습니다: "
+                                                            + errorBody
+                                            )
+                                    );
                                 })
                 )
                 .onStatus(HttpStatusCode::is5xxServerError, response ->
-                        Mono.error(new RuntimeException("토스페이먼츠 서버 에러(5xx)가 발생했습니다."))
+                        Mono.error(new RuntimeException(
+                                "토스페이먼츠 서버 오류가 발생했습니다."
+                        ))
                 )
                 .bodyToMono(PaymentResult.class)
                 .block();
+    }
+
+    private record TossConfirmRequest(
+            String paymentKey,
+            String orderId,
+            Long amount
+    ) {
     }
 
     public PaymentResult cancel(String paymentKey, PaymentCancelRequest request) {

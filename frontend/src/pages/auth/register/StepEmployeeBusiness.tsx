@@ -27,6 +27,7 @@ interface StepEmployeeBusinessProps {
     setIsCompanyVerified: (v: boolean) => void;
     isCompanyNotFound: boolean;
     setIsCompanyNotFound: (v: boolean) => void;
+    fieldErrors?: Record<string, string>;
 }
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ interface StepEmployeeBusinessProps {
 export function StepEmployeeBusiness({
                                          form, set,
                                          isCompanyVerified, setIsCompanyVerified,
-                                         isCompanyNotFound, setIsCompanyNotFound,
+                                         isCompanyNotFound, setIsCompanyNotFound, fieldErrors
                                      }: StepEmployeeBusinessProps) {
     const [loading, setLoading] = useState(false);
     const [statusError, setStatusError] = useState(""); // 회사 승인 상태 제한 에러 문구
@@ -160,6 +161,9 @@ export function StepEmployeeBusiness({
                         <span>{statusError}</span>
                     </p>
                 )}
+                {fieldErrors?.businessNumber && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.businessNumber}</p>
+                )}
             </Field>
 
             {/* 조회 성공 시: 회사 정보 표시 + 입력 내용 요약 */}
@@ -167,9 +171,15 @@ export function StepEmployeeBusiness({
                 <>
                     <Field label="상호명">
                         <input type="text" value={form.employeeCompanyName} readOnly className={readonlyCls}/>
+                        {fieldErrors?.employeeCompanyName && (
+                            <p className="text-xs text-red-500 mt-1">{fieldErrors.employeeCompanyName}</p>
+                        )}
                     </Field>
                     <Field label="대표자명">
                         <input type="text" value={form.employeeRepresentativeName} readOnly className={readonlyCls}/>
+                        {fieldErrors?.employeeRepresentativeName && (
+                            <p className="text-xs text-red-500 mt-1">{fieldErrors.employeeRepresentativeName}</p>
+                        )}
                     </Field>
 
                     {/* 입력 내용 요약 카드 */}

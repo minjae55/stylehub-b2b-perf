@@ -1,6 +1,5 @@
 package kr.remerge.stylehub.domain.order.service;
 
-import jakarta.validation.Valid;
 import kr.remerge.stylehub.domain.order.dto.seller.*;
 import kr.remerge.stylehub.domain.order.entity.Order;
 import kr.remerge.stylehub.domain.order.entity.OrderItem;
@@ -11,7 +10,7 @@ import kr.remerge.stylehub.domain.order.repository.OrderLogRepository;
 import kr.remerge.stylehub.domain.order.repository.OrderRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.enumtype.UserRole;
-import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.domain.user.support.UserReader;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -32,15 +31,12 @@ public class SellerOrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderLogRepository orderLogRepository;
-    private final UserRepository userRepository;
+    private final UserReader userReader;
     private final OrderStatusService orderStatusService;
 
     public List<SellerOrderListResponse> getSellerOrderList(Integer userId) {
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new BusinessException(ErrorCode.USER_NOT_FOUND)
-                );
+        User user = userReader.getCompanyUser(userId);
 
         List<Order> orders;
         Map<Integer, List<OrderItem>> itemsByOrderId;
@@ -117,8 +113,7 @@ public class SellerOrderService {
     @Transactional
     public SellerOrderDetailResponse getSellerOrderDetail(Integer userId, Integer orderId) {
 
-        User user = userRepository.findByIdWithCompany(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = userReader.getCompanyUser(userId);
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
@@ -135,14 +130,11 @@ public class SellerOrderService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
-        if (user.getRole() == UserRole.EMPLOYEE) {
-            boolean participates = orderItemRepository
-                    .existsByOrder_OrderIdAndAssignedUser_UserId(orderId, userId);
+        boolean isSellerMember =
+                user.getRole() == UserRole.PRESIDENT
+                        || user.getRole() == UserRole.EMPLOYEE;
 
-            if (!participates) {
-                throw new BusinessException(ErrorCode.FORBIDDEN);
-            }
-        } else if (user.getRole() != UserRole.PRESIDENT) {
+        if (!isSellerMember) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
@@ -187,8 +179,7 @@ public class SellerOrderService {
     @Transactional
     public void updateOrderStatus(Integer userId, Integer orderId, OrderStatus status) {
 
-        User user = userRepository.findByIdWithCompany(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = userReader.getCompanyUser(userId);
 
         orderStatusService.changeStatus(orderId, user, status);
     }
@@ -231,8 +222,7 @@ public class SellerOrderService {
             Integer userId,
             Integer orderId
     ) {
-        User user = userRepository.findByIdWithCompany(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = userReader.getCompanyUser(userId);
 
         if (user.getRole() != UserRole.PRESIDENT) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
@@ -272,8 +262,7 @@ public class SellerOrderService {
     @Transactional
     public void registerShipment(Integer userId, Integer orderId, OrderShipmentRequest request) {
 
-        User user = userRepository.findByIdWithCompany(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = userReader.getCompanyUser(userId);
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));

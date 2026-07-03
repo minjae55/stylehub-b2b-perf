@@ -70,5 +70,6 @@ public class ProductOption extends BaseEntity {
     private List<ProductOptionValue> optionValues = new ArrayList<>();
 
     @OneToMany(mappedBy = "productOption", fetch = FetchType.LAZY)
+    @OrderBy("isMain DESC, sortOrder ASC")
     private List<ProductImage> images = new ArrayList<>();
 }

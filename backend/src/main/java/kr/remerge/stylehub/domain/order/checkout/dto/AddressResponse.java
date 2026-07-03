@@ -1,6 +1,6 @@
 package kr.remerge.stylehub.domain.order.checkout.dto;
 
-import kr.remerge.stylehub.domain.company.entity.Address;
+import kr.remerge.stylehub.domain.address.Address;
 
 public record AddressResponse(
         Integer addressId,

@@ -7,13 +7,13 @@ import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingSupplierRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-@Slf4j
+import static reactor.netty.http.HttpConnectionLiveness.log;
+
 @Service
 @RequiredArgsConstructor
 public class SellerSourcingService {

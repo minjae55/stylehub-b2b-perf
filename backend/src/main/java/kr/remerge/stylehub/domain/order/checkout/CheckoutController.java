@@ -3,6 +3,7 @@ package kr.remerge.stylehub.domain.order.checkout;
 import jakarta.validation.Valid;
 import kr.remerge.stylehub.domain.order.checkout.dto.*;
 import kr.remerge.stylehub.domain.order.checkout.service.CheckoutService;
+import kr.remerge.stylehub.domain.order.checkout.service.SampleCheckoutService;
 import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.response.ApiResponse;
@@ -18,6 +19,7 @@ import java.util.List;
 public class CheckoutController {
 
     private final CheckoutService checkoutService;
+    private final SampleCheckoutService sampleCheckoutService;
 
     @PostMapping("/preview")
     public ResponseEntity<ApiResponse<CartCheckoutResponse>> cartCheckout(
@@ -59,20 +61,22 @@ public class CheckoutController {
 
     }
 
-    @PostMapping("/orders/dev-payment")
-    public ResponseEntity<ApiResponse<DevOrderPaymentResponse>> completeDevOrderPayment(
+    @GetMapping("/quotes/{quoteId}/sample")
+    public ResponseEntity<ApiResponse<SampleCheckoutResponse>>
+    getSampleCheckout(
             @LoginUser AuthUser authUser,
-            @Valid @RequestBody OrderCheckoutRequest request
+            @PathVariable Integer quoteId
     ) {
-        DevOrderPaymentResponse response =
-                checkoutService.completeDevOrderPayment(
+        SampleCheckoutResponse response =
+                sampleCheckoutService.getSampleCheckout(
                         authUser.userId(),
-                        request.orderIds()
+                        quoteId
                 );
 
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ResponseEntity.ok(
+                ApiResponse.success(response)
+        );
     }
-
 
     @GetMapping("/address")
     public ResponseEntity<ApiResponse<List<AddressResponse>>> address(

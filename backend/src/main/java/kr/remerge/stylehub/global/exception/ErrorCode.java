@@ -52,6 +52,9 @@ public enum ErrorCode {
     OCR_PARSING_FAILED(HttpStatus.BAD_REQUEST, "COMPANY_006", "사업자등록증 이미지 글자 인식에 실패했습니다."),
     INVALID_COMPANY_STATUS(HttpStatus.BAD_REQUEST, "COMPANY_007", "가입할 수 없는 상태의 회사입니다."),
     INVALID_JOIN_ROLE(HttpStatus.BAD_REQUEST, "COMPANY_008", "올바르지 않은 가입 입니다."),
+    COMPANY_PENDING(HttpStatus.CONFLICT, "COMPANY_009", "승인 대기 중인 회사입니다."),
+    COMPANY_SUSPENDED(HttpStatus.CONFLICT, "COMPANY_010", "이용 정지된 회사입니다."),
+    COMPANY_DELETED(HttpStatus.CONFLICT, "COMPANY_011", "삭제된 회사 정보입니다."),
 
     // ───────────────────────────────────────────
     // 상품 (PRODUCT)
@@ -78,8 +81,9 @@ public enum ErrorCode {
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_001", "주문을 찾을 수 없습니다."),
     INVALID_ORDER_STATUS(HttpStatus.BAD_REQUEST, "ORDER_002", "유효하지 않은 주문 상태입니다."),
     ORDER_CANCEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "ORDER_003", "취소할 수 없는 주문입니다."),
-    ORDER_ITEMS_NOT_READY(HttpStatus.CONFLICT, "ORDER_004", "모든 주문 상품의 출고 준비가 완료되지 않았습니다."
-    ),
+    ORDER_ITEMS_NOT_READY(HttpStatus.CONFLICT, "ORDER_004", "모든 주문 상품의 출고 준비가 완료되지 않았습니다."),
+    INVALID_RECEIVER_INFO(HttpStatus.BAD_REQUEST, "ORDER_005","수령인 이름과 연락처를 확인해 주세요."),
+    SAMPLE_ORDER_ALREADY_EXISTS(HttpStatus.CONFLICT,"ORDER_006","이미 진행 중인 샘플 주문이 있습니다."),
 
     // ───────────────────────────────────────────
     // 견적 (QUOTE)
@@ -87,6 +91,9 @@ public enum ErrorCode {
     QUOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "QUOTE_001", "견적서를 찾을 수 없습니다."),
     QUOTE_EXPIRED(HttpStatus.BAD_REQUEST, "QUOTE_002", "만료된 견적서입니다."),
     INVALID_QUOTE_STATUS(HttpStatus.BAD_REQUEST, "QUOTE_003", "변경할 수 없는 견적 상태입니다."),
+    QUOTE_SAMPLE_NOT_AVAILABLE(HttpStatus.BAD_REQUEST,"QUOTE_004","샘플 제공이 불가능한 견적서입니다."),
+    QUOTE_SAMPLE_ITEM_NOT_FOUND(HttpStatus.BAD_REQUEST,"QUOTE_005","결제할 샘플 품목이 없습니다."),
+
     // ───────────────────────────────────────────
     // 계약 (CONTRACT)
     // ───────────────────────────────────────────
@@ -101,6 +108,14 @@ public enum ErrorCode {
     SOURCING_NOT_FOUND(HttpStatus.NOT_FOUND, "SOURCING_002", "소싱 요청을 찾을 수 없습니다."),
 
     // ───────────────────────────────────────────
+    // 결제 (PAYMENT)
+    // ───────────────────────────────────────────
+    PAYMENT_ORDER_MISMATCH(HttpStatus.BAD_REQUEST,"PAYMENT_001","결제 대상 주문 정보가 일치하지 않습니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST,"PAYMENT_002","결제 요청 금액과 실제 주문 금액이 일치하지 않습니다."),
+    PAYMENT_CONFIRM_RESULT_MISMATCH(HttpStatus.INTERNAL_SERVER_ERROR,"PAYMENT_003","결제 승인 결과가 주문 정보와 일치하지 않습니다."),
+    PAYMENT_ORDER_STATE_MISMATCH(HttpStatus.CONFLICT,"PAYMENT_004","함께 결제한 주문들의 상태가 일치하지 않습니다."),
+
+    // ───────────────────────────────────────────
     // 카테고리 (CATEGORY)
     // ───────────────────────────────────────────
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "CATEGORY_001", "카테고리를 찾을 수 없습니다."),
@@ -109,7 +124,9 @@ public enum ErrorCode {
     // ───────────────────────────────────────────
     // 주소 (ADDRESS)
     // ───────────────────────────────────────────
-    ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "ADDRESS_001", "주소를 찾을 수 없습니다."),
+    ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "ADDRESS_001", "존재하지 않거나 이미 삭제된 주소지입니다."),
+    UNAUTHORIZED_ACCESS(HttpStatus.FORBIDDEN, "ADDRESS_002", "해당 주소록에 대한 접근 권한이 없습니다."),
+    INVALID_ADDRESS_TYPE(HttpStatus.BAD_REQUEST, "ADDRESS_003", "올바르지 않은 주소지 설정 타입입니다."),
 
     // ───────────────────────────────────────────
     // 배송 (Delivery)
@@ -127,4 +144,4 @@ public enum ErrorCode {
     private final HttpStatus httpStatus; // 400, 500 대신 HttpStatus 객체로 명확히 관리
     private final String code;           // 프론트엔드가 식별할 비즈니스 커스텀 에러 코드 (ex: COMPANY_002)
     private final String message;        // 에러 메시지
-    }
+}

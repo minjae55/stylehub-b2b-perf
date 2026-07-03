@@ -4,6 +4,7 @@ import kr.remerge.stylehub.domain.order.entity.OrderItem;
 
 public record OrderCheckoutItemResponse(
         Integer orderItemId,
+        String imageUrl,
         String productName,
         String optionSummary,
         Integer quantity,
@@ -14,6 +15,7 @@ public record OrderCheckoutItemResponse(
     public static OrderCheckoutItemResponse from(OrderItem orderItem) {
         return new OrderCheckoutItemResponse(
                 orderItem.getOrderItemId(),
+                orderItem.getProductImageUrl(),
                 orderItem.getProductName(),
                 orderItem.getOptionSummary(),
                 orderItem.getQuantity(),

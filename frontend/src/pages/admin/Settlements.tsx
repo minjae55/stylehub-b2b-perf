@@ -21,14 +21,14 @@ interface Summary {
 }
 
 interface SettlementRow {
-  settlement_id: number;
-  order_no: string;
-  created_at: string;
-  buyer_id: string;
-  seller_id: string;
-  total_amount: number;
-  platform_fee: number;
-  final_amount: number;
+  settlementId: number;
+  orderNo: string;
+  createdAt: string;
+  buyerId: string;
+  sellerId: string;
+  totalAmount: number;
+  platformFee: number;
+  finalAmount: number;
   status: string;
 }
 
@@ -232,23 +232,23 @@ export default function Settlements() {
                   .filter(item => activeTab === 'all' || item?.status === activeTab)
                   .filter(item =>
                       !searchTerm ||
-                      item?.order_no?.includes(searchTerm) ||
-                      String(item?.buyer_id)?.includes(searchTerm) ||
-                      String(item?.seller_id)?.includes(searchTerm)
+                      item?.orderNo?.includes(searchTerm) ||
+                      String(item?.buyerId)?.includes(searchTerm) ||
+                      String(item?.sellerId)?.includes(searchTerm)
                   )
                   .map((row) => (
-                      <tr key={row.settlement_id} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={row.settlementId} className="hover:bg-slate-50/50 transition-colors">
                         <td className="p-4 font-mono text-xs">
-                          <span className="font-semibold text-foreground block">{row.order_no}</span>
+                          <span className="font-semibold text-foreground block">{row.orderNo}</span>
                           <span className="text-muted-foreground">
-                        {row.created_at ? new Date(row.created_at).toLocaleDateString() : '-'}
-                      </span>
+          {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '-'}
+        </span>
                         </td>
-                        <td className="p-4 font-medium">ID: {row.buyer_id}</td>
-                        <td className="p-4 text-muted-foreground">ID: {row.seller_id}</td>
-                        <td className="p-4 text-right font-medium">{row.total_amount?.toLocaleString()}원</td>
-                        <td className="p-4 text-right text-slate-500">{row.platform_fee?.toLocaleString()}원</td>
-                        <td className="p-4 text-right font-semibold text-primary">{row.final_amount?.toLocaleString()}원</td>
+                        <td className="p-4 font-medium">ID: {row.buyerId}</td>
+                        <td className="p-4 text-muted-foreground">ID: {row.sellerId}</td>
+                        <td className="p-4 text-right font-medium">{row.totalAmount?.toLocaleString()}원</td>
+                        <td className="p-4 text-right text-slate-500">{row.platformFee?.toLocaleString()}원</td>
+                        <td className="p-4 text-right font-semibold text-primary">{row.finalAmount?.toLocaleString()}원</td>
                         <td className="p-4 text-center">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
                           row.status === 'COMPLETED' ? 'bg-green-50 text-green-700' :
@@ -264,7 +264,7 @@ export default function Settlements() {
                         <td className="p-4 text-center">
                           {row.status === 'PENDING' && (
                               <button
-                                  onClick={() => handleApprove(row.settlement_id)}
+                                  onClick={() => handleApprove(row.settlementId)}
                                   className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-1.5 rounded-md font-medium shadow-sm transition-colors"
                               >
                                 정산 승인
@@ -277,7 +277,7 @@ export default function Settlements() {
                           )}
                           {row.status === 'REFUNDED' && (
                               <button
-                                  onClick={() => handleRefund(row.settlement_id)}
+                                  onClick={() => handleRefund(row.settlementId)}
                                   className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-md font-medium shadow-sm transition-colors flex items-center gap-1 mx-auto"
                               >
                                 <RefreshCcw size={12} /> 환불 승인

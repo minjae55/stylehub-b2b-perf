@@ -1,10 +1,15 @@
 package kr.remerge.stylehub.domain.order.controller;
 
-import kr.remerge.stylehub.domain.order.dto.*;
+import jakarta.validation.Valid;
+import kr.remerge.stylehub.domain.order.dto.OrderCreateRequest;
+import kr.remerge.stylehub.domain.order.dto.OrderCreateResponse;
+import kr.remerge.stylehub.domain.order.dto.SampleOrderCreateRequest;
+import kr.remerge.stylehub.domain.order.dto.SampleOrderCreateResponse;
 import kr.remerge.stylehub.domain.order.dto.buyer.BuyerOrderDetailResponse;
 import kr.remerge.stylehub.domain.order.dto.buyer.BuyerOrderListResponse;
 import kr.remerge.stylehub.domain.order.dto.buyer.BuyerOrderOverviewResponse;
 import kr.remerge.stylehub.domain.order.service.BuyerOrderService;
+import kr.remerge.stylehub.domain.order.service.SampleOrderService;
 import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.response.ApiResponse;
@@ -20,6 +25,7 @@ import java.util.List;
 public class BuyerOrderController {
 
     private final BuyerOrderService buyerOrderService;
+    private final SampleOrderService sampleOrderService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<BuyerOrderListResponse>>> getOrderList(
@@ -63,6 +69,18 @@ public class BuyerOrderController {
     ) {
         BuyerOrderDetailResponse response =
                 buyerOrderService.getOrderDetail(authUser.userId(), orderId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/sample")
+    public ResponseEntity<ApiResponse<SampleOrderCreateResponse>> createSampleOrder(
+            @LoginUser AuthUser authUser,
+            @Valid @RequestBody SampleOrderCreateRequest request
+    ) {
+
+        SampleOrderCreateResponse response =
+                sampleOrderService.createSampleOrder(authUser.userId(), request);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

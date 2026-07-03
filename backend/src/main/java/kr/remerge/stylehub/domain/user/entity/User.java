@@ -1,9 +1,7 @@
 package kr.remerge.stylehub.domain.user.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Pattern;
-import kr.remerge.stylehub.domain.company.entity.Address;
+import kr.remerge.stylehub.domain.address.Address;
 import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.user.enumtype.BusinessRole;
 import kr.remerge.stylehub.domain.user.enumtype.UserRole;
@@ -34,12 +32,12 @@ public class User extends BaseEntity {
     private Company company;
 
     // 기본 출고지
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "default_shipping_address_id")
     private Address defaultShippingAddress;
 
     // 기본 수령지
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "default_receiving_address_id")
     private Address defaultReceivingAddress;
 
@@ -126,10 +124,6 @@ public class User extends BaseEntity {
         this.deletedAt = LocalDateTime.now();
     }
 
-    public void updateDefaultReceivingAddress(Address address) {
-        this.defaultReceivingAddress = address;
-    }
-
     public void updateEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new BusinessException(ErrorCode.UNVERIFIED_EMAIL);
@@ -149,5 +143,23 @@ public class User extends BaseEntity {
             throw new BusinessException(ErrorCode.EMPTY_FILE);
         }
         this.profileImageUrl = imageUrl;
+    }
+
+    // ───────────────────────────────────────────
+    // 기본 주소지 변경 비즈니스 메서드
+    // ───────────────────────────────────────────
+
+    /**
+     * 기본 출고지(배송지) 변경
+     */
+    public void updateDefaultShippingAddress(Address address) {
+        this.defaultShippingAddress = address;
+    }
+
+    /**
+     * 기본 수령지 변경
+     */
+    public void updateDefaultReceivingAddress(Address address) {
+        this.defaultReceivingAddress = address;
     }
 }

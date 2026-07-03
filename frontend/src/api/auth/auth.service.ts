@@ -2,8 +2,6 @@ import api from "@/api/axios";
 import {
     BusinessVerifyRequest,
     BuyerSignUpRequest,
-    ChangeEmailOtpRequest,
-    ChangePhoneOtpRequest,
     CompanyLookupResponse,
     EmployeeSignUpRequest,
     FindIdResponse,
@@ -18,9 +16,7 @@ import {
     SellerSignUpRequest,
     SendPhoneOtpPayload,
     VerifyEmailOtpPayload,
-    VerifyEmailOtpRequest,
     VerifyPhoneOtpPayload,
-    VerifyPhoneOtpRequest
 } from "@/api/auth/auth.types";
 
 /*
@@ -156,34 +152,6 @@ export const resetPassword = async (request: ResetPasswordRequest): Promise<void
     await api.post<void>("/auth/find-pw/reset", request);
 };
 
-// ───────────────────────────────────────────
-// 회원 정보 변경 인증 (Profile OTP)
-// ───────────────────────────────────────────
-export const sendEmailChangeOtp = async (request: ChangeEmailOtpRequest): Promise<void> => {
-    await api.post<void>("/auth/change-id/send-otp", request);
-};
-
-export const verifyEmailChangeOtp = async (request: VerifyEmailOtpRequest): Promise<void> => {
-    await api.post<void>("/auth/change-id/verify-otp", request);
-};
-
-export const sendPhoneChangeOtp = async (request: ChangePhoneOtpRequest): Promise<void> => {
-    await api.post<void>("/auth/change-phone/send-otp", request);
-};
-
-export const verifyPhoneChangeOtp = async (request: VerifyPhoneOtpRequest): Promise<void> => {
-    await api.post<void>("/auth/change-phone/verify-otp", request);
-};
-
-// ───────────────────────────────────────────
-// 회원 정보 수정 (Profile Update)
-// ───────────────────────────────────────────
-
-export interface UpdateProfilePayload {
-    email: string;
-    phone: string;
-    profileImageUrl: string | null;
-}
 // ───────────────────────────────────────────
 // 공통 파일 업로드
 // ───────────────────────────────────────────

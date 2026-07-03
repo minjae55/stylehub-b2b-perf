@@ -22,10 +22,11 @@ import {BANKS, Field, inputCls, type MemberType, type RegisterFormData, type Rol
  * - 온라인 포함 시 쇼핑몰 URL 필수
  */
 export function StepStore({
-                              form, set,
+                              form, set, fieldErrors
                           }: {
     form: RegisterFormData;
     set: (partial: Partial<RegisterFormData>) => void;
+    fieldErrors?: Record<string, string>;
 }) {
     const storeOpts: { value: StoreType; label: string; icon: ReactNode }[] = [
         {value: "offline", label: "오프라인", icon: <Store size={16}/>},
@@ -48,6 +49,9 @@ export function StepStore({
                     placeholder="대표 브랜드 (선택)"
                     className={inputCls}
                 />
+                {fieldErrors?.brandName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.brandName}</p>
+                )}
             </Field>
 
             {/* 매장 타입 토글 */}
@@ -69,6 +73,9 @@ export function StepStore({
                         </button>
                     ))}
                 </div>
+                {fieldErrors?.storeType && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.storeType}</p>
+                )}
             </Field>
 
             {/* 쇼핑몰 URL — 온라인 포함 타입만 표시 */}
@@ -81,6 +88,9 @@ export function StepStore({
                         placeholder="https://smartstore.naver.com/mystore"
                         className={inputCls}
                     />
+                    {fieldErrors?.websiteUrl && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.websiteUrl}</p>
+                    )}
                 </Field>
             )}
         </div>
@@ -97,10 +107,11 @@ export function StepStore({
  * 가입 후에도 마이페이지에서 변경 가능
  */
 export function StepBankAccount({
-                                    form, set,
+                                    form, set, fieldErrors
                                 }: {
     form: RegisterFormData;
     set: (partial: Partial<RegisterFormData>) => void;
+    fieldErrors?: Record<string, string>;
 }) {
     return (
         <div className="space-y-4">
@@ -123,6 +134,9 @@ export function StepBankAccount({
                         <option key={b} value={b}>{b}은행</option>
                     ))}
                 </select>
+                {fieldErrors?.bankName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.bankName}</p>
+                )}
             </Field>
 
             <Field label="계좌번호" required>
@@ -133,6 +147,9 @@ export function StepBankAccount({
                     placeholder="숫자만 입력"
                     className={inputCls}
                 />
+                {fieldErrors?.accountNumber && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.accountNumber}</p>
+                )}
             </Field>
 
             <Field label="예금주명" required>
@@ -143,6 +160,9 @@ export function StepBankAccount({
                     placeholder="예금주 이름"
                     className={inputCls}
                 />
+                {fieldErrors?.accountHolder && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.accountHolder}</p>
+                )}
             </Field>
 
             {/* 이전 스텝 입력 요약 카드 */}
@@ -182,12 +202,13 @@ export function StepBankAccount({
  * - 회사 취급 카테고리 (셀러 대표 전용): 무조건 최소 1개 필수 (required=true / 1~5개 허용)
  */
 export function StepCategory({
-                                 form, set, role, memberType,
+                                 form, set, role, memberType, fieldErrors
                              }: {
     form: RegisterFormData;
     set: (partial: Partial<RegisterFormData>) => void;
     role: Role;
     memberType: MemberType;
+    fieldErrors?: Record<string, string>
 }) {
     const isEmployee = memberType === "employee";
     const isSellerPresident = role === "seller" && memberType === "president";
@@ -209,6 +230,9 @@ export function StepCategory({
                 }
                 required={false}
             />
+            {fieldErrors?.preferredCategoryIds && (
+                <p className="text-xs text-red-500 -mt-2">{fieldErrors.preferredCategoryIds}</p>
+            )}
 
             <p className="text-xs text-muted-foreground -mt-2">
                 * 선호 카테고리는 선택 사항이며 지정하지 않아도 가입이 가능합니다. (최대 5개)
@@ -225,6 +249,9 @@ export function StepCategory({
                         description="우리 회사가 실제로 공급하는 카테고리를 선택해 주세요. 최소 1개는 무조건 지정하셔야 가입이 진행됩니다."
                         required={true}
                     />
+                    {fieldErrors?.handledCategoryIds && (
+                        <p className="text-xs text-red-500 -mt-2">{fieldErrors.handledCategoryIds}</p>
+                    )}
                 </>
             )}
 

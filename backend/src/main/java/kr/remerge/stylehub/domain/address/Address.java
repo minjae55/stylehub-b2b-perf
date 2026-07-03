@@ -1,6 +1,7 @@
-package kr.remerge.stylehub.domain.company.entity;
+package kr.remerge.stylehub.domain.address;
 
 import jakarta.persistence.*;
+import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.global.entity.BaseEntity;
 import lombok.*;
 

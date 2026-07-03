@@ -166,29 +166,6 @@ export interface ResetPasswordRequest {
     resetToken: string;
     newPassword: string;
 }
-
-// ───────────────────────────────────────────
-// 회원 정보 변경 인증 (Profile OTP)
-// ───────────────────────────────────────────
-
-export interface ChangeEmailOtpRequest {
-    target: string; // 변경할 이메일 주소
-}
-
-export interface VerifyEmailOtpRequest {
-    target: string;
-    otpCode: string; // 6자리 인증번호
-}
-
-export interface ChangePhoneOtpRequest {
-    target: string; // 변경할 연락처
-}
-
-export interface VerifyPhoneOtpRequest {
-    target: string;
-    otpCode: string; // 6자리 인증번호
-}
-
 // ───────────────────────────────────────────
 // OCR 및 국세청 검증 관련 타입 추가
 // ───────────────────────────────────────────

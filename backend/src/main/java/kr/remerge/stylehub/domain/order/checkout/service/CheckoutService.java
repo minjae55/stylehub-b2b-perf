@@ -1,12 +1,12 @@
 package kr.remerge.stylehub.domain.order.checkout.service;
 
+import kr.remerge.stylehub.domain.address.Address;
+import kr.remerge.stylehub.domain.address.AddressRepository;
 import kr.remerge.stylehub.domain.cart.dto.CartResponse;
 import kr.remerge.stylehub.domain.cart.entity.CartItem;
 import kr.remerge.stylehub.domain.cart.enumtype.CartType;
 import kr.remerge.stylehub.domain.cart.repository.CartRepository;
-import kr.remerge.stylehub.domain.company.entity.Address;
 import kr.remerge.stylehub.domain.company.entity.Company;
-import kr.remerge.stylehub.domain.company.repository.AddressRepository;
 import kr.remerge.stylehub.domain.order.checkout.dto.*;
 import kr.remerge.stylehub.domain.order.checkout.exception.CheckoutValidationException;
 import kr.remerge.stylehub.domain.order.entity.Order;
@@ -14,11 +14,10 @@ import kr.remerge.stylehub.domain.order.entity.OrderItem;
 import kr.remerge.stylehub.domain.order.enumtype.OrderStatus;
 import kr.remerge.stylehub.domain.order.repository.OrderItemRepository;
 import kr.remerge.stylehub.domain.order.repository.OrderRepository;
-import kr.remerge.stylehub.domain.order.service.OrderStatusService;
 import kr.remerge.stylehub.domain.product.entity.Product;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
 import kr.remerge.stylehub.domain.user.entity.User;
-import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.domain.user.support.UserReader;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -36,10 +35,8 @@ import static java.util.stream.Collectors.groupingBy;
 @RequiredArgsConstructor
 public class CheckoutService {
 
-    private final OrderStatusService orderStatusService;
-
     private final CartRepository cartRepository;
-    private final UserRepository userRepository;
+    private final UserReader userReader;
     private final AddressRepository addressRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -213,8 +210,7 @@ public class CheckoutService {
 
     public List<AddressResponse> getAddress(Integer userId) {
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = userReader.getCompanyUser(userId);
 
         Integer companyId = user.getCompany().getCompanyId();
 
@@ -235,8 +231,7 @@ public class CheckoutService {
     @Transactional
     public AddressResponse createAddress(Integer userId, AddressCreateRequest request) {
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = userReader.getCompanyUser(userId);
 
         Company company = user.getCompany();
 
@@ -290,8 +285,6 @@ public class CheckoutService {
     }
 
     public MultiOrderCheckoutResponse getMultiOrderCheckout(Integer userId, List<Integer> orderIds) {
-
-        findUser(userId);
         List<Order> orders = findOwnedPendingOrders(userId, orderIds);
         List<Integer> distinctOrderIds = orders.stream()
                 .map(Order::getOrderId)
@@ -346,29 +339,6 @@ public class CheckoutService {
 
     }
 
-    @Transactional
-    public DevOrderPaymentResponse completeDevOrderPayment(
-            Integer userId,
-            List<Integer> orderIds
-    ) {
-
-        User user = findUser(userId);
-
-        List<Order> orders = findOwnedPendingOrders(userId, orderIds);
-
-        orderStatusService.confirmPayments(orders, user);
-
-        List<String> orderNos = orders.stream()
-                .map(Order::getOrderNo)
-                .toList();
-
-        long totalAmount = orders.stream()
-                .mapToLong(Order::getTotalAmount)
-                .sum();
-
-        return new DevOrderPaymentResponse(orderNos, totalAmount);
-    }
-
     private List<Order> findOwnedPendingOrders(
             Integer userId,
             List<Integer> orderIds
@@ -395,10 +365,4 @@ public class CheckoutService {
         return orders;
     }
 
-    private User findUser(Integer userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new BusinessException(ErrorCode.USER_NOT_FOUND)
-                );
-    }
 }

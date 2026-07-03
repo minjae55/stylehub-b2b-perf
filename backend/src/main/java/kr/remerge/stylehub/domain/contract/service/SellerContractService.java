@@ -1,9 +1,6 @@
 package kr.remerge.stylehub.domain.contract.service;
 
-import kr.remerge.stylehub.domain.contract.dto.SellerContractCreateRequest;
-import kr.remerge.stylehub.domain.contract.dto.SellerContractCreateResponse;
-import kr.remerge.stylehub.domain.contract.dto.SellerContractDetailResponse;
-import kr.remerge.stylehub.domain.contract.dto.SellerContractSignRequest;
+import kr.remerge.stylehub.domain.contract.dto.*;
 import kr.remerge.stylehub.domain.contract.entity.Contract;
 import kr.remerge.stylehub.domain.contract.entity.ContractItem;
 import kr.remerge.stylehub.domain.contract.entity.ContractSignature;
@@ -16,7 +13,7 @@ import kr.remerge.stylehub.domain.quote.constant.QuoteStatusCode;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
 import kr.remerge.stylehub.domain.quote.repository.QuoteRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
-import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.domain.user.support.UserReader;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +31,7 @@ public class SellerContractService {
     private final ContractRepository contractRepository;
     private final ContractItemRepository contractItemRepository;
     private final ContractSignatureRepository contractSignatureRepository;
-    private final UserRepository userRepository;
+    private final UserReader userReader;
     private final QuoteRepository quoteRepository;
     private final ContractService contractService;
 
@@ -42,7 +39,7 @@ public class SellerContractService {
             Integer userId,
             Integer quoteId
     ) {
-        User seller = findSeller(userId);
+        User seller = userReader.getCompanyUser(userId);
         Contract contract = findContractByQuote(quoteId);
         validateSellerCompany(seller, contract);
 
@@ -63,7 +60,7 @@ public class SellerContractService {
             String signedIp,
             String userAgent
     ) {
-        User seller = findSeller(userId);
+        User seller = userReader.getCompanyUser(userId);
 
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() ->
@@ -101,11 +98,15 @@ public class SellerContractService {
         contract.sellerSign();
     }
 
-    private User findSeller(Integer userId) {
-        return userRepository.findByIdWithCompany(userId)
-                .orElseThrow(() ->
-                        new BusinessException(ErrorCode.USER_NOT_FOUND)
-                );
+    @Transactional
+    public void updateDraft(
+            Integer userId,
+            Integer contractId,
+            SellerContractUpdateRequest request
+    ) {
+        User seller = userReader.getCompanyUser(userId);
+
+//        contractRepository.fi
     }
 
     private Contract findContractByQuote(Integer quoteId) {
@@ -142,7 +143,7 @@ public class SellerContractService {
     @Transactional
     public SellerContractCreateResponse createContract(Integer userId, SellerContractCreateRequest request) {
 
-        User seller = findSeller(userId);
+        User seller = userReader.getCompanyUser(userId);
 
         Quote quote = quoteRepository.findById(request.quoteId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUOTE_NOT_FOUND));

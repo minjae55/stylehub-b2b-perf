@@ -54,14 +54,19 @@ public class SettlementDashboard {
             private long growth;
         }
     }
-        @Getter
-        @Setter
-        public static class RecentPayment {
-            private String settlementId;
-            private String createdAt;
-            private String sellerCompanyName;
-            private Long totalAmount;
-            private String status;
-        }
+    @Getter
+    @Setter
+    public static class RecentPayment {
+        private Integer settlementId;   // orderId 사용
+        private String orderNo;
+        private String createdAt;
+        private Integer buyerId;
+        private Integer sellerId;       // sellerCompany의 PK
+        private String sellerCompanyName;
+        private Long totalAmount;
+        private Long platformFee;
+        private Long finalAmount;
+        private String status;
+    }
 
 }

@@ -7,12 +7,14 @@ import kr.remerge.stylehub.global.auth.dto.login.LoginRequest;
 import kr.remerge.stylehub.global.auth.dto.token.TokenResponse;
 import kr.remerge.stylehub.global.auth.jwt.JwtProperties;
 import kr.remerge.stylehub.global.auth.jwt.JwtProvider;
+import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
 import kr.remerge.stylehub.global.common.RedisRepository;
 import kr.remerge.stylehub.global.common.service.EmailService;
 import kr.remerge.stylehub.global.common.service.SmsService;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,12 +38,14 @@ public class AuthService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     // ───────────────────────────────────────────
-    // 일반 로그인
+    // 로그인
     // ───────────────────────────────────────────
     @Transactional
     public TokenResponse login(LoginRequest request, String clientIp) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_LOGIN_CREDENTIALS));
+
+        validateCompanyStatus(user);
 
         validateUserStatus(user);
 
@@ -76,6 +80,17 @@ public class AuthService {
     }
 
     // ───────────────────────────────────────────
+    // JWT 필터 전용 - userId로 직접 조회 (Spring 표준 메서드 아님)
+    // JwtFilter에서 토큰의 userId로 조회할 때 호출됨
+    // ───────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public UserDetails loadUserByUserId(Integer userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return new CustomUserDetails(user);
+    }
+
+    // ───────────────────────────────────────────
     // 액세스 토큰 재발급 (Refresh)
     // ───────────────────────────────────────────
     @Transactional(readOnly = true)
@@ -103,6 +118,33 @@ public class AuthService {
                 user.getBusinessRole().name());
 
         return TokenResponse.of(newAccessToken, refreshToken);
+    }
+
+
+    private void validateUserStatus(User user) {
+        switch (user.getStatus()) {
+            case PENDING -> throw new BusinessException(ErrorCode.USER_PENDING);
+            case SUSPENDED -> throw new BusinessException(ErrorCode.USER_SUSPENDED);
+            case DELETED -> throw new BusinessException(ErrorCode.USER_DELETED);
+            default -> {
+            }
+        }
+    }
+
+    private void validateCompanyStatus(User user) {
+        // 유저에게 회사가 할당되어 있지 않은 예외 상황 방어 (ex: 최고 관리자 등)
+        if (user.getCompany() == null) {
+            return;
+        }
+
+        switch (user.getCompany().getStatus()) {
+            case PENDING -> throw new BusinessException(ErrorCode.COMPANY_PENDING);   // "승인 대기 중인 회사입니다."
+            case SUSPENDED -> throw new BusinessException(ErrorCode.COMPANY_SUSPENDED); // "이용 정지된 회사입니다."
+            case DELETED -> throw new BusinessException(ErrorCode.COMPANY_DELETED);   // "삭제된 회사 정보입니다."
+            default -> {
+                // APPROVED(정상) 상태일 때는 통과
+            }
+        }
     }
 
     // ───────────────────────────────────────────
@@ -191,16 +233,6 @@ public class AuthService {
     // ───────────────────────────────────────────
     public void logout(Integer userId) {
         redisRepository.delete(refreshTokenKey(userId));
-    }
-
-    private void validateUserStatus(User user) {
-        switch (user.getStatus()) {
-            case PENDING -> throw new BusinessException(ErrorCode.USER_PENDING);
-            case SUSPENDED -> throw new BusinessException(ErrorCode.USER_SUSPENDED);
-            case DELETED -> throw new BusinessException(ErrorCode.USER_DELETED);
-            default -> {
-            }
-        }
     }
 
     // ───────────────────────────────────────────

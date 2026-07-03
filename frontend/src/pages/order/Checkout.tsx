@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import api from "@/api/axios";
+import { useAuthStore } from "@/store/useAuthStore";
 import {
   AlertCircle,
   ArrowLeft,
@@ -11,10 +12,8 @@ import {
   LockKeyhole,
   MapPin,
   Package,
-  PenLine,
   ReceiptText,
   ShieldCheck,
-  ShoppingBag,
   Truck,
   X,
 } from "lucide-react";
@@ -26,7 +25,7 @@ type OrderItem = {
   supplier: string;
   price: number;
   quantity: number;
-  image: string;
+  image: string | null;
 };
 
 type CheckoutLocationState = {
@@ -38,6 +37,7 @@ type CheckoutPreviewResponse = {
   cartType: "NORMAL" | "SAMPLE";
   items: Array<{
     cartItemId: number;
+    imageUrl: string | null;
     productName: string;
     optionLabel: string;
     unitPrice: number;
@@ -54,6 +54,7 @@ type OrderCheckoutResponse = {
   orderNo: string;
   items: Array<{
     orderItemId: number;
+    imageUrl: string | null;
     productName: string;
     optionSummary: string | null;
     quantity: number;
@@ -70,11 +71,6 @@ type MultiOrderCheckoutResponse = {
   orders: OrderCheckoutResponse[];
   productAmount: number;
   shippingFee: number;
-  totalAmount: number;
-};
-
-type DevOrderPaymentResponse = {
-  orderNos: string[];
   totalAmount: number;
 };
 
@@ -104,6 +100,12 @@ type OrderCreateResponse = {
   totalAmount: number;
 };
 
+type SampleOrderCreateResponse = {
+  orderId: number;
+  orderNo: string;
+  totalAmount: number;
+};
+
 type DeliveryAddress = {
   receiverName: any;
   addressId: number;
@@ -121,49 +123,27 @@ type AddressCreateRequest = {
   addressDetail: string;
 };
 
+type SampleCheckoutResponse = {
+  quoteId: number;
+  quoteNo: string;
+  items: {
+    quoteItemId: number;
+    productName: string;
+    optionSummary: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+  }[];
+  productAmount: number;
+  shippingFee: number;
+  totalAmount: number;
+};
+
 const EMPTY_ADDRESS_FORM: AddressCreateRequest = {
   addressName: "",
   zipcode: "",
   address: "",
   addressDetail: "",
-};
-
-const READY_ITEMS: OrderItem[] = [
-  {
-    id: 1,
-    name: "여성 베이지 오버핏 셔츠",
-    supplier: "라온패션",
-    price: 18900,
-    quantity: 50,
-    image:
-      "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=120&h=120&fit=crop&auto=format",
-  },
-  {
-    id: 2,
-    name: "여성 와이드 슬랙스",
-    supplier: "모던클로젯",
-    price: 24500,
-    quantity: 30,
-    image:
-      "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=120&h=120&fit=crop&auto=format",
-  },
-];
-
-const CUSTOM_ITEMS: Record<string, OrderItem[]> = {
-  "ORD-2024-0901": [
-    {
-      id: 1,
-      name: "여성 린넨 오버핏 블라우스 (주문제작)",
-      supplier: "르블랑 어패럴",
-      price: 14000,
-      quantity: 200,
-      image: "https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=120&h=120&fit=crop",
-    },
-  ],
-};
-
-const isSignedMap: Record<string, boolean> = {
-  "ORD-2024-0901": false,
 };
 
 
@@ -174,14 +154,13 @@ function formatPrice(value: number) {
 export function Checkout() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
 
   const checkoutState = location.state as CheckoutLocationState | null;
 
   const orderType = checkoutState?.cartType === "SAMPLE"
     ? "sample"
     : searchParams.get("type") ?? "ready";
-  const customOrderId = searchParams.get("orderId") ?? "";
   const orderIdsParam = searchParams.get("orderIds") ?? "";
   const orderIds = useMemo(
     () => orderIdsParam
@@ -190,15 +169,20 @@ export function Checkout() {
       .filter((orderId) => Number.isInteger(orderId) && orderId > 0),
     [orderIdsParam]
   );
-  const orderId = customOrderId || String(orderIds[0] ?? "");
+  const quoteIdParam = searchParams.get("quoteId") ?? "";
+  const quoteId = Number(quoteIdParam);
 
-  const isCustom = orderType === "custom";
-  const isOrderCheckout = !isCustom && orderIds.length > 0;
+  const isSampleQuoteCheckout =
+    orderType === "sample" &&
+    Number.isInteger(quoteId) &&
+    quoteId > 0;
+
+
+  const isOrderCheckout = orderIds.length > 0;
   const isSample = orderType === "sample";
-  const isSigned = isCustom ? (isSignedMap[orderId] ?? false) : true;
 
   const [checkoutPreview, setCheckoutPreview] = useState<CheckoutPreviewResponse | null>(null);
-  const [isPreviewLoading, setIsPreviewLoading] = useState(!isCustom);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(true);
   const [previewError, setPreviewError] = useState("");
   const [checkoutInvalidItems, setCheckoutInvalidItems] = useState<CheckoutInvalidItem[]>([]);
   const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
@@ -211,13 +195,13 @@ export function Checkout() {
   const [showAddressForm, setShowAddressForm] = useState(false);
 
 
-  useEffect(() => {
-    if (isCustom) {
-      setIsPreviewLoading(false);
-      return;
-    }
 
-    if (!isOrderCheckout && !checkoutState?.cartItemIds.length) {
+  useEffect(() => {
+    if (
+      !isSampleQuoteCheckout &&
+      !isOrderCheckout &&
+      !checkoutState?.cartItemIds.length
+    ) {
       setPreviewError("선택한 장바구니 상품이 없습니다.");
       setIsPreviewLoading(false);
       return;
@@ -226,6 +210,31 @@ export function Checkout() {
     const loadCheckoutPreview = async () => {
       try {
         setCheckoutInvalidItems([]);
+        setPreviewError("");
+
+        if (isSampleQuoteCheckout) {
+          const response = await api.get<SampleCheckoutResponse>(
+            `/checkout/quotes/${quoteId}/sample`
+          );
+
+          setCheckoutPreview({
+            cartType: "SAMPLE",
+            items: response.items.map((item) => ({
+              cartItemId: item.quoteItemId,
+              imageUrl: null,
+              productName: item.productName,
+              optionLabel: item.optionSummary,
+              unitPrice: item.unitPrice,
+              quantity: item.quantity,
+              totalPrice: item.totalPrice,
+            })),
+            productAmount: response.productAmount,
+            shippingFee: response.shippingFee,
+            totalAmount: response.totalAmount,
+          });
+          return;
+        }
+
         if (isOrderCheckout) {
           const response = await api.post<MultiOrderCheckoutResponse>(
             "/checkout/orders/preview",
@@ -237,6 +246,7 @@ export function Checkout() {
             items: response.orders.flatMap((order) =>
               order.items.map((item) => ({
                 cartItemId: item.orderItemId,
+                imageUrl: item.imageUrl,
                 productName: item.productName,
                 optionLabel: item.optionSummary ?? "옵션 정보 없음",
                 unitPrice: item.unitPrice + item.additionalPrice,
@@ -285,18 +295,28 @@ export function Checkout() {
           return;
         }
 
-        setPreviewError(
-          isOrderCheckout
-            ? "선택한 주문 정보를 불러오지 못했습니다. 주문 목록에서 다시 시도해주세요."
-            : "주문 정보를 불러오지 못했습니다. 장바구니에서 다시 시도해주세요."
-        );
+        if (isSampleQuoteCheckout) {
+          setPreviewError(
+            errorResponse?.message
+              ?? (error instanceof Error ? error.message : null)
+              ?? "샘플 결제 정보를 불러오지 못했습니다. 견적서를 다시 확인해주세요."
+          );
+        } else if (isOrderCheckout) {
+          setPreviewError(
+            "선택한 주문 정보를 불러오지 못했습니다. 주문 목록에서 다시 시도해주세요."
+          );
+        } else {
+          setPreviewError(
+            "주문 정보를 불러오지 못했습니다. 장바구니에서 다시 시도해주세요."
+          );
+        }
       } finally {
         setIsPreviewLoading(false);
       }
     };
 
     void loadCheckoutPreview();
-  }, [checkoutState, isCustom, isOrderCheckout, orderIds]);
+  }, [checkoutState, isOrderCheckout, isSampleQuoteCheckout, orderIds, quoteId]);
 
   useEffect(() => {
     const loadAddresses = async () => {
@@ -322,25 +342,18 @@ export function Checkout() {
         supplier: item.optionLabel,
         price: item.unitPrice,
         quantity: item.quantity,
-        image: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=120&h=120&fit=crop&auto=format",
+        image: item.imageUrl,
       }))
-    : isCustom
-      ? CUSTOM_ITEMS[orderId] ?? READY_ITEMS
-      : [];
+    : [];
   const [paymentMethod, setPaymentMethod] = useState<"wire" | "card">("wire");
   const [agreeTerms, setAgreeTerms] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [isPaymentLoading, setIsPaymentLoading] = useState(false);
-  const [createdOrderNumbers, setCreatedOrderNumbers] = useState<string[]>([]);
-  const [createdOrderTotal, setCreatedOrderTotal] = useState(0);
-  const [isTestOrderLoading, setIsTestOrderLoading] = useState(false);
-  const [testOrderError, setTestOrderError] = useState("");
 
   const subtotal = checkoutPreview?.productAmount
     ?? orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const shipping = checkoutPreview?.shippingFee
-    ?? (isCustom ? (subtotal >= 1000000 ? 0 : 3000) : 0);
+    ?? 0;
   const total = checkoutPreview?.totalAmount ?? subtotal + shipping;
   const shippingText = shipping === 0 ? "무료" : formatPrice(shipping);
   const shippingDescription = shipping === 0
@@ -399,16 +412,18 @@ export function Checkout() {
             <p className="mb-5 mt-2 text-center text-sm font-semibold text-slate-700">{previewError}</p>
           )}
           <Link
-            to="/cart"
+            to={isSampleQuoteCheckout ? "/buyer/quotes" : "/cart"}
             className="mx-auto inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-white"
           >
-            장바구니로 돌아가 수정하기
+            {isSampleQuoteCheckout
+              ? "견적 목록으로 돌아가기"
+              : "장바구니로 돌아가 수정하기"}
           </Link>
         </div>
       </div>
     );
   }
-  const orderTypeLabel = isCustom ? "소싱 주문" : isSample ? "샘플 주문" : "일반 주문";
+  const orderTypeLabel = isSample ? "샘플 주문" : "일반 주문";
 
   const handleAddressFormChange = (field: keyof AddressCreateRequest, value: string) => {
     setAddressForm((previous) => ({ ...previous, [field]: value }));
@@ -441,24 +456,49 @@ export function Checkout() {
   };
   const TOSS_CLIENT_KEY = "test_ck_GePWvyJnrKme6gpAnkz63gLzN97E";
   const handlePayment = async () => {
-    if (!agreeTerms || !isSigned || !selectedAddress || isPaymentLoading) return;
-    if (!checkoutState?.cartItemIds.length) return;
+    if (!agreeTerms || !selectedAddress || isPaymentLoading) return;
+    if (!isSampleQuoteCheckout && !checkoutState?.cartItemIds.length) return;
+
+    if (isSampleQuoteCheckout && (!user?.name || !user.phone)) {
+      alert("샘플 배송을 위한 이름과 연락처를 회원정보에서 확인해 주세요.");
+      return;
+    }
 
     try {
       setIsPaymentLoading(true);
 
-        const orderResponse = await api.post<OrderCreateResponse>("/buyer/orders", {
-            cartItemIds: checkoutState.cartItemIds,
+      let orderNumbers: string[];
+
+      if (isSampleQuoteCheckout) {
+        const sampleOrderResponse =
+          await api.post<SampleOrderCreateResponse>("/buyer/orders/sample", {
+            quoteId,
             addressId: selectedAddress.addressId,
-            cartType: checkoutState.cartType,
+            receiverName: user!.name,
+            receiverPhone: user!.phone,
+            receiverMemo: "",
+            paymentMethod: paymentMethod === "card"
+              ? "CORP_CARD"
+              : "TRANSFER",
+          });
+
+        orderNumbers = [sampleOrderResponse.orderNo];
+      } else {
+        const orderResponse = await api.post<OrderCreateResponse>("/buyer/orders", {
+          cartItemIds: checkoutState!.cartItemIds,
+          addressId: selectedAddress.addressId,
+          cartType: checkoutState!.cartType,
         });
 
-      if (orderResponse.orderNos && orderResponse.orderNos.length > 0) {
-        sessionStorage.setItem("pending_order_ids", JSON.stringify(orderResponse.orderNos));
+        orderNumbers = orderResponse.orderNos;
+      }
+
+      if (orderNumbers.length > 0) {
+        sessionStorage.setItem("pending_order_ids", JSON.stringify(orderNumbers));
       }
 
       // 토스 결제창에는 대표로 첫 번째 주문 번호를 던져줍니다. (realOrderNumber)
-      const realOrderNumber = orderResponse.orderNos[0];
+      const realOrderNumber = orderNumbers[0];
 
       if (!realOrderNumber) {
         alert("주문 번호를 발급받지 못했습니다.");
@@ -478,7 +518,7 @@ export function Checkout() {
         orderName,
         successUrl: `${window.location.origin}/payment/success`,
         failUrl: `${window.location.origin}/payment/fail`,
-        customerName: "구매 담당자",
+        customerName: user?.name ?? "구매 담당자",
       };
 
       if (paymentMethod === "card") {
@@ -498,53 +538,6 @@ export function Checkout() {
       alert("결제 처리 중 오류가 발생했습니다.");
     } finally {
       setIsPaymentLoading(false);
-    }
-  };
-
-  const handleTestOrder = async () => {
-    if (isOrderCheckout || !checkoutState?.cartItemIds.length || !selectedAddress || isTestOrderLoading) return;
-
-    try {
-      setIsTestOrderLoading(true);
-      setTestOrderError("");
-
-      const response = await api.post<OrderCreateResponse>("/buyer/orders", {
-        cartItemIds: checkoutState.cartItemIds,
-        addressId: selectedAddress.addressId,
-        cartType: checkoutState.cartType,
-      });
-
-      setCreatedOrderNumbers(response.orderNos);
-      setCreatedOrderTotal(response.totalAmount);
-      setShowSuccessModal(true);
-    } catch (error) {
-      console.error("임시 주문 생성 실패", error);
-      setTestOrderError("주문 생성에 실패했습니다. 백엔드 로그를 확인해 주세요.");
-    } finally {
-      setIsTestOrderLoading(false);
-    }
-  };
-
-  const handleTestOrderPayment = async () => {
-    if (!isOrderCheckout || !selectedAddress || isTestOrderLoading) return;
-
-    try {
-      setIsTestOrderLoading(true);
-      setTestOrderError("");
-
-      const response = await api.post<DevOrderPaymentResponse>(
-        "/checkout/orders/dev-payment",
-        { orderIds }
-      );
-
-      setCreatedOrderNumbers(response.orderNos);
-      setCreatedOrderTotal(response.totalAmount);
-      setShowSuccessModal(true);
-    } catch (error) {
-      console.error("개발용 임시 결제 처리 실패", error);
-      setTestOrderError("임시 결제 처리에 실패했습니다. 주문 상태를 확인해 주세요.");
-    } finally {
-      setIsTestOrderLoading(false);
     }
   };
 
@@ -577,35 +570,6 @@ export function Checkout() {
             </div>
           </div>
         </header>
-
-        {isCustom && !isSigned && (
-          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
-            <div className="flex gap-4">
-              <AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-600" />
-              <div className="flex-1">
-                <p className="font-bold text-amber-900">전자서명이 필요합니다</p>
-                <p className="mt-1 text-sm leading-6 text-amber-800">
-                  소싱 주문은 결제 전 계약서 서명이 완료되어야 합니다.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/buyer/orders/custom/${orderId}/sign`)}
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-amber-700"
-                >
-                  <PenLine size={14} />
-                  전자서명 하러 가기
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isCustom && isSigned && (
-          <div className="mb-6 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
-            <CheckCircle size={16} />
-            전자서명이 완료되었습니다. 결제를 진행해 주세요.
-          </div>
-        )}
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <main className="space-y-5">
@@ -726,11 +690,17 @@ export function Checkout() {
               <div className="mb-5 max-h-[300px] space-y-3 overflow-y-auto">
                 {orderItems.map((item) => (
                   <div key={item.id} className="flex gap-3 border-b border-slate-100 pb-3 last:border-0">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="h-14 w-14 shrink-0 rounded-lg border border-slate-100 object-cover"
-                    />
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="h-14 w-14 shrink-0 rounded-lg border border-slate-100 object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400">
+                        <Package size={20} aria-hidden="true" />
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <h4 className="line-clamp-2 text-sm font-bold leading-snug text-slate-950">{item.name}</h4>
                       <p className="mt-0.5 text-xs text-slate-500">{item.supplier}</p>
@@ -770,25 +740,12 @@ export function Checkout() {
                 <p className="whitespace-nowrap text-2xl font-black text-primary">{formatPrice(total)}</p>
               </div>
 
-              {isCustom && (
-                <div
-                  className={`mt-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${
-                    isSigned
-                      ? "border border-green-200 bg-green-50 text-green-700"
-                      : "border border-amber-200 bg-amber-50 text-amber-700"
-                  }`}
-                >
-                  {isSigned ? <CheckCircle size={13} /> : <PenLine size={13} />}
-                  {isSigned ? "전자서명 완료" : "전자서명 대기 중"}
-                </div>
-              )}
-
               <button
                 type="button"
-                disabled={!agreeTerms || !selectedAddress || (isCustom && !isSigned) || isPaymentLoading}
+                disabled={!agreeTerms || !selectedAddress || isPaymentLoading}
                 onClick={handlePayment}
                 className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-sm font-bold transition ${
-                  agreeTerms && selectedAddress && (!isCustom || isSigned) && !isPaymentLoading
+                  agreeTerms && selectedAddress && !isPaymentLoading
                     ? "bg-primary text-white hover:bg-primary/90"
                     : "cursor-not-allowed bg-slate-100 text-slate-400"
                 }`}
@@ -800,45 +757,8 @@ export function Checkout() {
                   ? "약관에 동의해 주세요"
                   : !selectedAddress
                     ? "배송지를 선택해 주세요"
-                  : isCustom && !isSigned
-                    ? "전자서명 후 결제 가능"
                     : `${formatPrice(total)} 결제하기`}
               </button>
-
-              {import.meta.env.DEV && !isCustom && !isOrderCheckout && (
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    disabled={!selectedAddress || isTestOrderLoading || createdOrderNumbers.length > 0}
-                    onClick={handleTestOrder}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 bg-secondary/50 px-4 py-2.5 text-xs font-bold text-primary transition hover:border-primary hover:bg-secondary disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
-                  >
-                    <ReceiptText size={14} />
-                    {isTestOrderLoading
-                      ? "주문 생성 중..."
-                      : createdOrderNumbers.length > 0
-                        ? "주문 생성 완료"
-                        : "개발용: 결제 없이 주문 생성"}
-                  </button>
-                  {testOrderError && (
-                    <p className="mt-2 text-center text-xs font-medium text-rose-600">{testOrderError}</p>
-                  )}
-                </div>
-              )}
-
-              {import.meta.env.DEV && isOrderCheckout && (
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    disabled={!selectedAddress || isTestOrderLoading}
-                    onClick={handleTestOrderPayment}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 bg-secondary/50 px-4 py-2.5 text-xs font-bold text-primary transition hover:border-primary hover:bg-secondary disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
-                  >
-                    <ReceiptText size={14} />
-                    {isTestOrderLoading ? "임시 결제 처리 중..." : "개발용 임시 결제 완료"}
-                  </button>
-                </div>
-              )}
 
               <div className="mt-4 rounded-lg border border-primary/15 bg-white px-3 py-3 text-xs leading-5 text-slate-500">
                 <div className="mb-1 flex items-center gap-1.5 font-bold text-slate-700">
@@ -850,63 +770,6 @@ export function Checkout() {
             </div>
           </aside>
         </div>
-
-        {showSuccessModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-            <div className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-              <button
-                type="button"
-                onClick={() => setShowSuccessModal(false)}
-                className="absolute right-4 top-4 text-slate-400 transition hover:text-slate-900"
-              >
-                <X size={20} />
-              </button>
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
-                <CheckCircle size={48} className="text-primary" />
-              </div>
-              <h2 className="mb-2 text-center text-2xl font-bold text-slate-950">주문 생성 완료</h2>
-              <p className="mb-6 text-center text-sm text-slate-500">
-                판매사별로 {createdOrderNumbers.length}개의 주문이 생성되었습니다.
-              </p>
-              <div className="mb-6 rounded-xl border border-primary/20 bg-secondary/60 p-5 text-sm">
-                <p className="mb-2 text-xs font-bold text-slate-500">생성된 주문번호</p>
-                <div className="space-y-2">
-                  {createdOrderNumbers.map((createdOrderNumber) => (
-                    <div
-                      key={createdOrderNumber}
-                      className="rounded-lg border border-primary/15 bg-white px-3 py-2 font-bold text-slate-900"
-                    >
-                      {createdOrderNumber}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3">
-                  <SummaryRow label="주문 타입" value={orderTypeLabel} />
-                </div>
-                <div className="mt-3 border-t border-primary/20 pt-3">
-                  <SummaryRow label="주문 총액" value={formatPrice(createdOrderTotal)} />
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate("/")}
-                  className="flex-1 rounded-lg border border-slate-200 py-3 text-sm font-bold text-slate-600 transition hover:border-primary hover:text-primary"
-                >
-                  홈으로
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/buyer/orders")}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-bold text-white transition hover:bg-primary/90"
-                >
-                  <ShoppingBag size={18} />
-                  주문 내역
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {showAddressModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">

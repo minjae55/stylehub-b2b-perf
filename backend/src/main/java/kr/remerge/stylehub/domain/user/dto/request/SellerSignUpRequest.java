@@ -82,11 +82,12 @@ public record SellerSignUpRequest(
         List<Integer> handledCategoryIds
 ) {
     public Company toCompanyEntity() {
+        String cleanRepresentativePhone = this.phone.replaceAll("[^0-9]", "");
         return Company.builder()
                 .name(companyName)
                 .businessNumber(businessNumber)
                 .representativeName(representativeName)
-                .representativePhone(representativePhone)
+                .representativePhone(cleanRepresentativePhone)
                 .address(address)
                 .addressDetail(addressDetail)
                 .businessLicenseUrl(businessLicenseUrl)
@@ -105,12 +106,13 @@ public record SellerSignUpRequest(
     }
 
     public User toUserEntity(Company company, String encodedPassword, UserRole userRole, BusinessRole businessRole) {
+        String cleanPhone = this.phone.replaceAll("[^0-9]", "");
         return User.builder()
                 .company(company)
                 .email(email)
                 .password(encodedPassword)
                 .name(name)
-                .phone(phone)
+                .phone(cleanPhone)
                 .role(userRole)
                 .businessRole(businessRole)
                 .status(UserStatus.PENDING)

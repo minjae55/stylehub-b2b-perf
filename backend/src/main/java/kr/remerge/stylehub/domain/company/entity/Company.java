@@ -1,6 +1,7 @@
 package kr.remerge.stylehub.domain.company.entity;
 
 import jakarta.persistence.*;
+import kr.remerge.stylehub.domain.address.Address;
 import kr.remerge.stylehub.domain.company.enumtype.CompanyStatus;
 import kr.remerge.stylehub.domain.company.enumtype.CompanyStoreType;
 import kr.remerge.stylehub.domain.company.enumtype.SellerStatus;
@@ -26,7 +27,7 @@ public class Company extends BaseEntity {
     private Integer companyId;
 
     // 기본 반품지 (없을 수도 있음)
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "default_return_address_id")
     private Address defaultReturnAddress;
 
