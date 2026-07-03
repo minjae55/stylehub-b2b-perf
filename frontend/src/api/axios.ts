@@ -1,84 +1,128 @@
-import axios, { AxiosResponse } from "axios";
-import { useAuthStore } from "@/store/useAuthStore";
-import { ApiResponse, ErrorResponse } from "./types";
+import axios, {AxiosError} from "axios";
+import {useAuthStore} from "@/store/useAuthStore";
+import {ErrorResponse} from "./types";
 
-// ───────────────────────────────────────────
-// Axios 인스턴스 생성
-// 팀 전체가 이 인스턴스를 import해서 사용
-// fetch나 axios.create()를 새로 만들지 말 것
-// ───────────────────────────────────────────
+/* ─────────────────────────────
+   Base API Instance
+   - 일반 API 요청용 axios 인스턴스
+   - 모든 서비스에서 공통으로 사용
+───────────────────────────── */
 const api = axios.create({
-    baseURL: "/api",          // Vite proxy를 통해 Spring Boot(8080)로 연결
-    withCredentials: true,    // HttpOnly 쿠키 방식이라 필수 (없으면 쿠키 안 보내짐)
-    headers: {
-        "Content-Type": "application/json",
-    },
+    baseURL: "/api",
+    withCredentials: true, // HttpOnly Cookie(JWT) 사용 시 필수
+    headers: {"Content-Type": "application/json"},
 });
 
-// ───────────────────────────────────────────
-// 응답 인터셉터
-// 모든 API 응답이 이 파이프라인을 거쳐서 나감
-// ───────────────────────────────────────────
+/* ─────────────────────────────
+   Refresh 전용 API Instance
+   - interceptor 영향을 받지 않도록 별도 분리
+   - accessToken 만료 시 refresh 요청 전용
+───────────────────────────── */
+const refreshApi = axios.create({
+    baseURL: "/api",
+    withCredentials: true,
+});
+
+/* ─────────────────────────────
+   Refresh Lock (중복 요청 방지)
+   - 여러 요청이 동시에 401 발생 시 refresh 1번만 수행
+   - 나머지는 해당 Promise를 공유하여 대기
+───────────────────────────── */
+let refreshPromise: Promise<any> | null = null;
+
+/* ─────────────────────────────
+   Response Interceptor
+   - 모든 API 응답/에러를 중앙에서 처리
+───────────────────────────── */
 api.interceptors.response.use(
-    // ── 정상 응답 처리 ──────────────────────
-    // 백엔드가 ApiResponse<T> 형태로 응답하면
-    // 실제 데이터인 response.data.data만 언래핑(Unwrapping)해서 반환
-    (response: AxiosResponse<ApiResponse<any>>) => {
-        return response.data.data;
-    },
+    /**
+     * [SUCCESS]
+     * 백엔드 응답 구조: ApiResponse<T>
+     * 실제 데이터만 추출해서 반환
+     */
+    (res) => res.data.data,
 
-    // ── 에러 응답 처리 ──────────────────────
-    async (error) => {
-        const originalRequest = error.config;
-        const url = originalRequest.url || "";
+    /**
+     * [ERROR HANDLING]
+     * 1. 401 → access token 만료 처리
+     * 2. refresh 성공 시 원 요청 재시도
+     * 3. 일반 에러는 message 표준화
+     */
+    async (error: AxiosError) => {
+        const {config, response} = error;
+        const status = response?.status;
 
-        // /auth 요청(로그인, 재발급 등)은 무한 루프 방지를 위해 토큰 재발급 로직에서 제외
-        const isAuthRequest = url.includes("/auth");
+        // 요청 정보가 없으면 그대로 에러 반환
+        if (!config) return Promise.reject(error);
 
-        // 액세스 토큰 만료(401) 시 리프레시 토큰으로 자동 갱신 시도
-        if (!isAuthRequest && error.response?.status === 401 && !originalRequest._retry) {
-            originalRequest._retry = true;
+        // refresh / auth 관련 요청은 재인증 대상에서 제외
+        const isAuthEndpoint = config.url?.includes("/auth");
+
+        /* ─────────────────────────────
+           401 Unauthorized 처리
+           - Access Token 만료 상황
+           - refresh token으로 재발급 시도
+        ───────────────────────────── */
+        if (status === 401 && !(config as any)._retry && !isAuthEndpoint) {
+            (config as any)._retry = true; // 무한 retry 방지
+
+            /**
+             * 이미 refresh 진행 중이면
+             * 기존 refreshPromise를 공유하여 대기
+             */
+            if (!refreshPromise) {
+                refreshPromise = refreshApi
+                    .post("/auth/refresh")
+                    .finally(() => {
+                        // refresh 완료 후 lock 해제
+                        refreshPromise = null;
+                    });
+            }
+
             try {
-                // api 인스턴스가 아닌 axios 원본으로 요청하여 인터셉터 중복 실행 방지
-                await axios.post("/api/auth/refresh", {}, { withCredentials: true });
-                return api(originalRequest);
+                // refresh 완료까지 대기
+                await refreshPromise;
+
+                // 성공 시 원래 요청 재시도
+                return api(config);
+
             } catch (refreshError) {
-                // 리프레시 토큰까지 만료된 경우 전역 상태 초기화 (ProtectedLayout이 로그인 페이지로 튕김 처리)
+                // refresh 실패 (refresh token 만료 등)
                 useAuthStore.getState().clearUser();
                 return Promise.reject(refreshError);
             }
         }
 
-        // 백엔드 커스텀 에러 포맷(ErrorResponse) 처리
-        if (error.response?.data) {
-            const serverError = error.response.data as ErrorResponse;
+        /* ─────────────────────────────
+           공통 에러 포맷 처리
+           - 백엔드 ErrorResponse 표준화
+        ───────────────────────────── */
+        if (response?.data) {
+            const serverError = response.data as ErrorResponse;
 
-            // catch(err) 문에서 err.message로 백엔드의 한글 에러 메시지를 바로 꺼낼 수 있도록 매핑
-            if (serverError.message) {
-                error.message = serverError.message;
-            }
+            // 프론트에서 바로 message 사용 가능하도록 변환
+            error.message = serverError.message || "에러 발생";
 
-            // 필요한 경우를 대비해 error 객체 내에 백엔드 원본 에러 구조를 그대로 보존
-            error.response.data = serverError;
-        } else if (!error.response) {
-            error.message = "서버와 연결할 수 없습니다. 서버 구동 상태를 확인하세요.";
+            // 원본 에러 구조 보존 (디버깅용)
+            response.data = serverError;
+        } else {
+            error.message = "서버와 연결할 수 없습니다.";
         }
 
         return Promise.reject(error);
     }
 );
 
-// ───────────────────────────────────────────
-// 커스텀 타입 정의
-// ───────────────────────────────────────────
-// 인터셉터가 T 자체를 반환하므로 인터페이스 타입을 우회 설정하여
-// api.get<User>("/users/me") 사용 시 Promise<User>가 추론되도록 처리
+/* ─────────────────────────────
+   Type Override (편의용)
+   - api.get<T>() → 자동으로 T 추론되도록 설정
+───────────────────────────── */
 type CustomizedAxios = {
-    get<T = any, R = T, D = any>(url: string, config?: any): Promise<R>;
-    post<T = any, R = T, D = any>(url: string, data?: any, config?: any): Promise<R>;
-    put<T = any, R = T, D = any>(url: string, data?: any, config?: any): Promise<R>;
-    patch<T = any, R = T, D = any>(url: string, data?: any, config?: any): Promise<R>;
-    delete<T = any, R = T, D = any>(url: string, config?: any): Promise<R>;
+    get<T = any, R = T>(url: string, config?: any): Promise<R>;
+    post<T = any, R = T>(url: string, data?: any, config?: any): Promise<R>;
+    put<T = any, R = T>(url: string, data?: any, config?: any): Promise<R>;
+    patch<T = any, R = T>(url: string, data?: any, config?: any): Promise<R>;
+    delete<T = any, R = T>(url: string, config?: any): Promise<R>;
 };
 
 export default api as unknown as CustomizedAxios;

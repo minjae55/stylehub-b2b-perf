@@ -1,5 +1,7 @@
 package kr.remerge.stylehub.global.auth;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
 import kr.remerge.stylehub.global.auth.dto.find.*;
@@ -62,12 +64,7 @@ public class AuthService {
 
         user.onLoginSuccess(clientIp);
 
-        String accessToken = jwtProvider.generateAccessToken(
-                user.getUserId(),
-                user.getCompany().getCompanyId(),
-                user.getRole().name(),
-                user.getBusinessRole().name()
-        );
+        String accessToken = jwtProvider.generateAccessToken(user.getUserId());
         String refreshToken = jwtProvider.generateRefreshToken(user.getUserId());
 
         redisRepository.save(
@@ -95,29 +92,30 @@ public class AuthService {
     // ───────────────────────────────────────────
     @Transactional(readOnly = true)
     public TokenResponse refresh(String refreshToken) {
-        if (jwtProvider.isExpired(refreshToken)) {
+        try {
+            Claims claims = jwtProvider.parseClaims(refreshToken);
+
+            Integer userId = Integer.parseInt(claims.getSubject());
+
+            String savedRefreshToken = redisRepository.get(refreshTokenKey(userId));
+            if (savedRefreshToken == null || !savedRefreshToken.equals(refreshToken)) {
+                throw new BusinessException(ErrorCode.REFRESH_TOKEN_EXPIRED);
+            }
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+            validateUserStatus(user);
+
+            String newAccessToken = jwtProvider.generateAccessToken(
+                    user.getUserId()
+            );
+
+            return TokenResponse.of(newAccessToken, refreshToken);
+
+        } catch (JwtException | IllegalArgumentException e) {
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_EXPIRED);
         }
-
-        Integer userId = jwtProvider.getUserId(refreshToken);
-
-        String savedRefreshToken = redisRepository.get(refreshTokenKey(userId));
-        if (savedRefreshToken == null || !savedRefreshToken.equals(refreshToken)) {
-            throw new BusinessException(ErrorCode.REFRESH_TOKEN_EXPIRED);
-        }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        validateUserStatus(user);
-
-        String newAccessToken = jwtProvider.generateAccessToken(
-                user.getUserId(),
-                user.getCompany().getCompanyId(),
-                user.getRole().name(),
-                user.getBusinessRole().name());
-
-        return TokenResponse.of(newAccessToken, refreshToken);
     }
 
 

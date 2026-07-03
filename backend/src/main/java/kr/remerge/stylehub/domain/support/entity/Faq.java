@@ -21,11 +21,10 @@ public class Faq extends BaseEntity {
     @Column(length = 50)
     private String category;
 
-    @Column(nullable = false, length = 300)
+    @Column(nullable = false, length = 1000)
     private String question;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, length = 1000)
     private String answer;
 
     @Builder.Default

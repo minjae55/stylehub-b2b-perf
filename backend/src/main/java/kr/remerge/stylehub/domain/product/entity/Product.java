@@ -75,8 +75,7 @@ public class Product extends BaseEntity {
     @Lob
     private String description;
 
-    @Lob
-    @Column(name = "care_instruction")
+    @Column(name = "care_instruction", length = 1000)
     private String careInstruction;
 
     @Column(name = "product_url", length = 2000)

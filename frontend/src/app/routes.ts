@@ -30,8 +30,8 @@ import {SellerContractSign} from "@/pages/contract/SellerContractSign";
 import {SellerContractCreate} from "@/pages/contract/SellerContractCreate";
 import {BuyerContractSign} from "@/pages/contract/BuyerContractSign";
 
-import {Inquiry} from "@/pages/inquiry/Inquiry";
-import {Support} from "@/pages/inquiry/Support";
+import {Inquiry} from "@/pages/support/Inquiry";
+import {Support} from "@/pages/support/Support";
 
 import {Cart} from "@/pages/order/Cart";
 import {Orders} from "@/pages/order/Orders";

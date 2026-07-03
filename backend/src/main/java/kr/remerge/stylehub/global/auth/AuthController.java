@@ -2,15 +2,15 @@ package kr.remerge.stylehub.global.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import kr.remerge.stylehub.domain.user.UserService;
 import kr.remerge.stylehub.global.auth.dto.SignUpAuth;
 import kr.remerge.stylehub.global.auth.dto.change.ChangeAuthRequest;
 import kr.remerge.stylehub.global.auth.dto.change.VerifyChangeAuthRequest;
 import kr.remerge.stylehub.global.auth.dto.find.*;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.dto.login.LoginRequest;
 import kr.remerge.stylehub.global.auth.dto.token.TokenResponse;
 import kr.remerge.stylehub.global.auth.jwt.JwtProperties;
-import kr.remerge.stylehub.global.auth.security.CustomUserDetails;
+import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import kr.remerge.stylehub.global.response.ApiResponse;
@@ -18,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -65,7 +64,7 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<Void>> refresh(
             @CookieValue(value = "refreshToken", required = false) String refreshToken) {
-
+        System.out.println("REFRESH HIT");
         if (refreshToken == null) {
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_EXPIRED);
         }
@@ -147,19 +146,22 @@ public class AuthController {
     // ───────────────────────────────────────────
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @AuthenticationPrincipal CustomUserDetails userDetails) { // 💡 시큐리티 컨텍스트에서 유저 정보 주입
+            @LoginUser AuthUser user) {
 
-        // 💡 필수 반영: Redis에 저장된 리프레시 토큰도 함께 삭제
-        if (userDetails != null) {
-            authService.logout(userDetails.getUserId());
+        // 필수 반영: Redis에 저장된 리프레시 토큰도 함께 삭제
+        if (user != null) {
+            authService.logout(user.userId());
         }
 
         ResponseCookie deleteAccessToken = createCookie("accessToken", "", 0);
         ResponseCookie deleteRefreshToken = createCookie("refreshToken", "", 0);
 
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.SET_COOKIE, deleteAccessToken.toString());
+        headers.add(HttpHeaders.SET_COOKIE, deleteRefreshToken.toString());
+
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, deleteAccessToken.toString())
-                .header(HttpHeaders.SET_COOKIE, deleteRefreshToken.toString())
+                .headers(headers)
                 .body(ApiResponse.successWithMessage("로그아웃 되었습니다."));
     }
 
@@ -169,8 +171,8 @@ public class AuthController {
     private ResponseCookie createCookie(String name, String value, long maxAgeSeconds) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(true)
-                .sameSite("None")
+                .secure(false) // true | false
+                .sameSite("Lax") // None | Lax
                 .path("/")
                 .maxAge(maxAgeSeconds)
                 .build();
