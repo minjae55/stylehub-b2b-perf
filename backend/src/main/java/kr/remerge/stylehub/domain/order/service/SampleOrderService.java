@@ -1,8 +1,8 @@
 package kr.remerge.stylehub.domain.order.service;
 
 import kr.remerge.stylehub.domain.address.Address;
+import kr.remerge.stylehub.domain.address.AddressRepository;
 import kr.remerge.stylehub.domain.company.entity.Company;
-import kr.remerge.stylehub.domain.company.repository.AddressRepository;
 import kr.remerge.stylehub.domain.order.dto.SampleOrderCreateRequest;
 import kr.remerge.stylehub.domain.order.dto.SampleOrderCreateResponse;
 import kr.remerge.stylehub.domain.order.entity.Order;
