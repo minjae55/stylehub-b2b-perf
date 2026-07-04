@@ -1,5 +1,7 @@
 package kr.remerge.stylehub.domain.quote.dto;
 
+import kr.remerge.stylehub.domain.order.entity.Order;
+import kr.remerge.stylehub.domain.order.enumtype.OrderStatus;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
 
 import java.time.LocalDateTime;
@@ -16,10 +18,16 @@ public record QuoteBuyerListResponse(
         LocalDateTime validUntil,
         Boolean sampleAvailable,
         String status,
-        LocalDateTime submittedAt
+        LocalDateTime submittedAt,
+        LocalDateTime viewedAt,
+        Integer sampleOrderId,
+        OrderStatus sampleOrderStatus
 ) {
 
-    public static QuoteBuyerListResponse from(Quote quote) {
+    public static QuoteBuyerListResponse from(
+            Quote quote,
+            Order sampleOrder
+    ) {
         return new QuoteBuyerListResponse(
                 quote.getQuoteId(),
                 quote.getQuoteNo(),
@@ -32,7 +40,10 @@ public record QuoteBuyerListResponse(
                 quote.getValidUntil(),
                 "AVAILABLE".equals(quote.getSampleAvailable()),
                 quote.getStatus(),
-                quote.getSubmittedAt()
+                quote.getSubmittedAt(),
+                quote.getViewedAt(),
+                sampleOrder == null ? null : sampleOrder.getOrderId(),
+                sampleOrder == null ? null : sampleOrder.getStatus()
         );
     }
 }

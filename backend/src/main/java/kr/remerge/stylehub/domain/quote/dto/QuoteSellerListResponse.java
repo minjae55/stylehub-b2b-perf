@@ -1,5 +1,6 @@
 package kr.remerge.stylehub.domain.quote.dto;
 
+import kr.remerge.stylehub.domain.contract.enumtype.ContractStatus;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
 
 import java.time.LocalDateTime;
@@ -14,10 +15,14 @@ public record QuoteSellerListResponse(
     Integer leadTimeDays,
     LocalDateTime validUntil,
     String status,
-    LocalDateTime submittedAt
+    LocalDateTime submittedAt,
+    ContractStatus contractStatus
 ) {
 
-    public static QuoteSellerListResponse from(Quote quote) {
+    public static QuoteSellerListResponse from(
+            Quote quote,
+            ContractStatus contractStatus
+    ) {
         return new QuoteSellerListResponse(
                 quote.getQuoteId(),
                 quote.getQuoteNo(),
@@ -27,7 +32,8 @@ public record QuoteSellerListResponse(
                 quote.getLeadTimeDays(),
                 quote.getValidUntil(),
                 quote.getStatus(),
-                quote.getSubmittedAt()
+                quote.getSubmittedAt(),
+                contractStatus
         );
     }
 }

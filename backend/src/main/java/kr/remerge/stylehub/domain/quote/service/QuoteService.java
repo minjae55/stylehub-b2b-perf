@@ -58,6 +58,8 @@ public class QuoteService {
                         company.getCompanyId()
                 );
 
+        validateQuoteSubmission(supplier);
+
         QuoteAmounts amounts =
                 validateAndCalculateAmounts(request);
 
@@ -93,6 +95,21 @@ public class QuoteService {
 
     }
 
+    private void validateQuoteSubmission(SourcingSupplier supplier) {
+        if (supplier.getStatus() == SourcingSupplierStatus.QUOTED) {
+            throw new BusinessException(ErrorCode.QUOTE_ALREADY_SUBMITTED);
+        }
+
+        boolean canSubmit =
+                supplier.getStatus() == SourcingSupplierStatus.SUGGESTED
+                        || supplier.getStatus() == SourcingSupplierStatus.RECOMMENDED;
+
+        if (!canSubmit) {
+            throw new BusinessException(ErrorCode.INVALID_QUOTE_STATUS);
+        }
+    }
+
+    @Transactional
     public QuoteDetailResponse getQuoteDetail(
             Integer userId,
             Integer quoteId
@@ -103,6 +120,13 @@ public class QuoteService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUOTE_NOT_FOUND));
 
         validateQuoteAccess(user, quote);
+
+        if (Objects.equals(
+                quote.getBuyer().getUserId(),
+                user.getUserId()
+        )) {
+            quote.markViewed();
+        }
 
         List<QuoteItem> items
                 = quoteItemRepository.findByQuote_QuoteId(quoteId);

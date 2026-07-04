@@ -116,6 +116,9 @@ public class Quote{
     @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;
 
+    @Column(name = "viewed_at")
+    private LocalDateTime viewedAt;
+
     @Column(name = "negotiated_at")
     private LocalDateTime negotiatedAt;
 
@@ -135,6 +138,12 @@ public class Quote{
             case "EXPIRED" -> this.expiredAt = now;
             default -> {
             }
+        }
+    }
+
+    public void markViewed() {
+        if (this.viewedAt == null) {
+            this.viewedAt = LocalDateTime.now();
         }
     }
 }
