@@ -42,17 +42,17 @@ public class AuthService {
     // ───────────────────────────────────────────
     @Transactional
     public TokenResponse login(LoginRequest request, String clientIp) {
+        // 1. 이메일로 사용자 조회 (없으면 바로 로그인 실패 에러)
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_LOGIN_CREDENTIALS));
 
-        validateCompanyStatus(user);
 
-        validateUserStatus(user);
-
+        // 2. 계정 잠금 여부 먼저 체크 (비밀번호 검사 전 5회 실패 차단)
         if (user.getFailedLoginAttempts() >= 5) {
             throw new BusinessException(ErrorCode.LOGIN_ATTEMPTS_EXCEEDED);
         }
 
+        // 3. 비밀번호 일치 여부 '먼저' 검사
         boolean passwordMatched = passwordEncoder.matches(request.password(), user.getPassword());
 
         if (!passwordMatched) {
@@ -60,7 +60,8 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_LOGIN_CREDENTIALS);
         }
 
-        user.onLoginSuccess(clientIp);
+        validateCompanyStatus(user);
+        validateUserStatus(user);
 
         String accessToken = jwtProvider.generateAccessToken(user.getUserId(), user.getCompany().getCompanyId(), user.getRole().name(), user.getBusinessRole().name());
         String refreshToken = jwtProvider.generateRefreshToken(user.getUserId());
@@ -70,7 +71,7 @@ public class AuthService {
                 refreshToken,
                 Duration.ofMillis(jwtProperties.getRefreshTokenExpiration())
         );
-
+        user.onLoginSuccess(clientIp);
         return TokenResponse.of(accessToken, refreshToken);
     }
 

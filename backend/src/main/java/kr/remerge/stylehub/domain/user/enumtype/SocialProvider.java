@@ -1,7 +1,13 @@
 package kr.remerge.stylehub.domain.user.enumtype;
 
 public enum SocialProvider {
-    NAVER,
+
+    // 구글
+    GOOGLE,
+
+    // 카카오
     KAKAO,
-    GOOGLE
+
+    // 네이버
+    NAVER
 }

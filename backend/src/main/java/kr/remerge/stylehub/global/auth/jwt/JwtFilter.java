@@ -7,7 +7,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import kr.remerge.stylehub.global.auth.AuthService;
 import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
@@ -56,7 +55,6 @@ React에서 감지
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
-    private final AuthService authService;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,

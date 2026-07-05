@@ -146,7 +146,7 @@ public class CompanyService {
     /**
      * 2. PRESIDENT용 — 본인 회사 소속 직원 목록 조회
      */
-    public List<EmployeeResponse> getEmployeesByCompanyId(Integer companyId, AuthUser authUser) {
+    public List<EmployeeResponse> getInquiryByCompanyId(Integer companyId, AuthUser authUser) {
         // 보안 검증: 대표자(PRESIDENT)가 요청했을 때, 본인의 회사 ID와 주소창의 companyId가 일치하는지 확인
         // 만약 다르면 다른 회사 정보를 훔쳐보려는 시도이므로 차단합니다.
         if ("PRESIDENT".equals(authUser.role()) && !authUser.companyId().equals(companyId)) {
@@ -158,6 +158,21 @@ public class CompanyService {
         List<User> employees = userRepository.findByCompany_CompanyIdAndRole(companyId, UserRole.EMPLOYEE);
 
         return employees.stream()
+                .map(EmployeeResponse::ofSimple)
+                .collect(Collectors.toList());
+    }
+
+    public List<EmployeeResponse> getEmployeesByCompanyId(Integer companyId, AuthUser authUser) {
+        // 보안 검증
+        if ("PRESIDENT".equals(authUser.role()) && !authUser.companyId().equals(companyId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        // 대표 본인을 제외한 소속 모든 유저 조회
+        List<User> employees = userRepository.findByCompany_CompanyId(companyId);
+
+        return employees.stream()
+                .filter(user -> user.getRole() != UserRole.PRESIDENT)
                 .map(EmployeeResponse::from)
                 .collect(Collectors.toList());
     }

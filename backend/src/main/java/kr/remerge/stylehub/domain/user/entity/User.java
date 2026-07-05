@@ -162,4 +162,16 @@ public class User extends BaseEntity {
     public void updateDefaultReceivingAddress(Address address) {
         this.defaultReceivingAddress = address;
     }
+
+    /**
+     * 직원 권한 및 거래 유형 선택적 변경 (비즈니스 메서드)
+     */
+    public void updateRoles(UserRole newRole, BusinessRole newBusinessRole) {
+        if (newRole != null) {
+            this.role = newRole;
+        }
+        if (newBusinessRole != null) {
+            this.businessRole = newBusinessRole;
+        }
+    }
 }

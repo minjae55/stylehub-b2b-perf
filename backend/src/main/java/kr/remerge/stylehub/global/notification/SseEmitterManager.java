@@ -113,4 +113,36 @@ public class SseEmitterManager {
             if (list.isEmpty()) map.remove(key);
         }
     }
+
+    // =========================================================================================================
+    // ── 특정 유저(userId) 단건에게 커스텀 SseEventBuilder 발송 ──
+    public void send(Integer userId, SseEmitter.SseEventBuilder event) {
+        List<SseEmitter> emitters = userEmitters.get(userId);
+        executeSend(emitters, event);
+    }
+
+    // ── 특정 권한군(role, 예: "ADMIN") 전체에게 커스텀 SseEventBuilder 발송 ──
+    public void sendToRole(String role, SseEmitter.SseEventBuilder event) {
+        List<SseEmitter> emitters = roleEmitters.get(role);
+        executeSend(emitters, event);
+    }
+
+    /**
+     * SseEventBuilder용 공통 실제 전송 헬퍼 로직 (안전한 동시성 순회)
+     */
+    private void executeSend(List<SseEmitter> emitters, SseEmitter.SseEventBuilder event) {
+        if (emitters == null || emitters.isEmpty()) return;
+
+        // 동시성 오류 방지를 위한 안전한 스냅샷 복사 후 순회
+        List<SseEmitter> targetList = new ArrayList<>(emitters);
+
+        for (SseEmitter emitter : targetList) {
+            try {
+                emitter.send(event);
+            } catch (Exception e) {
+                log.debug("[SSE] 개별 에미터 전송 실패 (정상적인 브라우저 종료 포함): {}", e.getMessage());
+            }
+        }
+    }
+    // =========================================================================================================
 }

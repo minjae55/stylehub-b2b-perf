@@ -2,7 +2,11 @@ package kr.remerge.stylehub.global.auth;
 
 import kr.remerge.stylehub.global.auth.jwt.JwtAuthenticationEntryPoint;
 import kr.remerge.stylehub.global.auth.jwt.JwtFilter;
+import kr.remerge.stylehub.global.auth.oauth2.CustomOAuth2UserService;
+import kr.remerge.stylehub.global.auth.oauth2.HttpCookieOAuth2AuthorizationRequestRepository;
+import kr.remerge.stylehub.global.auth.oauth2.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,59 +24,70 @@ import org.springframework.web.cors.CorsConfigurationSource;
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
+@Slf4j
 public class SecurityConfig {
 
-    // 💡 인증 없이 접근 가능한 URL 목록 정돈
     private static final String[] PUBLIC_URLS = {
-            "/api/auth/**"
+            "/api/auth/**",
+            "/ws/**",
+            "/login/**",
+            "/oauth2/**",
+            "/error",
+            "/favicon.ico"
     };
 
     private final JwtFilter jwtFilter;
     private final JwtAuthenticationEntryPoint entryPoint;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final HttpCookieOAuth2AuthorizationRequestRepository authorizationRequestRepository;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
-    // ───────────────────────────────────────────
-    // Security 필터 체인 설정
-    // ───────────────────────────────────────────
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1. CSRF 비활성화 (REST API 환경)
                 .csrf(AbstractHttpConfigurer::disable)
-                // 2. CORS 설정 적용
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
 
-                // 3. JWT 사용을 위한 세션 비활성화
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 4. URL별 접근 권한 설정
                 .authorizeHttpRequests(auth -> auth
-                        // 무인증 통과 주소 적용
                         .requestMatchers(PUBLIC_URLS).permitAll()
-                        // 웹소켓 핸드셰이크 경로는 시큐리티 검사 제외
                         .requestMatchers("/ws/**").permitAll()
-                        // 관리자 전용 기능 제어
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // 그 외 모든 요청은 기본 인증 필요
                         .anyRequest().authenticated()
                 )
 
-                .exceptionHandling(ex ->
-                        ex.authenticationEntryPoint(entryPoint)
+//                .oauth2Login(oauth2 -> oauth2
+//                        .authorizationEndpoint(endpoint ->
+//                                endpoint.authorizationRequestRepository(authorizationRequestRepository))
+//                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+//                        .successHandler(oAuth2SuccessHandler
+//                        )
+//                        .failureHandler((request, response, exception) -> {
+//                            exception.printStackTrace();
+//                        })
+//                )
+
+                .exceptionHandling(ex -> ex
+                                .authenticationEntryPoint(entryPoint)
+//                        .defaultAuthenticationEntryPointFor(
+//                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+//                                (RequestMatcher) request -> request.getRequestURI().startsWith("/login/oauth2/")
+//                        )
                 )
 
-                // 5. JwtFilter를 UsernamePasswordAuthenticationFilter 앞에 등록
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // ───────────────────────────────────────────
-    // 공통 Bean 등록
-    // ───────────────────────────────────────────
+//    @Bean
+//    public HttpCookieOAuth2AuthorizationRequestRepository authorizationRequestRepository() {
+//        return new HttpCookieOAuth2AuthorizationRequestRepository();
+//    }
 
-    // 수동 인증 처리를 담당할 매니저 빈 등록
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration authenticationConfiguration) throws Exception {
