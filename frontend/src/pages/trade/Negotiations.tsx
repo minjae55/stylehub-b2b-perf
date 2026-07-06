@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronRight,
   Clock3,
   FileText,
   Handshake,
@@ -15,14 +14,23 @@ import {
   X,
 } from "lucide-react";
 import api from "@/api/axios";
+import { useAuthStore } from "@/store/useAuthStore";
 
 type NegotiationStatus = "OPEN" | "AGREED" | "CLOSED";
 type NegotiationFilter = "ALL" | NegotiationStatus;
+type NegotiationRequestStatus =
+  | "REQUESTED"
+  | "RESPONDED"
+  | "ACCEPTED"
+  | "CANCELED";
 
 type NegotiationResponse = {
   negotiationId: number;
   negotiationType: "QUOTE" | "CONTRACT";
+  buyerId: number;
+  sellerId: number;
   quoteId: number | null;
+  contractId: number | null;
   quoteNo: string | null;
   productName: string | null;
   buyerName: string | null;
@@ -31,6 +39,8 @@ type NegotiationResponse = {
   status: NegotiationStatus;
   title: string;
   latestRequest: string | null;
+  latestRequestId: number | null;
+  latestRequestStatus: NegotiationRequestStatus | null;
   openedAt: string;
   updatedAt: string;
   agreedAt: string | null;
@@ -40,6 +50,68 @@ type NegotiationResponse = {
 type NegotiationLocationState = {
   quoteId?: number;
   requestId?: number;
+};
+
+type QuoteItemSummary = {
+  optionSummary: string | null;
+  quantity: number;
+  unitPrice: number;
+  sample: boolean;
+};
+
+type QuoteSummary = {
+  quoteId: number;
+  version: number;
+  leadTimeDays: number;
+  shippingFee: number;
+  validUntil: string;
+  sellerMemo: string | null;
+  totalAmount: number;
+  items: QuoteItemSummary[];
+};
+
+type ContractSummary = {
+  contractId: number;
+  version: number;
+  contractName: string | null;
+  deliveryDate: string;
+  paymentTerms: string;
+  returnPolicy: string;
+  specialTerms: string | null;
+  contractAmount: number;
+};
+
+type NegotiationRequestDetail = {
+  negotiationRequestId: number;
+  status: NegotiationRequestStatus;
+  buyerRequest: string;
+  sellerMemo: string | null;
+  requestedAt: string;
+  respondedAt: string | null;
+  acceptedAt: string | null;
+  canceledAt: string | null;
+  requestedQuote: QuoteSummary | null;
+  revisedQuote: QuoteSummary | null;
+  requestedContract: ContractSummary | null;
+  revisedContract: ContractSummary | null;
+};
+
+type RequestModalTarget = {
+  quoteId: number | null;
+  contractId: number | null;
+  negotiationType: "QUOTE" | "CONTRACT";
+};
+
+type RespondTarget = {
+  negotiationRequestId: number;
+  negotiationType: "QUOTE" | "CONTRACT";
+};
+
+type RespondItemForm = {
+  optionSummary: string;
+  quantity: string;
+  unitPrice: string;
+  sample: boolean;
 };
 
 const filters: Array<{ value: NegotiationFilter; label: string }> = [
@@ -70,6 +142,13 @@ const statusConfig: Record<
   },
 };
 
+const requestStatusLabel: Record<NegotiationRequestStatus, string> = {
+  REQUESTED: "응답 대기",
+  RESPONDED: "응답 완료",
+  ACCEPTED: "수락됨",
+  CANCELED: "거절됨",
+};
+
 function formatDateTime(value: string | null) {
   if (!value) return "-";
 
@@ -82,23 +161,89 @@ function formatDateTime(value: string | null) {
   }).format(new Date(value));
 }
 
+function formatPrice(value: number) {
+  return `${value.toLocaleString("ko-KR")}원`;
+}
+
+// 목록 행에 보여줄 단일 액션 버튼의 문구/강조 여부를 역할과 최신 요청 상태에 따라 결정한다
+
+function getRowAction(
+  item: NegotiationResponse,
+  currentUserId: number | undefined,
+): { label: string; emphasize: boolean } {
+  if (item.status !== "OPEN") {
+    return { label: "내역 보기", emphasize: false };
+  }
+
+  const isSeller = currentUserId === item.sellerId;
+
+  if (isSeller) {
+    return item.latestRequestStatus === "REQUESTED"
+      ? { label: "응답하기", emphasize: true }
+      : { label: "바이어 확인 대기", emphasize: false };
+  }
+
+  return item.latestRequestStatus === "RESPONDED"
+    ? { label: "응답 확인", emphasize: true }
+    : { label: "셀러 응답 대기", emphasize: false };
+}
+
 export function Negotiations() {
   const location = useLocation();
   const navigate = useNavigate();
   const locationState = location.state as NegotiationLocationState | null;
+  const currentUser = useAuthStore((state) => state.user);
 
   const [negotiations, setNegotiations] = useState<NegotiationResponse[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const detailSectionRef = useRef<HTMLElement | null>(null);
   const [activeFilter, setActiveFilter] =
     useState<NegotiationFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [modalQuoteId, setModalQuoteId] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // 협의 요청 작성/추가 협의 모달 (바이어 전용)
+  const [requestModalTarget, setRequestModalTarget] =
+    useState<RequestModalTarget | null>(null);
   const [buyerRequest, setBuyerRequest] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+
+  // 라운드별 이력
+  const [requests, setRequests] = useState<NegotiationRequestDetail[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [requestsError, setRequestsError] = useState("");
+
+  // 수락/거절 (바이어 전용)
+  const [isDeciding, setIsDeciding] = useState(false);
+  const [decideError, setDecideError] = useState("");
+
+  // 응답 모달 (셀러 전용)
+  const [respondTarget, setRespondTarget] = useState<RespondTarget | null>(
+    null,
+  );
+  const [respondBaselineQuote, setRespondBaselineQuote] =
+    useState<QuoteSummary | null>(null);
+  const [respondBaselineContract, setRespondBaselineContract] =
+    useState<ContractSummary | null>(null);
+  const [respondSellerMemo, setRespondSellerMemo] = useState("");
+  const [respondLeadTimeDays, setRespondLeadTimeDays] = useState("");
+  const [respondShippingFee, setRespondShippingFee] = useState("");
+  const [respondValidUntil, setRespondValidUntil] = useState("");
+  const [respondItems, setRespondItems] = useState<RespondItemForm[]>([]);
+  const [respondContractName, setRespondContractName] = useState("");
+  const [respondDeliveryDate, setRespondDeliveryDate] = useState("");
+  const [respondPaymentTerms, setRespondPaymentTerms] = useState("");
+  const [respondReturnPolicy, setRespondReturnPolicy] = useState("");
+  const [respondSpecialTerms, setRespondSpecialTerms] = useState("");
+  const [respondContractAmount, setRespondContractAmount] = useState("");
+  const [isResponding, setIsResponding] = useState(false);
+  const [respondError, setRespondError] = useState("");
+
+  const [reviewRequest, setReviewRequest] =
+    useState<NegotiationRequestDetail | null>(null);
 
   const loadNegotiations = async () => {
     try {
@@ -130,14 +275,49 @@ export function Negotiations() {
     }
   };
 
+  const loadRequests = async (negotiationId: number | null) => {
+    if (negotiationId === null) {
+      setRequests([]);
+      return [];
+    }
+
+    try {
+      setIsLoadingRequests(true);
+      setRequestsError("");
+      const response = await api.get<NegotiationRequestDetail[]>(
+        `/negotiations/${negotiationId}/requests`,
+      );
+      setRequests(response);
+      return response;
+    } catch (error) {
+      console.error("협의 이력 조회 실패", error);
+      setRequestsError(
+        error instanceof Error
+          ? error.message
+          : "협의 이력을 불러오지 못했습니다.",
+      );
+      return [];
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  };
+
   useEffect(() => {
     void loadNegotiations();
   }, []);
 
   useEffect(() => {
+    void loadRequests(selectedId);
+  }, [selectedId]);
+
+  useEffect(() => {
     if (!locationState?.quoteId) return;
 
-    setModalQuoteId(locationState.quoteId);
+    setRequestModalTarget({
+      quoteId: locationState.quoteId,
+      contractId: null,
+      negotiationType: "QUOTE",
+    });
     setBuyerRequest("");
     setSubmitError("");
 
@@ -167,6 +347,26 @@ export function Negotiations() {
   const selected =
     negotiations.find((item) => item.negotiationId === selectedId) ?? null;
 
+  const viewerRole: "BUYER" | "SELLER" | null = selected
+    ? currentUser?.userId === selected.buyerId
+      ? "BUYER"
+      : currentUser?.userId === selected.sellerId
+        ? "SELLER"
+        : null
+    : null;
+
+  const latestRequestDetail =
+    requests.length > 0 ? requests[requests.length - 1] : null;
+
+  // 응답 폼에서 셀러가 입력 중인 값 기준으로 실시간 합계를 계산해 이전 견적과 비교한다.
+  const respondCurrentSubtotal = respondItems.reduce(
+    (sum, item) =>
+      sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+    0,
+  );
+  const respondCurrentTotal =
+    respondCurrentSubtotal + (Number(respondShippingFee) || 0);
+
   const counts = {
     all: negotiations.length,
     open: negotiations.filter((item) => item.status === "OPEN").length,
@@ -174,36 +374,94 @@ export function Negotiations() {
     closed: negotiations.filter((item) => item.status === "CLOSED").length,
   };
 
-  const openRequestModal = (quoteId: number | null) => {
-    if (!quoteId) return;
-    setModalQuoteId(quoteId);
+  // 행 클릭 시 이미 선택돼 있어 상태 변화가 없는 경우에도 상세 패널로 스크롤해서
+  // 클릭이 아무 반응 없는 것처럼 보이지 않도록 한다.
+  const selectNegotiation = (negotiationId: number) => {
+    setSelectedId(negotiationId);
+    requestAnimationFrame(() => {
+      detailSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
+
+  // 합의 완료/종료된 협의의 "내역 보기"는 바이어/셀러 구분 없이
+  // 마지막 라운드의 이전-신규 조건 비교 모달을 바로 띄운다.
+  const openHistoryModal = async (negotiationId: number) => {
+    setSelectedId(negotiationId);
+    const fetched = await loadRequests(negotiationId);
+    const latest = fetched.length > 0 ? fetched[fetched.length - 1] : null;
+
+    if (latest && (latest.revisedQuote || latest.revisedContract)) {
+      setDecideError("");
+      setReviewRequest(latest);
+    } else {
+      requestAnimationFrame(() => {
+        detailSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    }
+  };
+
+  const handleRowAction = (item: NegotiationResponse) => {
+    if (item.status === "OPEN") {
+      selectNegotiation(item.negotiationId);
+    } else {
+      void openHistoryModal(item.negotiationId);
+    }
+  };
+
+  const openFollowUpModal = (item: NegotiationResponse) => {
+    setRequestModalTarget({
+      quoteId: item.negotiationType === "QUOTE" ? item.quoteId : null,
+      contractId: item.negotiationType === "CONTRACT" ? item.contractId : null,
+      negotiationType: item.negotiationType,
+    });
     setBuyerRequest("");
     setSubmitError("");
   };
 
   const closeRequestModal = () => {
     if (isSubmitting) return;
-    setModalQuoteId(null);
+    setRequestModalTarget(null);
     setBuyerRequest("");
     setSubmitError("");
   };
 
   const handleSubmit = async () => {
-    if (!modalQuoteId || !buyerRequest.trim() || isSubmitting) return;
+    if (!requestModalTarget || !buyerRequest.trim() || isSubmitting) return;
+
+    const targetId =
+      requestModalTarget.negotiationType === "QUOTE"
+        ? requestModalTarget.quoteId
+        : requestModalTarget.contractId;
+
+    if (!targetId) return;
 
     try {
       setIsSubmitting(true);
       setSubmitError("");
 
-      await api.post(`/negotiations/${modalQuoteId}/new`, {
-        buyerRequest: buyerRequest.trim(),
+      await api.post(`/negotiations`, {
+        quoteId:
+          requestModalTarget.negotiationType === "QUOTE" ? targetId : undefined,
+        contractId:
+          requestModalTarget.negotiationType === "CONTRACT"
+            ? targetId
+            : undefined,
+        content: buyerRequest.trim(),
+        negotiationType: requestModalTarget.negotiationType,
       });
 
-      setModalQuoteId(null);
+      setRequestModalTarget(null);
       setBuyerRequest("");
       setSubmitError("");
       setSuccessMessage("협의 요청을 등록했습니다.");
       await loadNegotiations();
+      await loadRequests(selectedId);
     } catch (error) {
       console.error("협의 요청 등록 실패", error);
       setSubmitError(
@@ -213,6 +471,201 @@ export function Negotiations() {
       );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleAccept = async (negotiationRequestId: number) => {
+    if (isDeciding) return;
+
+    try {
+      setIsDeciding(true);
+      setDecideError("");
+      await api.post(`/negotiations/requests/${negotiationRequestId}/accept`);
+      setSuccessMessage("협의 내용을 수락했습니다.");
+      await loadNegotiations();
+      await loadRequests(selectedId);
+    } catch (error) {
+      console.error("협의 수락 실패", error);
+      setDecideError(
+        error instanceof Error ? error.message : "수락 처리에 실패했습니다.",
+      );
+    } finally {
+      setIsDeciding(false);
+    }
+  };
+
+  const handleReject = async (negotiationRequestId: number) => {
+    if (isDeciding) return;
+    if (!window.confirm("이 응답을 거절하면 협의가 종료됩니다. 계속할까요?")) {
+      return;
+    }
+
+    try {
+      setIsDeciding(true);
+      setDecideError("");
+      await api.post(`/negotiations/requests/${negotiationRequestId}/reject`);
+      setSuccessMessage("협의를 거절 처리했습니다.");
+      await loadNegotiations();
+      await loadRequests(selectedId);
+    } catch (error) {
+      console.error("협의 거절 실패", error);
+      setDecideError(
+        error instanceof Error ? error.message : "거절 처리에 실패했습니다.",
+      );
+    } finally {
+      setIsDeciding(false);
+    }
+  };
+
+  const openRespondModal = (
+    latest: NegotiationRequestDetail,
+    negotiationType: "QUOTE" | "CONTRACT",
+  ) => {
+    setRespondTarget({
+      negotiationRequestId: latest.negotiationRequestId,
+      negotiationType,
+    });
+    setRespondSellerMemo("");
+    setRespondError("");
+    setRespondBaselineQuote(null);
+    setRespondBaselineContract(null);
+
+    if (negotiationType === "QUOTE" && latest.requestedQuote) {
+      const quote = latest.requestedQuote;
+      setRespondBaselineQuote(quote);
+      setRespondLeadTimeDays(String(quote.leadTimeDays));
+      setRespondShippingFee(String(quote.shippingFee));
+      setRespondValidUntil(quote.validUntil.slice(0, 16));
+      setRespondItems(
+        quote.items.map((item) => ({
+          optionSummary: item.optionSummary ?? "",
+          quantity: String(item.quantity),
+          unitPrice: String(item.unitPrice),
+          sample: item.sample,
+        })),
+      );
+    } else if (negotiationType === "CONTRACT" && latest.requestedContract) {
+      const contract = latest.requestedContract;
+      setRespondBaselineContract(contract);
+      setRespondContractName(contract.contractName ?? "");
+      setRespondDeliveryDate(contract.deliveryDate);
+      setRespondPaymentTerms(contract.paymentTerms);
+      setRespondReturnPolicy(contract.returnPolicy);
+      setRespondSpecialTerms(contract.specialTerms ?? "");
+      setRespondContractAmount(String(contract.contractAmount));
+    }
+  };
+
+  const closeRespondModal = () => {
+    if (isResponding) return;
+    setRespondTarget(null);
+  };
+
+  const openReviewModal = (request: NegotiationRequestDetail) => {
+    setDecideError("");
+    setReviewRequest(request);
+  };
+
+  const closeReviewModal = () => {
+    if (isDeciding) return;
+    setReviewRequest(null);
+  };
+
+  const updateRespondItem = (
+    index: number,
+    patch: Partial<RespondItemForm>,
+  ) => {
+    setRespondItems((current) =>
+      current.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+    );
+  };
+
+  const addRespondItem = () => {
+    setRespondItems((current) => [
+      ...current,
+      { optionSummary: "", quantity: "", unitPrice: "", sample: false },
+    ]);
+  };
+
+  const removeRespondItem = (index: number) => {
+    setRespondItems((current) => current.filter((_, i) => i !== index));
+  };
+
+  const canSubmitRespond =
+    respondTarget?.negotiationType === "QUOTE"
+      ? respondLeadTimeDays.trim().length > 0
+        && respondShippingFee.trim().length > 0
+        && respondValidUntil.trim().length > 0
+        && respondItems.length > 0
+        && respondItems.every(
+          (item) =>
+            item.optionSummary.trim().length > 0
+            && item.quantity.trim().length > 0
+            && item.unitPrice.trim().length > 0,
+        )
+      : respondContractName.trim().length > 0
+        && respondDeliveryDate.trim().length > 0
+        && respondPaymentTerms.trim().length > 0
+        && respondReturnPolicy.trim().length > 0;
+
+  const handleRespond = async () => {
+    if (!respondTarget || !canSubmitRespond || isResponding) return;
+
+    try {
+      setIsResponding(true);
+      setRespondError("");
+
+      if (respondTarget.negotiationType === "QUOTE") {
+        const items = respondItems.map((item) => ({
+          optionSummary: item.optionSummary.trim(),
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+          sample: item.sample,
+        }));
+
+        const validUntil =
+          respondValidUntil.length === 16
+            ? `${respondValidUntil}:00`
+            : respondValidUntil;
+
+        await api.post(
+          `/negotiations/requests/${respondTarget.negotiationRequestId}/respond`,
+          {
+            sellerMemo: respondSellerMemo.trim() || null,
+            leadTimeDays: Number(respondLeadTimeDays),
+            shippingFee: Number(respondShippingFee),
+            validUntil,
+            items,
+          },
+        );
+      } else {
+        await api.post(
+          `/negotiations/requests/${respondTarget.negotiationRequestId}/respond`,
+          {
+            sellerMemo: respondSellerMemo.trim() || null,
+            contractName: respondContractName.trim(),
+            deliveryDate: respondDeliveryDate,
+            paymentTerms: respondPaymentTerms.trim(),
+            returnPolicy: respondReturnPolicy.trim(),
+            specialTerms: respondSpecialTerms.trim() || null,
+            contractAmount: respondContractAmount.trim()
+              ? Number(respondContractAmount)
+              : null,
+          },
+        );
+      }
+
+      setRespondTarget(null);
+      setSuccessMessage("응답을 등록했습니다.");
+      await loadNegotiations();
+      await loadRequests(selectedId);
+    } catch (error) {
+      console.error("협의 응답 등록 실패", error);
+      setRespondError(
+        error instanceof Error ? error.message : "응답 등록에 실패했습니다.",
+      );
+    } finally {
+      setIsResponding(false);
     }
   };
 
@@ -355,6 +808,10 @@ export function Negotiations() {
                       statusConfig[item.status] ?? statusConfig.OPEN;
                     const isSelected =
                       selectedId === item.negotiationId;
+                    const rowAction = getRowAction(
+                      item,
+                      currentUser?.userId,
+                    );
 
                     return (
                       <tr
@@ -367,7 +824,7 @@ export function Negotiations() {
                           <button
                             type="button"
                             onClick={() =>
-                              setSelectedId(item.negotiationId)
+                              selectNegotiation(item.negotiationId)
                             }
                             className="text-left"
                           >
@@ -405,30 +862,18 @@ export function Negotiations() {
                           {formatDateTime(item.updatedAt)}
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              title="협의 상세 보기"
-                              onClick={() =>
-                                setSelectedId(item.negotiationId)
-                              }
-                              className="inline-flex size-9 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:border-slate-400 hover:text-slate-900"
-                            >
-                              <ChevronRight size={16} />
-                            </button>
-                            {item.status === "OPEN" && item.quoteId && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openRequestModal(item.quoteId)
-                                }
-                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-bold text-white transition hover:bg-blue-700"
-                              >
-                                <MessageSquareText size={14} />
-                                협의 계속
-                              </button>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => selectNegotiation(item.negotiationId)}
+                            className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-bold transition ${
+                              rowAction.emphasize
+                                ? "bg-blue-600 text-white hover:bg-blue-700"
+                                : "border border-slate-200 text-slate-500 hover:border-slate-400 hover:text-slate-900"
+                            }`}
+                          >
+                            <MessageSquareText size={14} />
+                            {rowAction.label}
+                          </button>
                         </td>
                       </tr>
                     );
@@ -440,8 +885,11 @@ export function Negotiations() {
         </section>
 
         {selected && (
-          <section className="mt-6 grid overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:grid-cols-[minmax(0,1fr)_280px]">
-            <div className="p-5 sm:p-6">
+          <section
+            ref={detailSectionRef}
+            className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">
                   <FileText size={13} />
@@ -452,38 +900,171 @@ export function Negotiations() {
                 <span className="font-mono text-xs text-slate-400">
                   {selected.quoteNo || `#${selected.negotiationId}`}
                 </span>
+                {viewerRole && (
+                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">
+                    내 역할 {viewerRole === "BUYER" ? "바이어" : "셀러"}
+                  </span>
+                )}
               </div>
-              <h2 className="mt-3 text-lg font-black text-slate-950">
+              <h2 className="text-sm font-black text-slate-950">
                 {selected.title}
               </h2>
-              <p className="mt-4 whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                {selected.latestRequest || "등록된 협의 요청 내용이 없습니다."}
-              </p>
             </div>
 
-            <dl className="border-t border-slate-200 bg-slate-50 p-5 text-sm lg:border-l lg:border-t-0">
-              <DetailRow
-                label="협의 시작"
-                value={formatDateTime(selected.openedAt)}
-              />
-              <DetailRow
-                label="최근 수정"
-                value={formatDateTime(selected.updatedAt)}
-              />
-              <DetailRow
-                label="합의 일시"
-                value={formatDateTime(selected.agreedAt)}
-              />
-              <DetailRow
-                label="종료 일시"
-                value={formatDateTime(selected.closedAt)}
-              />
-            </dl>
+            <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="p-5 sm:p-6">
+                {isLoadingRequests ? (
+                  <div className="flex items-center justify-center py-10 text-sm font-semibold text-slate-500">
+                    <LoaderCircle size={16} className="mr-2 animate-spin" />
+                    이력을 불러오는 중입니다.
+                  </div>
+                ) : requestsError ? (
+                  <p className="text-sm font-semibold text-rose-600">
+                    {requestsError}
+                  </p>
+                ) : requests.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    등록된 요청이 없습니다.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {requests.map((request, index) => (
+                      <RoundCard
+                        key={request.negotiationRequestId}
+                        round={index + 1}
+                        request={request}
+                        negotiationType={selected.negotiationType}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {selected.status === "OPEN" && latestRequestDetail && (
+                  <div className="mt-5 border-t border-slate-200 pt-5">
+                    {viewerRole === "SELLER"
+                    && latestRequestDetail.status === "REQUESTED" ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openRespondModal(
+                            latestRequestDetail,
+                            selected.negotiationType,
+                          )
+                        }
+                        className="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700"
+                      >
+                        <Send size={15} />
+                        {selected.negotiationType === "QUOTE"
+                          ? "새 견적으로 응답하기"
+                          : "새 계약 조건으로 응답하기"}
+                      </button>
+                    ) : viewerRole === "BUYER"
+                    && latestRequestDetail.status === "RESPONDED" ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openReviewModal(latestRequestDetail)}
+                          className="inline-flex h-10 items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-4 text-sm font-black text-blue-700 transition hover:bg-blue-100"
+                        >
+                          <FileText size={15} />
+                          {selected.negotiationType === "QUOTE"
+                            ? "견적 비교"
+                            : "계약 비교"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDeciding}
+                          onClick={() =>
+                            void handleAccept(
+                              latestRequestDetail.negotiationRequestId,
+                            )
+                          }
+                          className="inline-flex h-10 items-center gap-1.5 rounded-md bg-emerald-600 px-4 text-sm font-black text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          <CheckCircle2 size={15} />
+                          수락
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDeciding}
+                          onClick={() =>
+                            void handleReject(
+                              latestRequestDetail.negotiationRequestId,
+                            )
+                          }
+                          className="inline-flex h-10 items-center gap-1.5 rounded-md bg-rose-600 px-4 text-sm font-black text-white transition hover:bg-rose-700 disabled:opacity-50"
+                        >
+                          <X size={15} />
+                          거절
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDeciding}
+                          onClick={() => openFollowUpModal(selected)}
+                          className="inline-flex h-10 items-center gap-1.5 rounded-md border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <MessageSquareText size={15} />
+                          추가 협의 요청
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-semibold text-slate-400">
+                        {viewerRole === "SELLER"
+                          ? "바이어 확인을 기다리고 있습니다."
+                          : "셀러 응답을 기다리고 있습니다."}
+                      </p>
+                    )}
+                    {decideError && (
+                      <p className="mt-3 text-xs font-semibold text-rose-600">
+                        {decideError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {selected.status === "AGREED"
+                && viewerRole === "SELLER"
+                && selected.negotiationType === "QUOTE"
+                && selected.quoteId && (
+                  <div className="mt-5 border-t border-slate-200 pt-5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(`/seller/contracts/new/${selected.quoteId}`)
+                      }
+                      className="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700"
+                    >
+                      <FileText size={15} />
+                      계약서 작성하러 가기
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <dl className="border-t border-slate-200 bg-slate-50 p-5 text-sm lg:border-l lg:border-t-0">
+                <DetailRow
+                  label="협의 시작"
+                  value={formatDateTime(selected.openedAt)}
+                />
+                <DetailRow
+                  label="최근 수정"
+                  value={formatDateTime(selected.updatedAt)}
+                />
+                <DetailRow
+                  label="합의 일시"
+                  value={formatDateTime(selected.agreedAt)}
+                />
+                <DetailRow
+                  label="종료 일시"
+                  value={formatDateTime(selected.closedAt)}
+                />
+              </dl>
+            </div>
           </section>
         )}
       </main>
 
-      {modalQuoteId !== null && (
+      {requestModalTarget !== null && (
         <div
           role="dialog"
           aria-modal="true"
@@ -494,7 +1075,9 @@ export function Negotiations() {
             <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
               <div>
                 <p className="text-xs font-black text-blue-700">
-                  견적 #{modalQuoteId}
+                  {requestModalTarget.negotiationType === "QUOTE"
+                    ? `견적 #${requestModalTarget.quoteId}`
+                    : `계약 #${requestModalTarget.contractId}`}
                 </p>
                 <h2
                   id="negotiation-modal-title"
@@ -577,6 +1160,776 @@ export function Negotiations() {
           </div>
         </div>
       )}
+
+      {respondTarget !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="respond-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
+        >
+          <div className="max-h-[90vh] w-full max-w-[960px] overflow-y-auto rounded-lg bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+              <div>
+                <h2
+                  id="respond-modal-title"
+                  className="text-lg font-black text-slate-950"
+                >
+                  {respondTarget.negotiationType === "QUOTE"
+                    ? "새 견적으로 응답"
+                    : "새 계약 조건으로 응답"}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  바이어의 요청을 반영해 조건을 조정한 뒤 전달하세요. 기존
+                  조건에서 값이 미리 채워져 있습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                title="모달 닫기"
+                onClick={closeRespondModal}
+                className="inline-flex size-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="grid gap-5 px-6 py-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+              {respondTarget.negotiationType === "QUOTE" ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-black text-slate-500">
+                    이전 견적 (이번 라운드 기준)
+                  </p>
+                  <ul className="mt-2.5 space-y-1.5 text-xs text-slate-600">
+                    <li>
+                      리드타임 {respondBaselineQuote?.leadTimeDays ?? "-"}일
+                    </li>
+                    <li>
+                      배송비{" "}
+                      {respondBaselineQuote
+                        ? formatPrice(respondBaselineQuote.shippingFee)
+                        : "-"}
+                    </li>
+                    <li>
+                      유효기간{" "}
+                      {respondBaselineQuote
+                        ? formatDateTime(respondBaselineQuote.validUntil)
+                        : "-"}
+                    </li>
+                    <li className="border-t border-slate-200 pt-1.5 font-black text-slate-800">
+                      합계{" "}
+                      {respondBaselineQuote
+                        ? formatPrice(respondBaselineQuote.totalAmount)
+                        : "-"}
+                    </li>
+                  </ul>
+                  <div className="mt-3 border-t border-slate-200 pt-3">
+                    <p className="text-xs font-black text-slate-500">품목</p>
+                    <ul className="mt-1.5 space-y-1 text-xs text-slate-600">
+                      {respondBaselineQuote?.items.map((item, index) => (
+                        <li key={index}>
+                          {item.optionSummary} · {item.quantity}개 ·{" "}
+                          {formatPrice(item.unitPrice)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-black text-slate-500">
+                    이전 계약 조건 (이번 라운드 기준)
+                  </p>
+                  <ul className="mt-2.5 space-y-1.5 text-xs text-slate-600">
+                    <li>계약명 {respondBaselineContract?.contractName ?? "-"}</li>
+                    <li>
+                      납품 예정일 {respondBaselineContract?.deliveryDate ?? "-"}
+                    </li>
+                    <li>
+                      결제 조건 {respondBaselineContract?.paymentTerms ?? "-"}
+                    </li>
+                    <li>
+                      반품·교환 조건{" "}
+                      {respondBaselineContract?.returnPolicy ?? "-"}
+                    </li>
+                    {respondBaselineContract?.specialTerms && (
+                      <li>특약사항 {respondBaselineContract.specialTerms}</li>
+                    )}
+                    <li className="border-t border-slate-200 pt-1.5 font-black text-slate-800">
+                      계약 금액{" "}
+                      {respondBaselineContract
+                        ? formatPrice(respondBaselineContract.contractAmount)
+                        : "-"}
+                    </li>
+                  </ul>
+                </div>
+              )}
+
+              <div className="space-y-4">
+              {respondTarget.negotiationType === "QUOTE" ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="text-xs font-black text-slate-700">
+                        리드타임(일)
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={respondLeadTimeDays}
+                        onChange={(event) =>
+                          setRespondLeadTimeDays(event.target.value)
+                        }
+                        className="mt-1.5 h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                      {respondBaselineQuote && respondLeadTimeDays.trim() && (
+                        <DeltaText
+                          before={respondBaselineQuote.leadTimeDays}
+                          after={Number(respondLeadTimeDays) || 0}
+                          unit="일"
+                        />
+                      )}
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-black text-slate-700">
+                        배송비(원)
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={respondShippingFee}
+                        onChange={(event) =>
+                          setRespondShippingFee(event.target.value)
+                        }
+                        className="mt-1.5 h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                      {respondBaselineQuote && respondShippingFee.trim() && (
+                        <DeltaText
+                          before={respondBaselineQuote.shippingFee}
+                          after={Number(respondShippingFee) || 0}
+                          unit="원"
+                        />
+                      )}
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className="text-xs font-black text-slate-700">
+                      견적 유효기간
+                    </span>
+                    <input
+                      type="datetime-local"
+                      value={respondValidUntil}
+                      onChange={(event) =>
+                        setRespondValidUntil(event.target.value)
+                      }
+                      className="mt-1.5 h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </label>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-700">
+                        품목
+                      </span>
+                      <button
+                        type="button"
+                        onClick={addRespondItem}
+                        className="text-xs font-bold text-blue-600 hover:underline"
+                      >
+                        + 품목 추가
+                      </button>
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {respondItems.map((item, index) => {
+                        const baselineItem = respondBaselineQuote?.items[index];
+                        const currentQuantity = Number(item.quantity) || 0;
+                        const currentUnitPrice = Number(item.unitPrice) || 0;
+                        const currentItemTotal =
+                          currentQuantity * currentUnitPrice;
+                        const baselineItemTotal = baselineItem
+                          ? baselineItem.quantity * baselineItem.unitPrice
+                          : null;
+
+                        return (
+                          <div
+                            key={index}
+                            className="rounded-md border border-slate-200 p-3"
+                          >
+                            <div className="flex items-start gap-2">
+                              <input
+                                value={item.optionSummary}
+                                onChange={(event) =>
+                                  updateRespondItem(index, {
+                                    optionSummary: event.target.value,
+                                  })
+                                }
+                                placeholder="옵션 정보"
+                                className="h-9 flex-1 rounded-md border border-slate-200 px-2.5 text-xs outline-none focus:border-blue-500"
+                              />
+                              <button
+                                type="button"
+                                title="품목 삭제"
+                                onClick={() => removeRespondItem(index)}
+                                className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-rose-600"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <label className="block">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={item.quantity}
+                                  onChange={(event) =>
+                                    updateRespondItem(index, {
+                                      quantity: event.target.value,
+                                    })
+                                  }
+                                  placeholder="수량"
+                                  className="h-9 w-full rounded-md border border-slate-200 px-2.5 text-xs outline-none focus:border-blue-500"
+                                />
+                                {baselineItem && item.quantity.trim() && (
+                                  <DeltaText
+                                    before={baselineItem.quantity}
+                                    after={currentQuantity}
+                                    unit="개"
+                                  />
+                                )}
+                              </label>
+
+                              <label className="block">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={item.unitPrice}
+                                  onChange={(event) =>
+                                    updateRespondItem(index, {
+                                      unitPrice: event.target.value,
+                                    })
+                                  }
+                                  placeholder="단가"
+                                  className="h-9 w-full rounded-md border border-slate-200 px-2.5 text-xs outline-none focus:border-blue-500"
+                                />
+                                {baselineItem && item.unitPrice.trim() && (
+                                  <DeltaText
+                                    before={baselineItem.unitPrice}
+                                    after={currentUnitPrice}
+                                    unit="원"
+                                  />
+                                )}
+                              </label>
+                            </div>
+
+                            <div className="mt-2 flex items-center justify-between rounded-md bg-slate-50 px-2.5 py-2">
+                              <span className="text-[11px] font-bold text-slate-500">
+                                품목 소계
+                              </span>
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-xs font-black text-slate-800">
+                                  {formatPrice(currentItemTotal)}
+                                </span>
+                                {baselineItemTotal !== null && (
+                                  <DeltaText
+                                    before={baselineItemTotal}
+                                    after={currentItemTotal}
+                                    unit="원"
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            <label className="mt-2 flex items-center gap-1.5 text-xs text-slate-600">
+                              <input
+                                type="checkbox"
+                                checked={item.sample}
+                                onChange={(event) =>
+                                  updateRespondItem(index, {
+                                    sample: event.target.checked,
+                                  })
+                                }
+                              />
+                              샘플 품목
+                            </label>
+                          </div>
+                        );
+                      })}
+
+                    </div>
+                  </div>
+
+                  <div className="flex items-baseline justify-between gap-3 rounded-md border border-blue-100 bg-blue-50/60 px-3 py-3">
+                    <span className="text-sm font-black text-blue-700">
+                      새 합계
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xl font-black text-blue-800">
+                        {formatPrice(respondCurrentTotal)}
+                      </span>
+                      {respondBaselineQuote && (
+                        <DeltaText
+                          before={respondBaselineQuote.totalAmount}
+                          after={respondCurrentTotal}
+                          unit="원"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label className="block">
+                    <span className="text-xs font-black text-slate-700">
+                      계약명
+                    </span>
+                    <input
+                      value={respondContractName}
+                      onChange={(event) =>
+                        setRespondContractName(event.target.value)
+                      }
+                      className="mt-1.5 h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="text-xs font-black text-slate-700">
+                        납품 예정일
+                      </span>
+                      <input
+                        type="date"
+                        value={respondDeliveryDate}
+                        onChange={(event) =>
+                          setRespondDeliveryDate(event.target.value)
+                        }
+                        className="mt-1.5 h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-black text-slate-700">
+                        계약 금액(원)
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={respondContractAmount}
+                        onChange={(event) =>
+                          setRespondContractAmount(event.target.value)
+                        }
+                        className="mt-1.5 h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                      {respondBaselineContract
+                      && respondContractAmount.trim() && (
+                        <DeltaText
+                          before={respondBaselineContract.contractAmount}
+                          after={Number(respondContractAmount) || 0}
+                          unit="원"
+                        />
+                      )}
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className="text-xs font-black text-slate-700">
+                      결제 조건
+                    </span>
+                    <textarea
+                      rows={2}
+                      value={respondPaymentTerms}
+                      onChange={(event) =>
+                        setRespondPaymentTerms(event.target.value)
+                      }
+                      className="mt-1.5 w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-xs font-black text-slate-700">
+                      반품·교환 조건
+                    </span>
+                    <textarea
+                      rows={3}
+                      value={respondReturnPolicy}
+                      onChange={(event) =>
+                        setRespondReturnPolicy(event.target.value)
+                      }
+                      className="mt-1.5 w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-xs font-black text-slate-700">
+                      특약사항
+                    </span>
+                    <textarea
+                      rows={2}
+                      value={respondSpecialTerms}
+                      onChange={(event) =>
+                        setRespondSpecialTerms(event.target.value)
+                      }
+                      className="mt-1.5 w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </label>
+                </>
+              )}
+
+              <label className="block">
+                <span className="text-xs font-black text-slate-700">
+                  셀러 메모
+                </span>
+                <textarea
+                  rows={3}
+                  maxLength={2000}
+                  value={respondSellerMemo}
+                  onChange={(event) =>
+                    setRespondSellerMemo(event.target.value)
+                  }
+                  placeholder={
+                    respondTarget.negotiationType === "QUOTE"
+                      ? "예: 요청하신 대로 최소 주문 수량을 200개로 조정했습니다. 다만 납기가 3일 늘어납니다."
+                      : "예: 요청하신 납품일을 반영해 계약 조건을 수정했습니다."
+                  }
+                  className="mt-1.5 w-full resize-none rounded-md border border-slate-200 px-3 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+
+              {respondError && (
+                <p className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700">
+                  <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                  {respondError}
+                </p>
+              )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                disabled={isResponding}
+                onClick={closeRespondModal}
+                className="h-10 flex-1 rounded-md border border-slate-200 bg-white text-sm font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={!canSubmitRespond || isResponding}
+                onClick={() => void handleRespond()}
+                className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md bg-blue-600 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isResponding ? (
+                  <LoaderCircle size={15} className="animate-spin" />
+                ) : (
+                  <Send size={15} />
+                )}
+                {isResponding ? "전송 중..." : "응답 보내기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reviewRequest !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="review-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
+        >
+          <div className="max-h-[90vh] w-full max-w-[960px] overflow-y-auto rounded-lg bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+              <div>
+                <h2
+                  id="review-modal-title"
+                  className="text-lg font-black text-slate-950"
+                >
+                  {selected?.negotiationType === "QUOTE"
+                    ? "이전 견적 vs 새 견적 비교"
+                    : "이전 계약 조건 vs 새 계약 조건 비교"}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  셀러가 응답한 새 조건과 이전 조건을 비교해서 확인하세요.
+                </p>
+              </div>
+              <button
+                type="button"
+                title="모달 닫기"
+                onClick={closeReviewModal}
+                className="inline-flex size-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5">
+              {reviewRequest.sellerMemo && (
+                <div className="mb-4 rounded-md border border-blue-100 bg-blue-50/60 p-3">
+                  <p className="text-xs font-black text-blue-700">셀러 메모</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                    {reviewRequest.sellerMemo}
+                  </p>
+                </div>
+              )}
+
+              {selected?.negotiationType === "QUOTE" ? (
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-black text-slate-500">
+                      이전 견적
+                    </p>
+                    <ul className="mt-2.5 space-y-1.5 text-xs text-slate-600">
+                      <li>
+                        리드타임{" "}
+                        {reviewRequest.requestedQuote?.leadTimeDays ?? "-"}일
+                      </li>
+                      <li>
+                        배송비{" "}
+                        {reviewRequest.requestedQuote
+                          ? formatPrice(reviewRequest.requestedQuote.shippingFee)
+                          : "-"}
+                      </li>
+                      <li>
+                        유효기간{" "}
+                        {reviewRequest.requestedQuote
+                          ? formatDateTime(
+                            reviewRequest.requestedQuote.validUntil,
+                          )
+                          : "-"}
+                      </li>
+                      <li className="border-t border-slate-200 pt-1.5 font-black text-slate-800">
+                        합계{" "}
+                        {reviewRequest.requestedQuote
+                          ? formatPrice(reviewRequest.requestedQuote.totalAmount)
+                          : "-"}
+                      </li>
+                    </ul>
+                    <div className="mt-3 border-t border-slate-200 pt-3">
+                      <p className="text-xs font-black text-slate-500">품목</p>
+                      <ul className="mt-1.5 space-y-1 text-xs text-slate-600">
+                        {reviewRequest.requestedQuote?.items.map(
+                          (item, index) => (
+                            <li key={index}>
+                              {item.optionSummary} · {item.quantity}개 ·{" "}
+                              {formatPrice(item.unitPrice)}
+                            </li>
+                          ),
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border border-blue-200 bg-blue-50/40 p-4">
+                    <p className="text-xs font-black text-blue-700">
+                      새 견적
+                    </p>
+                    {reviewRequest.revisedQuote && (
+                      <>
+                        <ul className="mt-2.5 space-y-1.5 text-xs text-slate-700">
+                          <li>
+                            리드타임 {reviewRequest.revisedQuote.leadTimeDays}일
+                            {reviewRequest.requestedQuote && (
+                              <DeltaText
+                                before={
+                                  reviewRequest.requestedQuote.leadTimeDays
+                                }
+                                after={reviewRequest.revisedQuote.leadTimeDays}
+                                unit="일"
+                              />
+                            )}
+                          </li>
+                          <li>
+                            배송비{" "}
+                            {formatPrice(reviewRequest.revisedQuote.shippingFee)}
+                            {reviewRequest.requestedQuote && (
+                              <DeltaText
+                                before={
+                                  reviewRequest.requestedQuote.shippingFee
+                                }
+                                after={reviewRequest.revisedQuote.shippingFee}
+                                unit="원"
+                              />
+                            )}
+                          </li>
+                          <li>
+                            유효기간{" "}
+                            {formatDateTime(
+                              reviewRequest.revisedQuote.validUntil,
+                            )}
+                          </li>
+                          <li className="border-t border-blue-200 pt-1.5 font-black text-blue-800">
+                            합계{" "}
+                            {formatPrice(reviewRequest.revisedQuote.totalAmount)}
+                            {reviewRequest.requestedQuote && (
+                              <DeltaText
+                                before={
+                                  reviewRequest.requestedQuote.totalAmount
+                                }
+                                after={reviewRequest.revisedQuote.totalAmount}
+                                unit="원"
+                              />
+                            )}
+                          </li>
+                        </ul>
+                        <div className="mt-3 border-t border-blue-200 pt-3">
+                          <p className="text-xs font-black text-blue-700">
+                            품목
+                          </p>
+                          <ul className="mt-1.5 space-y-1 text-xs text-slate-700">
+                            {reviewRequest.revisedQuote.items.map(
+                              (item, index) => (
+                                <li key={index}>
+                                  {item.optionSummary} · {item.quantity}개 ·{" "}
+                                  {formatPrice(item.unitPrice)}
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-black text-slate-500">
+                      이전 계약 조건
+                    </p>
+                    <ul className="mt-2.5 space-y-1.5 text-xs text-slate-600">
+                      <li>
+                        계약명 {reviewRequest.requestedContract?.contractName ?? "-"}
+                      </li>
+                      <li>
+                        납품 예정일{" "}
+                        {reviewRequest.requestedContract?.deliveryDate ?? "-"}
+                      </li>
+                      <li>
+                        결제 조건{" "}
+                        {reviewRequest.requestedContract?.paymentTerms ?? "-"}
+                      </li>
+                      <li>
+                        반품·교환 조건{" "}
+                        {reviewRequest.requestedContract?.returnPolicy ?? "-"}
+                      </li>
+                      {reviewRequest.requestedContract?.specialTerms && (
+                        <li>
+                          특약사항 {reviewRequest.requestedContract.specialTerms}
+                        </li>
+                      )}
+                      <li className="border-t border-slate-200 pt-1.5 font-black text-slate-800">
+                        계약 금액{" "}
+                        {reviewRequest.requestedContract
+                          ? formatPrice(
+                            reviewRequest.requestedContract.contractAmount,
+                          )
+                          : "-"}
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="rounded-md border border-blue-200 bg-blue-50/40 p-4">
+                    <p className="text-xs font-black text-blue-700">
+                      새 계약 조건
+                    </p>
+                    {reviewRequest.revisedContract && (
+                      <ul className="mt-2.5 space-y-1.5 text-xs text-slate-700">
+                        <li>
+                          계약명{" "}
+                          {reviewRequest.revisedContract.contractName ?? "-"}
+                        </li>
+                        <li>
+                          납품 예정일{" "}
+                          {reviewRequest.revisedContract.deliveryDate}
+                        </li>
+                        <li>
+                          결제 조건 {reviewRequest.revisedContract.paymentTerms}
+                        </li>
+                        <li>
+                          반품·교환 조건{" "}
+                          {reviewRequest.revisedContract.returnPolicy}
+                        </li>
+                        {reviewRequest.revisedContract.specialTerms && (
+                          <li>
+                            특약사항{" "}
+                            {reviewRequest.revisedContract.specialTerms}
+                          </li>
+                        )}
+                        <li className="border-t border-blue-200 pt-1.5 font-black text-blue-800">
+                          계약 금액{" "}
+                          {formatPrice(
+                            reviewRequest.revisedContract.contractAmount,
+                          )}
+                          {reviewRequest.requestedContract && (
+                            <DeltaText
+                              before={
+                                reviewRequest.requestedContract.contractAmount
+                              }
+                              after={
+                                reviewRequest.revisedContract.contractAmount
+                              }
+                              unit="원"
+                            />
+                          )}
+                        </li>
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {decideError && (
+                <p className="mt-4 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700">
+                  <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                  {decideError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                disabled={isDeciding}
+                onClick={closeReviewModal}
+                className="h-10 flex-1 rounded-md border border-slate-200 bg-white text-sm font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+              >
+                닫기
+              </button>
+              {reviewRequest.status === "RESPONDED"
+              && selected?.status === "OPEN"
+              && viewerRole === "BUYER" && (
+                <>
+                  <button
+                    type="button"
+                    disabled={isDeciding}
+                    onClick={async () => {
+                      await handleReject(reviewRequest.negotiationRequestId);
+                      setReviewRequest(null);
+                    }}
+                    className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-rose-600 text-sm font-black text-white transition hover:bg-rose-700 disabled:opacity-50"
+                  >
+                    <X size={15} />
+                    거절
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeciding}
+                    onClick={async () => {
+                      await handleAccept(reviewRequest.negotiationRequestId);
+                      setReviewRequest(null);
+                    }}
+                    className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-emerald-600 text-sm font-black text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <CheckCircle2 size={15} />
+                    수락
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -613,5 +1966,179 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <dt className="text-xs font-bold text-slate-400">{label}</dt>
       <dd className="mt-1 font-semibold text-slate-700">{value}</dd>
     </div>
+  );
+}
+
+function RoundCard({
+  round,
+  request,
+  negotiationType,
+}: {
+  round: number;
+  request: NegotiationRequestDetail;
+  negotiationType: "QUOTE" | "CONTRACT";
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+        <span className="text-xs font-black text-slate-600">
+          {round}라운드
+        </span>
+        <span className="text-xs font-bold text-slate-500">
+          {requestStatusLabel[request.status]}
+        </span>
+      </div>
+      <div className="p-4">
+        <p className="text-xs font-bold text-slate-400">바이어 요청</p>
+        <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+          {request.buyerRequest}
+        </p>
+
+        {(request.revisedQuote || request.revisedContract) && (
+          <div className="mt-3 rounded-md border border-blue-100 bg-blue-50/60 p-3">
+            <p className="text-xs font-bold text-blue-700">셀러 응답</p>
+            {request.sellerMemo && (
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                {request.sellerMemo}
+              </p>
+            )}
+
+            {negotiationType === "QUOTE" && request.revisedQuote && (
+              <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <p className="font-black text-slate-500">이전 조건</p>
+                  <ul className="mt-1 space-y-1 text-slate-600">
+                    <li>
+                      리드타임 {request.requestedQuote?.leadTimeDays ?? "-"}일
+                    </li>
+                    <li>
+                      배송비{" "}
+                      {request.requestedQuote
+                        ? formatPrice(request.requestedQuote.shippingFee)
+                        : "-"}
+                    </li>
+                    <li>
+                      합계{" "}
+                      {request.requestedQuote
+                        ? formatPrice(request.requestedQuote.totalAmount)
+                        : "-"}
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-black text-blue-700">변경된 조건</p>
+                  <ul className="mt-1 space-y-1 text-slate-700">
+                    <li>
+                      리드타임 {request.revisedQuote.leadTimeDays}일
+                      {request.requestedQuote && (
+                        <DeltaText
+                          before={request.requestedQuote.leadTimeDays}
+                          after={request.revisedQuote.leadTimeDays}
+                          unit="일"
+                        />
+                      )}
+                    </li>
+                    <li>
+                      배송비 {formatPrice(request.revisedQuote.shippingFee)}
+                      {request.requestedQuote && (
+                        <DeltaText
+                          before={request.requestedQuote.shippingFee}
+                          after={request.revisedQuote.shippingFee}
+                          unit="원"
+                        />
+                      )}
+                    </li>
+                    <li>
+                      합계 {formatPrice(request.revisedQuote.totalAmount)}
+                      {request.requestedQuote && (
+                        <DeltaText
+                          before={request.requestedQuote.totalAmount}
+                          after={request.revisedQuote.totalAmount}
+                          unit="원"
+                        />
+                      )}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {negotiationType === "CONTRACT" && request.revisedContract && (
+              <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <p className="font-black text-slate-500">이전 조건</p>
+                  <ul className="mt-1 space-y-1 text-slate-600">
+                    <li>
+                      납품 예정일{" "}
+                      {request.requestedContract?.deliveryDate ?? "-"}
+                    </li>
+                    <li>
+                      계약 금액{" "}
+                      {request.requestedContract
+                        ? formatPrice(
+                          request.requestedContract.contractAmount,
+                        )
+                        : "-"}
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-black text-blue-700">변경된 조건</p>
+                  <ul className="mt-1 space-y-1 text-slate-700">
+                    <li>납품 예정일 {request.revisedContract.deliveryDate}</li>
+                    <li>결제 조건 {request.revisedContract.paymentTerms}</li>
+                    <li>
+                      계약 금액{" "}
+                      {formatPrice(request.revisedContract.contractAmount)}
+                      {request.requestedContract && (
+                        <DeltaText
+                          before={request.requestedContract.contractAmount}
+                          after={request.revisedContract.contractAmount}
+                          unit="원"
+                        />
+                      )}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DeltaText({
+  before,
+  after,
+  unit,
+}: {
+  before: number;
+  after: number;
+  unit: string;
+}) {
+  const diff = after - before;
+
+  if (diff === 0) {
+    return (
+      <span className="ml-1 text-[11px] font-bold text-slate-400">
+        (변동 없음)
+      </span>
+    );
+  }
+
+  const decreased = diff < 0;
+
+  return (
+    <span
+      className={`ml-1 text-[11px] font-black leading-none ${
+        decreased ? "text-blue-600" : "text-rose-600"
+      }`}
+    >
+      ({decreased ? "▼" : "▲"}
+      {Math.abs(diff).toLocaleString("ko-KR")}
+      {unit})
+    </span>
   );
 }
