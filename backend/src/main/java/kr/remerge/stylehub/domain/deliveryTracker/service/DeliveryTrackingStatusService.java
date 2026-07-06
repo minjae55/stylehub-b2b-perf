@@ -8,11 +8,15 @@ import kr.remerge.stylehub.domain.deliveryTracker.entity.DeliveryTrackingStatus;
 import kr.remerge.stylehub.domain.deliveryTracker.enumtype.DeliveryStatus;
 import kr.remerge.stylehub.domain.deliveryTracker.repository.DeliveryTrackingStatusRepository;
 import kr.remerge.stylehub.domain.order.entity.Order;
+import kr.remerge.stylehub.domain.order.entity.OrderLog;
+import kr.remerge.stylehub.domain.order.enumtype.OrderProcessStep;
 import kr.remerge.stylehub.domain.order.enumtype.OrderStatus;
+import kr.remerge.stylehub.domain.order.repository.OrderLogRepository;
 import kr.remerge.stylehub.domain.order.repository.OrderRepository;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DeliveryTrackingStatusService {
@@ -27,6 +32,7 @@ public class DeliveryTrackingStatusService {
     private final DeliveryTrackingStatusRepository deliveryTrackingStatusRepository;
     private final DeliveryTrackingService deliveryTrackingService;
     private final OrderRepository orderRepository;
+    private final OrderLogRepository orderLogRepository;
 
     // 운송장 등록 — 셀러가 호출
     @Transactional
@@ -91,7 +97,16 @@ public class DeliveryTrackingStatusService {
             return buildResult(orderId, tracking, List.of());
         }
 
-        // DeliveryTracker 실시간 호출
+        List<DeliveryTrackingResponse.EventResult> events = refreshTracking(tracking);
+
+        return buildResult(orderId, tracking, events);
+    }
+
+    // 배송 건 1개를 실시간 조회하여 DB 동기화 + 배송완료 시 주문 상태 전이
+    // (화면에서의 단건 조회, 스케줄러의 전체 폴링 양쪽에서 공용으로 사용)
+    private List<DeliveryTrackingResponse.EventResult> refreshTracking(
+            DeliveryTrackingStatus tracking
+    ) {
         DeliveryTrackingDto.TrackingResponse response = deliveryTrackingService
                 .getTrackingInfo(tracking.getCarrierId(), tracking.getTrackingNumber());
 
@@ -111,21 +126,66 @@ public class DeliveryTrackingStatusService {
 
         // DELIVERED 전환 시 order.deliveredAt 자동 세팅
         if (currentStatus == DeliveryStatus.DELIVERED) {
-            Order order = orderRepository.findById(orderId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
-            if (order.getStatus() == OrderStatus.SHIPPED) {
-                order.markDelivered(); // deliveredAt + status 동시 세팅
-            }
+            orderRepository.findById(tracking.getOrderId())
+                    .filter(order -> order.getStatus() == OrderStatus.SHIPPED)
+                    .ifPresent(order -> {
+                        order.markDelivered(); // deliveredAt + status 동시 세팅
+
+                        if (order.getIsSample()) {
+                            orderLogRepository.save(
+                                    OrderLog.createProcessLog(
+                                            order,
+                                            OrderProcessStep.SAMPLE_DELIVERED,
+                                            null,
+                                            "샘플이 바이어에게 도착했습니다."
+                                    )
+                            );
+                        }
+                    });
         }
 
         // events 변환 (null-safe)
-        List<DeliveryTrackingResponse.EventResult> events = response.events() != null
+        return response.events() != null
                 ? response.events().stream()
                 .map(DeliveryTrackingResponse.EventResult::from)
                 .toList()
                 : List.of();
+    }
 
-        return buildResult(orderId, tracking, events);
+    // 스케줄러 전용: 아직 배송완료/만료되지 않은 건 전체를 폴링하여 자동 동기화
+    @Transactional
+    public void syncActiveDeliveries() {
+        List<DeliveryStatus> terminalStatuses =
+                List.of(DeliveryStatus.DELIVERED, DeliveryStatus.EXPIRED);
+
+        List<DeliveryTrackingStatus> activeTrackings =
+                deliveryTrackingStatusRepository.findByLastStatusNotIn(terminalStatuses);
+
+        int successCount = 0;
+        int failCount = 0;
+
+        for (DeliveryTrackingStatus tracking : activeTrackings) {
+            try {
+                refreshTracking(tracking);
+                successCount++;
+            } catch (Exception e) {
+                failCount++;
+                log.warn(
+                        "[배송 자동동기화 실패] orderId={}, carrierId={}, trackingNumber={}, reason={}",
+                        tracking.getOrderId(),
+                        tracking.getCarrierId(),
+                        tracking.getTrackingNumber(),
+                        e.getMessage()
+                );
+            }
+        }
+
+        log.info(
+                "[배송 자동동기화 결과] 대상={}건, 성공={}건, 실패={}건",
+                activeTrackings.size(),
+                successCount,
+                failCount
+        );
     }
 
     // 응답 조립 공통 메서드
