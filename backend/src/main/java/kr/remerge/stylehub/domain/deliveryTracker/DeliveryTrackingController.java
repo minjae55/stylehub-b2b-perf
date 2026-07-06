@@ -1,5 +1,8 @@
 package kr.remerge.stylehub.domain.deliveryTracker;
 
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
+import kr.remerge.stylehub.global.auth.security.LoginUser;
+import kr.remerge.stylehub.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,5 +27,22 @@ public class DeliveryTrackingController {
     ) {
         DeliveryTrackingDto.TrackingResponse result = trackingService.getTrackingInfo(carrierId, trackingNumber);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/orders/{orderId}")
+    public ResponseEntity<ApiResponse<DeliveryTrackingDto.TrackingResponse>>
+    getOrderTracking(
+            @LoginUser AuthUser authUser,
+            @PathVariable Integer orderId
+    ) {
+        DeliveryTrackingDto.TrackingResponse response =
+                trackingService.getOrderTracking(
+                        authUser.userId(),
+                        orderId
+                );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(response)
+        );
     }
 }
