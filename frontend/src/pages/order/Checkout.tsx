@@ -812,7 +812,7 @@ export function Checkout() {
                 <AgreementRow
                   checked={agreements.policy}
                   title="구매 조건 및 취소·환불 정책 동의"
-                  description="주문 확정 이후 적용되는 취소 및 환불 기준에 동의합니다."
+                  description="결제 전에는 주문을 취소할 수 있으며, 결제 완료 후 취소·환불은 별도 절차로 진행됨을 확인했습니다."
                   onChange={(checked) =>
                     setAgreements((previous) => ({ ...previous, policy: checked }))
                   }
