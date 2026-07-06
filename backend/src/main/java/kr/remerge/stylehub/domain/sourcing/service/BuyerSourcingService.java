@@ -156,7 +156,7 @@ public class BuyerSourcingService {
             suppliers.stream()
                     .filter(s -> s.getStatus() == SourcingSupplierStatus.RECOMMENDED
                             || s.getStatus() == SourcingSupplierStatus.QUOTED)
-                    .forEach(s -> s.decline("바이어 요청 취소"));
+                    .forEach(SourcingSupplier::cancelByBuyerWithdrawal);
 
             List<Quote> quotes = quoteRepository
                     .findBySourcingRequest_SourcingRequestId(sourcingRequestId);

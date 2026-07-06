@@ -135,6 +135,19 @@ const BID_STATUS_ICON: Partial<Record<BidStatus, React.ReactNode>> = {
   EXPIRED:     <Clock size={11} />,
 };
 
+// 취소는 PENDING/QUOTED 단계에서만 가능 - 협의(NEGOTIATING) 시작 이후엔
+// 셀러 쪽도 이미 대응을 진행 중일 수 있어 일방적인 취소를 막음.
+// canWithdraw가 false인데 아직 종료 상태가 아닌 경우에만 사유를 안내.
+function getWithdrawUnavailableReason(status: RequestStatus): string | null {
+  if (status === "NEGOTIATING") {
+    return "협의가 시작된 이후에는 요청을 취소할 수 없습니다.";
+  }
+  if (status === "TRADING") {
+    return "거래가 진행중인 요청은 취소할 수 없습니다.";
+  }
+  return null;
+}
+
 // ── API ──────────────────────────────────────────────────────────────────────
 async function fetchSourcingDetail(requestId: string): Promise<SourcingRequestDetail> {
   return api.get<SourcingRequestDetail>(`/sourcing/requests/${requestId}`);
@@ -361,6 +374,11 @@ export function BuyerSourcingDetail() {
         navigate(`/checkout?type=sample&quoteId=${quoteId}`);
         return;
       }
+      if (status === "APPROVED") {
+        // 승인 완료 → 승인된 견적 목록 페이지로 이동
+        navigate("/buyer/quotes?status=APPROVED");
+        return;
+      }
       const refreshed = await fetchSourcingDetail(requestId);
       setRequest(refreshed);
     } catch (e) {
@@ -442,13 +460,19 @@ export function BuyerSourcingDetail() {
                 <h1 className="text-xl font-bold text-foreground mb-1">{request.productName}</h1>
                 <div className="text-xs text-muted-foreground">{request.createdAt.slice(0, 10)} 등록</div>
               </div>
-              {request.canWithdraw && (
+              {request.canWithdraw ? (
                   <button
                       onClick={() => setShowWithdraw(true)}
                       className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-xs font-medium transition-colors"
                   >
                     <Ban size={12} /> 취소
                   </button>
+              ) : (
+                  getWithdrawUnavailableReason(request.status) && (
+                      <span className="flex-shrink-0 text-[11px] text-muted-foreground text-right max-w-[160px] leading-snug">
+                        {getWithdrawUnavailableReason(request.status)}
+                      </span>
+                  )
               )}
             </div>
           </div>
@@ -560,6 +584,21 @@ export function BuyerSourcingDetail() {
           {actionError && (
               <div className="mb-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {actionError}
+              </div>
+          )}
+
+          {request.status === "TRADING" && (
+              <div className="flex items-center justify-between gap-3 mb-4 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4">
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <BadgeCheck size={16} className="flex-shrink-0" />
+                  <span>거래가 진행중입니다. 자세한 내용은 견적관리에서 확인해 주세요.</span>
+                </div>
+                <button
+                    onClick={() => navigate("/buyer/quotes?status=APPROVED")}
+                    className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors"
+                >
+                  견적관리로 이동 <ChevronRight size={12} />
+                </button>
               </div>
           )}
 

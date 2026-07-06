@@ -1,7 +1,10 @@
 package kr.remerge.stylehub.domain.sourcing.service;
 
 
+import kr.remerge.stylehub.domain.company.enumtype.CompanyStatus;
+import kr.remerge.stylehub.domain.company.enumtype.SellerStatus;
 import kr.remerge.stylehub.domain.company.repository.CompanyHandledCategoryRepository;
+import kr.remerge.stylehub.domain.company.repository.CompanyRepository;
 import kr.remerge.stylehub.domain.sourcing.entity.SupplierProfile;
 import kr.remerge.stylehub.domain.sourcing.entity.SupplierStatistics;
 import kr.remerge.stylehub.domain.sourcing.enumtype.SupplierSourcingType;
@@ -26,6 +29,7 @@ public class SupplierStatisticsService {
     private final SupplierProfileRepository profileRepository;
     private final SupplierStatisticsRepository statisticsRepository;
     private final CompanyHandledCategoryRepository companyHandledCategoryRepository;
+    private final CompanyRepository companyRepository;
 
     /**
      * 배치 스케줄러에서 호출
@@ -52,8 +56,9 @@ public class SupplierStatisticsService {
      * 1. auto_assign_enabled = true 인 공급사 조회
      * 2. 요청 타입(READY/CUSTOM)과 호환되는 공급사 필터
      * 3. 요청을 올린 바이어 회사 본인은 후보에서 제외 (같은 카테고리를 취급하는 셀러라도 자기 요청에 자기가 배정되면 안 됨)
-     * 4. 응답률 높은 순으로 정렬
-     * 5. 상위 N개 반환 (베테랑/콜드스타트 슬롯이 한쪽에서 부족하면 다른 쪽으로 백필해서 최대한 topN을 채움)
+     * 4. 회사 상태(APPROVED) + 셀러 심사 상태(APPROVED)를 모두 통과한 회사만 후보로 남김
+     * 5. 응답률 높은 순으로 정렬
+     * 6. 상위 N개 반환 (베테랑/콜드스타트 슬롯이 한쪽에서 부족하면 다른 쪽으로 백필해서 최대한 topN을 채움)
      */
     private static final int TOP_N = 5;
     private static final int COLD_START_THRESHOLD = 5; // 요청 수 이하면 신규로 봄
@@ -85,6 +90,20 @@ public class SupplierStatisticsService {
 
         if (companyIds.isEmpty()) {
             log.warn("[AutoAssign] 카테고리 매칭 공급사 없음 - CategoryId: {}", categoryId);
+            return List.of();
+        }
+
+        // 회사 상태(APPROVED) + 셀러 심사 상태(APPROVED) 둘 다 통과한 회사만 후보로 남김
+        // (정지/삭제/미승인 회사가 auto_assign_enabled=true로 남아있어도 여기서 걸러짐)
+        List<Integer> approvedIds = companyRepository.findIdsByIdInAndStatusAndSellerStatus(
+                companyIds, CompanyStatus.APPROVED, SellerStatus.APPROVED
+        );
+        companyIds = companyIds.stream()
+                .filter(approvedIds::contains)
+                .collect(Collectors.toList());
+
+        if (companyIds.isEmpty()) {
+            log.warn("[AutoAssign] 승인 상태(APPROVED) 공급사 없음 - CategoryId: {}", categoryId);
             return List.of();
         }
 

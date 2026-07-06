@@ -92,4 +92,10 @@ public class SourcingSupplier extends BaseEntity {
         this.status = SourcingSupplierStatus.QUOTED;
         this.respondedAt = LocalDateTime.now();
     }
+
+    // 바이어가 요청 자체를 취소해서 배정이 무효화된 경우 - 셀러의 능동적 액션이 아니므로 sellerFeedback 사용 안 함
+    public void cancelByBuyerWithdrawal() {
+        this.status = SourcingSupplierStatus.CANCELLED;
+        this.respondedAt = LocalDateTime.now();
+    }
 }

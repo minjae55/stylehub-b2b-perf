@@ -1,5 +1,6 @@
 package kr.remerge.stylehub.domain.sourcing.service;
 
+import kr.remerge.stylehub.domain.quote.constant.QuoteStatusCode;
 import kr.remerge.stylehub.domain.sourcing.dto.SellerSourcingResponse;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequest;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingSupplier;
@@ -34,13 +35,13 @@ public class SellerSourcingService {
                 .toList();
     }
 
-    // past 탭: DECLINED + EXPIRED
     @Transactional(readOnly = true)
     public List<SellerSourcingResponse> getSellerPastRequests(Integer companyId, String type) {
         return sourcingSupplierRepository
                 .findSellerPastRequests(
                         companyId,
-                        List.of(SourcingSupplierStatus.DECLINED, SourcingSupplierStatus.EXPIRED),
+                        List.of(SourcingSupplierStatus.DECLINED, SourcingSupplierStatus.EXPIRED,SourcingSupplierStatus.CANCELLED),
+                        List.of(QuoteStatusCode.REJECTED, QuoteStatusCode.NOT_SELECTED),
                         type
                 )
                 .stream()
@@ -76,4 +77,14 @@ public class SellerSourcingService {
             log.info("[AutoCancel] 모든 공급사 거절 → 소싱 요청 반려 처리 - sourcingRequestId: {}", sourcingRequestId);
         }
     }
+    @Transactional(readOnly = true)
+    public List<SellerSourcingResponse> getSellerCompletedRequests(Integer companyId, String type) {
+        return sourcingSupplierRepository
+                .findSellerCompletedRequests(companyId, QuoteStatusCode.APPROVED, type)
+                .stream()
+                .map(SellerSourcingResponse::from)
+                .toList();
+    }
+
+
 }

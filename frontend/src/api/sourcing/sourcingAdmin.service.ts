@@ -1,6 +1,6 @@
 import api from "@/api/axios";
 
-export type SourcingSupplierStatus = "SUGGESTED" | "RECOMMENDED" | "QUOTED" | "DECLINED" | "REJECTED" | "EXPIRED";
+export type SourcingSupplierStatus = "SUGGESTED" | "RECOMMENDED" | "QUOTED" | "DECLINED" | "REJECTED" | "EXPIRED" | "CANCELLED";
 
 export type SourcingStatus = "PENDING" | "QUOTED" | "NEGOTIATING" | "TRADING" | "COMPLETED" | "CANCELLED" | "WITHDRAWN" | "EXPIRED";
 

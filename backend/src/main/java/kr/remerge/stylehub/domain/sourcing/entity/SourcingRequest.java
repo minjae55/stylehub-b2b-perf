@@ -86,4 +86,7 @@ public class SourcingRequest extends BaseEntity {
     public void trade() {
         this.status = SourcingStatus.TRADING;
     }
+    public void complete() {
+        this.status = SourcingStatus.COMPLETED;
+    }
 }

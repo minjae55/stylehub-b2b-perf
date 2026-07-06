@@ -11,7 +11,7 @@ import {
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 type SourcingType = "READY" | "CUSTOM";
-type SupplierStatus = "RECOMMENDED" | "QUOTED" | "DECLINED" | "EXPIRED";
+type SupplierStatus = "RECOMMENDED" | "QUOTED" | "DECLINED" | "EXPIRED" | "CANCELLED";
 type SourcingStatus = "PENDING" | "NEGOTIATING" | "TRADING" | "COMPLETED";
 
 interface SellerSourcingResponse {
@@ -440,7 +440,29 @@ function RequestRow({ req, myBids, onDecline, onDetail }: {
 }
 
 // ── 이전 요청 행 ──────────────────────────────────────────────────────
+// 이전 요청으로 분류되는 사유는 크게 두 축:
+//   1) 견적을 아예 내지 않고 배정 자체가 끝난 경우 → supplierStatus (DECLINED/EXPIRED)
+//   2) 견적을 제출했지만 결과적으로 진행되지 않은 경우 → myQuote.status (REJECTED/NOT_SELECTED)
+const PAST_REASON_STYLE: Record<string, string> = {
+  "요청 거절": "bg-secondary text-muted-foreground border-border",
+  "배정 만료": "bg-secondary text-muted-foreground border-border",
+  "견적 거절": "bg-red-50 text-red-500 border-red-200",
+  "미채택":   "bg-secondary text-muted-foreground border-border",
+  "요청 취소됨": "bg-secondary text-muted-foreground border-border",
+};
+
+function getPastReason(req: SellerSourcingResponse): string {
+  // 견적을 제출한 상태에서 종료된 경우 - myQuote.status 우선 확인
+  if (req.myQuote?.status === "REJECTED") return "견적 거절";
+  if (req.myQuote?.status === "NOT_SELECTED") return "미채택";
+  // 견적을 아예 내지 않고 배정 자체가 끝난 경우
+  if (req.supplierStatus === "DECLINED") return "요청 거절";
+  if (req.supplierStatus === "CANCELLED") return "요청 취소됨"; // 바이어가 요청 자체를 취소
+  return "배정 만료";
+}
+
 function PastRow({ req, onDetail }: { req: SellerSourcingResponse; onDetail: (r: SellerSourcingResponse) => void }) {
+  const reason = getPastReason(req);
   return (
       <div
           onClick={() => onDetail(req)}
@@ -450,9 +472,9 @@ function PastRow({ req, onDetail }: { req: SellerSourcingResponse; onDetail: (r:
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] text-muted-foreground font-mono">{req.sourcingNo}</span>
-              <span className="text-[10px] bg-secondary text-muted-foreground border border-border px-2 py-0.5 rounded-full">
-              {req.supplierStatus === "DECLINED" ? "거절" : "만료"}
-            </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${PAST_REASON_STYLE[reason]}`}>
+                {reason}
+              </span>
             </div>
             <div className="font-semibold text-sm text-foreground truncate">{req.productName}</div>
             <div className="text-xs text-muted-foreground mt-0.5">납기 {req.deliveryDate}</div>
@@ -514,10 +536,10 @@ export function SellerRequestList() {
       if (subTab === "current") {
         data = await fetchSellerRequests(activeTab, "RECOMMENDED");
       } else if (subTab === "my") {
-        // ss.status는 승인 이후에도 QUOTED로 유지되어 이 엔드포인트에 계속 잡힘.
-        // 완료(승인)된 건은 전용 completed 탭에서 보여주므로 여기선 중복 방지로 제외.
+        // 진행중인 견적만 "내 제안"에 표시. APPROVED → completed 탭, REJECTED/NOT_SELECTED → past 탭으로 이동
+        const ONGOING = ["SUBMITTED", "NEGOTIATING", "SAMPLE_REQUESTED"];
         const all = await fetchSellerRequests(activeTab, "QUOTED");
-        data = all.filter((r) => r.myQuote?.status !== "APPROVED");
+        data = all.filter((r) => ONGOING.includes(r.myQuote?.status ?? ""));
       } else if (subTab === "completed") {
         data = await fetchSellerCompletedRequests(activeTab);
       } else {

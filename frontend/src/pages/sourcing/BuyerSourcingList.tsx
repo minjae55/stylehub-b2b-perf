@@ -43,7 +43,7 @@ interface BuyerSourcingBoard {
   counts: BuyerSourcingCounts;
 }
 
-// ── 상태 스타일 ────────────────────────────────────────────────────────────
+// ── 상태 스타일 (개별 요청 상태 - 관리자 화면과 동일한 라벨 사용) ────────────
 const STATUS_LABEL: Record<RequestStatus, string> = {
   PENDING:     "대기중",
   QUOTED:      "견적수신",
@@ -70,14 +70,19 @@ const STATUS_STYLE: Record<RequestStatus, string> = {
 const TERMINATED_STATUSES: RequestStatus[] = ["CANCELLED", "WITHDRAWN", "EXPIRED"];
 
 // ── 진행 상태 필터 (백엔드 status 그룹 파라미터와 1:1 대응) ──────────────────
+// 그룹 라벨 기준 (관리자 화면과 동일하게 통일):
+//  - ACTIVE:    아직 채택 전 (PENDING/QUOTED/NEGOTIATING)
+//  - TRADING:   견적 승인 후 거래 진행중
+//  - COMPLETED: 거래가 성사되어 완료됨 → "거래완료"
+//  - CLOSED:    거래가 성사되지 않고 중단됨 (반려/취소/기한만료) → "거래중단"
 type StatusFilter = "ALL" | "ACTIVE" | "TRADING" | "COMPLETED" | "CLOSED";
 
 const FILTERS: Array<{ value: StatusFilter; label: string; icon: React.ReactNode; countKey: keyof BuyerSourcingCounts }> = [
-  { value: "ALL",       label: "전체",   icon: <LayoutGrid size={15} />,   countKey: "all" },
-  { value: "ACTIVE",    label: "진행중", icon: <Clock3 size={15} />,       countKey: "active" },
-  { value: "TRADING",   label: "거래중", icon: <Handshake size={15} />,    countKey: "trading" },
-  { value: "COMPLETED", label: "완료",   icon: <CheckCircle2 size={15} />, countKey: "completed" },
-  { value: "CLOSED",    label: "종료",   icon: <Ban size={15} />,          countKey: "closed" },
+  { value: "ALL",       label: "전체",     icon: <LayoutGrid size={15} />,   countKey: "all" },
+  { value: "ACTIVE",    label: "진행중",   icon: <Clock3 size={15} />,       countKey: "active" },
+  { value: "TRADING",   label: "거래중",   icon: <Handshake size={15} />,    countKey: "trading" },
+  { value: "COMPLETED", label: "거래완료", icon: <CheckCircle2 size={15} />, countKey: "completed" },
+  { value: "CLOSED",    label: "거래중단", icon: <Ban size={15} />,          countKey: "closed" },
 ];
 
 // ── API ───────────────────────────────────────────────────────────────────

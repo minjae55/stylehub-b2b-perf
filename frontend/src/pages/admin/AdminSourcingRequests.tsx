@@ -40,13 +40,24 @@ const STATUS_STYLE: Record<SourcingStatus, string> = {
 };
 
 // ── 상단 통계 카드 (원본 디자인 - 가운데 정렬 큰 숫자) ───────────────────────
+// 그룹 라벨 기준:
+//  - ACTIVE:    아직 채택 전 (PENDING/QUOTED/NEGOTIATING)
+//  - TRADING:   견적 승인 후 거래 진행중
+//  - COMPLETED: 거래가 성사되어 완료됨
+//  - CLOSED:    거래가 성사되지 않고 중단됨 (반려/취소/기한만료 — 사유는 개별 STATUS_LABEL로 구분)
 const STAT_CARDS: Array<{ value: SourcingGroupFilter; label: string; color: string; countKey: keyof AdminSourcingStatsResponse }> = [
-  { value: "ALL",       label: "전체",   color: "bg-muted",                              countKey: "all" },
-  { value: "ACTIVE",    label: "진행중", color: "bg-blue-50 border border-blue-200",     countKey: "active" },
-  { value: "TRADING",   label: "거래중", color: "bg-green-50 border border-green-200",   countKey: "trading" },
-  { value: "COMPLETED", label: "완료",   color: "bg-purple-50 border border-purple-200", countKey: "completed" },
-  { value: "CLOSED",    label: "종료",   color: "bg-muted border border-border",         countKey: "closed" },
+  { value: "ALL",       label: "전체",     color: "bg-muted",                              countKey: "all" },
+  { value: "ACTIVE",    label: "진행중",   color: "bg-blue-50 border border-blue-200",     countKey: "active" },
+  { value: "TRADING",   label: "거래중",   color: "bg-green-50 border border-green-200",   countKey: "trading" },
+  { value: "COMPLETED", label: "거래완료", color: "bg-purple-50 border border-purple-200", countKey: "completed" },
+  { value: "CLOSED",    label: "거래중단", color: "bg-muted border border-border",         countKey: "closed" },
 ];
+
+// 후보 업체 검토가 더 이상 의미 없는 상태 (거래가 완료됐거나 성사되지 않고 끝난 경우)
+const REQUEST_DONE_STATUSES: SourcingStatus[] = ["COMPLETED", "CANCELLED", "WITHDRAWN", "EXPIRED"];
+function isRequestDone(status: SourcingStatus): boolean {
+  return REQUEST_DONE_STATUSES.includes(status);
+}
 
 // ── 유틸 ──────────────────────────────────────────────────────────────────
 function formatBudget(req: AdminSourcingRequestResponse): string {
@@ -306,7 +317,12 @@ export function AdminSourcingRequests() {
     const opening = expandedId !== request.sourcingRequestId;
     setExpandedId(opening ? request.sourcingRequestId : null);
 
-    if (opening && request.pendingSupplierCount > 0 && !suppliersByRequest[request.sourcingRequestId]) {
+    if (
+        opening &&
+        !isRequestDone(request.status) &&
+        request.pendingSupplierCount > 0 &&
+        !suppliersByRequest[request.sourcingRequestId]
+    ) {
       setIsLoadingSuppliers(true);
       try {
         const suppliers = await getSuggestedSuppliers(request.sourcingRequestId);
@@ -399,6 +415,7 @@ export function AdminSourcingRequests() {
               <div className="divide-y divide-border">
                 {requests.map((req) => {
                   const isExpanded = expandedId === req.sourcingRequestId;
+                  const done = isRequestDone(req.status);
 
                   return (
                       <div key={req.sourcingRequestId}>
@@ -413,7 +430,7 @@ export function AdminSourcingRequests() {
                               <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${STATUS_STYLE[req.status]}`}>
                                 {STATUS_LABEL[req.status]}
                               </span>
-                              {req.pendingSupplierCount > 0 && (
+                              {!done && req.pendingSupplierCount > 0 && (
                                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border bg-amber-50 border-amber-200 text-amber-700">
                                     후보 {req.pendingSupplierCount}건 대기
                                   </span>
@@ -528,13 +545,19 @@ export function AdminSourcingRequests() {
                                   <Send size={12} />
                                   후보 업체 검토
                                 </h4>
-                                <SupplierReviewPanel
-                                    request={req}
-                                    suppliers={suppliersByRequest[req.sourcingRequestId]}
-                                    isLoading={isLoadingSuppliers && !suppliersByRequest[req.sourcingRequestId]}
-                                    onBulkApprove={(ids) => handleBulkApprove(req.sourcingRequestId, ids)}
-                                    onReject={(id, reason) => handleReject(req.sourcingRequestId, id, reason)}
-                                />
+                                {done ? (
+                                    <div className="text-center py-4 text-xs text-muted-foreground">
+                                      {STATUS_LABEL[req.status]} 상태의 요청은 후보 업체 검토가 필요하지 않습니다.
+                                    </div>
+                                ) : (
+                                    <SupplierReviewPanel
+                                        request={req}
+                                        suppliers={suppliersByRequest[req.sourcingRequestId]}
+                                        isLoading={isLoadingSuppliers && !suppliersByRequest[req.sourcingRequestId]}
+                                        onBulkApprove={(ids) => handleBulkApprove(req.sourcingRequestId, ids)}
+                                        onReject={(id, reason) => handleReject(req.sourcingRequestId, id, reason)}
+                                    />
+                                )}
                               </div>
                             </div>
                         )}

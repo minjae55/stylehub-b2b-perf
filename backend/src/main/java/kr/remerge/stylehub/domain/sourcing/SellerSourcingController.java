@@ -64,4 +64,14 @@ public class SellerSourcingController {
         sellerSourcingService.decline(sourcingSupplierId, authUser.companyId(), request.getFeedback());
         return ResponseEntity.ok(ApiResponse.success());
     }
+
+    // completed: 견적이 승인(APPROVED)된 요청
+    @GetMapping("/requests/completed")
+    public ResponseEntity<ApiResponse<List<SellerSourcingResponse>>> getSellerCompletedRequests(
+            @LoginUser AuthUser authUser,
+            @RequestParam String type
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                sellerSourcingService.getSellerCompletedRequests(authUser.companyId(), type)));
+    }
 }
