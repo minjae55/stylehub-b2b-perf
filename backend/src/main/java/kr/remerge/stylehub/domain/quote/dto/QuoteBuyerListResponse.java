@@ -1,5 +1,7 @@
 package kr.remerge.stylehub.domain.quote.dto;
 
+import kr.remerge.stylehub.domain.contract.entity.Contract;
+import kr.remerge.stylehub.domain.contract.enumtype.ContractStatus;
 import kr.remerge.stylehub.domain.order.entity.Order;
 import kr.remerge.stylehub.domain.order.enumtype.OrderStatus;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
@@ -21,12 +23,16 @@ public record QuoteBuyerListResponse(
         LocalDateTime submittedAt,
         LocalDateTime viewedAt,
         Integer sampleOrderId,
-        OrderStatus sampleOrderStatus
+        OrderStatus sampleOrderStatus,
+        Integer contractId,
+        String contractName,
+        ContractStatus contractStatus
 ) {
 
     public static QuoteBuyerListResponse from(
             Quote quote,
-            Order sampleOrder
+            Order sampleOrder,
+            Contract contract
     ) {
         return new QuoteBuyerListResponse(
                 quote.getQuoteId(),
@@ -43,7 +49,10 @@ public record QuoteBuyerListResponse(
                 quote.getSubmittedAt(),
                 quote.getViewedAt(),
                 sampleOrder == null ? null : sampleOrder.getOrderId(),
-                sampleOrder == null ? null : sampleOrder.getStatus()
+                sampleOrder == null ? null : sampleOrder.getStatus(),
+                contract == null ? null : contract.getContractId(),
+                contract == null ? null : contract.getContractName(),
+                contract == null ? null : contract.getStatus()
         );
     }
 }

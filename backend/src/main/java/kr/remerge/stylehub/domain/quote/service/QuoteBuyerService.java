@@ -1,5 +1,7 @@
 package kr.remerge.stylehub.domain.quote.service;
 
+import kr.remerge.stylehub.domain.contract.entity.Contract;
+import kr.remerge.stylehub.domain.contract.repository.ContractRepository;
 import kr.remerge.stylehub.domain.order.entity.Order;
 import kr.remerge.stylehub.domain.order.repository.OrderRepository;
 import kr.remerge.stylehub.domain.quote.dto.QuoteBuyerListResponse;
@@ -20,6 +22,7 @@ public class QuoteBuyerService {
 
     private final QuoteRepository quoteRepository;
     private final OrderRepository orderRepository;
+    private final ContractRepository contractRepository;
 
     public List<QuoteBuyerListResponse> getQuoteList(Integer userId) {
         List<Quote> quotes =
@@ -49,11 +52,22 @@ public class QuoteBuyerService {
                 )
         );
 
+        Map<Integer, Contract> contractByQuoteId = new HashMap<>();
+
+        contractRepository.findByQuote_QuoteIdIn(quoteIds)
+                .forEach(contract ->
+                        contractByQuoteId.put(
+                                contract.getQuote().getQuoteId(),
+                                contract
+                        )
+                );
+
         return quotes
                 .stream()
                 .map(quote -> QuoteBuyerListResponse.from(
                         quote,
-                        latestSampleOrderByQuoteId.get(quote.getQuoteId())
+                        latestSampleOrderByQuoteId.get(quote.getQuoteId()),
+                        contractByQuoteId.get(quote.getQuoteId())
                 ))
                 .toList();
     }

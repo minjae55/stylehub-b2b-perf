@@ -3,8 +3,6 @@ import { Link, useNavigate, useParams } from "react-router";
 import { isAxiosError } from "axios";
 import {
   AlertCircle,
-  Calendar,
-  CheckCircle2,
   ChevronLeft,
   Clock,
   FileText,
@@ -12,7 +10,6 @@ import {
   Package,
   Plus,
   Send,
-  Sparkles,
   Truck,
   X,
 } from "lucide-react";
@@ -24,7 +21,7 @@ const SHIPPING_COMPANIES = ["CJ대한통운", "롯데택배", "한진택배", "�
 // ─── 타입 ───────────────────────────────────────────────────────────────────
 
 type QuoteInitItem = {
-  optionSummary: string;
+  optionSummary: string | null;
   quantity: number;
   sampleQuantity: number | null;
 };
@@ -47,7 +44,7 @@ type SourcingDetailResponse = {
   delivery_date: string | null;
   need_sample: "Y" | "N";
   items: {
-    option_summary: string;
+    option_summary: string | null;
     quantity: number;
     sample_quantity: number | null;
   }[];
@@ -118,7 +115,7 @@ function buildInitialQuoteItems(data: QuoteInitData): QuoteItemRow[] {
   if (data.items.length === 0) return [makeDefaultQuoteItem()];
 
   return data.items.map((item) => ({
-    optionValues: DEFAULT_OPTION_VALUES.map((option) => ({ ...option })),
+    optionValues: parseOptionSummary(item.optionSummary),
     quantity: item.quantity ? String(item.quantity) : "",
     unitPrice: "",
   }));
@@ -128,7 +125,7 @@ function buildInitialSampleItems(data: QuoteInitData): SampleItemRow[] {
   if (data.needSample !== "Y") return [makeDefaultSampleItem()];
 
   return data.items.map((item) => ({
-    sampleName: data.productName,
+    sampleName: item.optionSummary || data.productName,
     quantity: item.sampleQuantity ? String(item.sampleQuantity) : "1",
     unitPrice: "",
     memo: "",
@@ -141,6 +138,32 @@ const DEFAULT_OPTION_VALUES: QuoteOptionValueRow[] = [
   { optionName: "색상", optionValue: "" },
   { optionName: "사이즈", optionValue: "" },
 ];
+
+function parseOptionSummary(summary: string | null): QuoteOptionValueRow[] {
+  if (!summary?.trim()) {
+    return DEFAULT_OPTION_VALUES.map((option) => ({ ...option }));
+  }
+
+  return summary
+      .split(/\s*\/\s*|\s*,\s*/)
+      .filter(Boolean)
+      .map((part, index) => {
+        const separatorIndex = part.search(/[:：]/);
+
+        if (separatorIndex >= 0) {
+          return {
+            optionName: part.slice(0, separatorIndex).trim(),
+            optionValue: part.slice(separatorIndex + 1).trim(),
+          };
+        }
+
+        return {
+          optionName:
+              DEFAULT_OPTION_VALUES[index]?.optionName ?? `옵션 ${index + 1}`,
+          optionValue: part.trim(),
+        };
+      });
+}
 
 function makeDefaultQuoteItem(): QuoteItemRow {
   return {
@@ -299,7 +322,7 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 }
 
 const inputClass =
-    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-3 focus:ring-primary/10";
+    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-3 focus:ring-blue-100";
 
 const mutedInputClass =
     "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900";
@@ -308,7 +331,7 @@ function SectionTitle({ icon, title, compact }: { icon: React.ReactNode; title: 
   return (
       <div className={compact ? "" : "mb-4"}>
         <h2 className="flex items-center gap-2 text-sm font-bold text-slate-950">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-primary">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
           {icon}
         </span>
           {title}
@@ -317,29 +340,11 @@ function SectionTitle({ icon, title, compact }: { icon: React.ReactNode; title: 
   );
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-slate-500">{label}</span>
-        <span className="font-semibold text-slate-900">{value}</span>
-      </div>
-  );
-}
-
 function RequestMetric({ label, value }: { label: string; value: string }) {
   return (
-      <div className="rounded-lg border border-primary/15 bg-[#fff7f8] px-4 py-3">
-        <p className="text-xs font-bold text-primary/80">{label}</p>
-        <p className="mt-1 text-base font-black text-slate-950">{value}</p>
-      </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-      <div className="rounded-lg bg-slate-50 px-2 py-3">
-        <p className="text-[11px] font-semibold text-slate-400">{label}</p>
-        <p className="mt-1 text-sm font-bold text-slate-900">{value}</p>
+      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <p className="text-xs font-bold text-slate-500">{label}</p>
+        <p className="mt-1 text-base font-black text-slate-900">{value}</p>
       </div>
   );
 }
@@ -597,76 +602,146 @@ export function SellerQuoteWrite() {
   // ── 메인 렌더 ─────────────────────────────────────────────────────────────
   return (
       <div className="min-h-screen bg-slate-50">
-        <div className="mx-auto max-w-[1180px] px-4 py-8">
+        <div className="mx-auto max-w-[1280px] px-4 py-8 sm:px-6">
           <div className="mb-5 flex items-center justify-between gap-4">
             <Link
                 to="/seller/sourcing-requests"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-primary"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-blue-700"
             >
               <ChevronLeft size={16} />
               소싱 요청 목록
             </Link>
           </div>
 
-          <header className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:p-7">
-            <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <header className="mb-6">
+            <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-primary">
-                  <Sparkles size={13} />
-                  셀러 견적 작성
-                </div>
-                <h1 className="text-2xl font-bold text-slate-950">바이어 요청 조건 확인</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                  아래 요청 조건을 기준으로 옵션별 견적, 샘플 조건, 출고 정보를 작성합니다.
+                <h1 className="mt-1 text-2xl font-black text-slate-950">
+                  견적서 작성
+                </h1>
+                <p className="mt-2 text-sm text-slate-500">
+                  바이어 요청 조건을 확인하고 옵션별 공급 단가와 납품 조건을 입력합니다.
                 </p>
               </div>
-              <div className="shrink-0 rounded-lg border border-primary/25 bg-white px-4 py-3 text-sm shadow-sm">
-                <p className="text-xs font-semibold text-primary">요청 번호</p>
-                <p className="mt-1 font-bold text-slate-950">{initData?.sourcingNo ?? requestId}</p>
+              <div className="text-left lg:text-right">
+                <p className="text-xs font-semibold text-slate-400">요청 번호</p>
+                <p className="mt-1 font-mono text-sm font-black text-slate-900">
+                  {initData?.sourcingNo ?? requestId}
+                </p>
               </div>
             </div>
 
-            <div className="rounded-xl border border-primary/25 bg-white shadow-sm ring-1 ring-primary/5">
-              <div className="flex flex-col gap-4 border-b border-primary/15 bg-[#fff7f8] px-5 py-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="mb-2 h-1 w-14 rounded-full bg-primary" />
-                  <p className="text-xs font-bold uppercase tracking-wide text-primary">Buyer Request Summary</p>
-                  <h2 className="mt-1 text-lg font-bold text-slate-950">
-                    {initData?.productName ?? "-"}
-                  </h2>
+            <section className="overflow-hidden rounded-lg border border-blue-200 bg-blue-50 text-slate-900 shadow-sm">
+              <div className="bg-blue-50 px-5 py-6 sm:px-7">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-md bg-blue-100 px-2 py-1 text-[11px] font-black text-blue-700">
+                        BUYER REQUEST
+                      </span>
+                      {initData?.needSample === "Y" && (
+                        <span className="rounded border border-blue-200 bg-white px-2 py-1 text-[11px] font-bold text-blue-700">
+                          샘플 요청 포함
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="mt-4 text-xl font-black sm:text-2xl">
+                      {initData?.productName ?? "-"}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {initData?.brandName
+                        ? `브랜드 ${initData.brandName}`
+                        : "브랜드 정보 없음"}
+                    </p>
+                  </div>
                 </div>
-                <span className="w-fit rounded-full border border-primary/20 bg-white px-3 py-1 text-xs font-bold text-primary shadow-sm">
-                {initData?.needSample === "Y" ? "샘플 확인 후 본 주문 희망" : "샘플 불필요"}
-              </span>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3 bg-white p-4 md:grid-cols-4">
-                <RequestMetric label="카테고리" value="-" />
-                <RequestMetric
-                    label="희망 수량"
+                <div className="mt-6 grid grid-cols-2 gap-3 border-t border-blue-200 pt-5 md:grid-cols-4">
+                  <RequestMetric
+                    label="총 요청 수량"
                     value={
                       initData && initData.items.length > 0
-                          ? `${initData.items.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}벌`
-                          : "-"
+                        ? `${initData.items.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}벌`
+                        : "-"
                     }
-                />
-                <RequestMetric label="희망 납기" value={initData?.deliveryDate ?? "-"} />
-                <RequestMetric label="소재" value={initData?.material ?? "-"} />
+                  />
+                  <RequestMetric
+                    label="희망 납기"
+                    value={initData?.deliveryDate ?? "-"}
+                  />
+                  <RequestMetric
+                    label="요청 소재"
+                    value={initData?.material ?? "-"}
+                  />
+                  <RequestMetric
+                    label="옵션 조합"
+                    value={`${initData?.items.length ?? 0}개`}
+                  />
+                </div>
               </div>
 
-              {initData?.brandName && (
-                  <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-4">
-                    <p className="text-xs font-bold text-slate-600">브랜드명</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-900">{initData.brandName}</p>
+              <div className="border-t border-blue-200 bg-slate-50/70 px-5 py-5 text-slate-900 sm:px-7">
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white">
+                      <Package size={17} />
+                    </span>
+                    <div>
+                    <h3 className="text-sm font-black text-blue-950">바이어 요청 옵션</h3>
+                    <p className="mt-1 text-xs text-blue-700">
+                      요청 옵션과 수량이 아래 견적 품목에 자동 입력됩니다.
+                    </p>
+                    </div>
                   </div>
-              )}
-            </div>
+                  <span className="shrink-0 rounded-md bg-white px-2.5 py-1.5 text-xs font-bold text-blue-700 shadow-sm">
+                    총 {initData?.items.length ?? 0}개 조합
+                  </span>
+                </div>
+
+                <div className="mt-3 divide-y divide-blue-100 overflow-hidden rounded-lg border border-blue-200 bg-white shadow-sm">
+                  {initData?.items.map((item, index) => (
+                    <div
+                      key={`${item.optionSummary}-${index}`}
+                      className="grid gap-3 px-4 py-3.5 transition hover:bg-blue-50/60 sm:grid-cols-[40px_minmax(0,1fr)_120px_120px] sm:items-center"
+                    >
+                      <span className="flex size-7 items-center justify-center rounded-md bg-blue-100 text-xs font-black text-blue-700">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900">
+                          {item.optionSummary || "옵션 지정 없음"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold text-slate-500">본 주문</p>
+                        <p className="mt-0.5 text-sm font-black text-slate-950">
+                          {item.quantity.toLocaleString()}벌
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold text-slate-500">샘플</p>
+                        <p className="mt-0.5 text-sm font-black text-slate-950">
+                          {item.sampleQuantity
+                            ? `${item.sampleQuantity.toLocaleString()}벌`
+                            : "요청 없음"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {(!initData || initData.items.length === 0) && (
+                    <p className="px-4 py-5 text-center text-sm text-slate-400">
+                      등록된 요청 옵션이 없습니다.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
           </header>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <main className="space-y-5">
+          <div className="grid items-start gap-6 lg:grid-cols-12">
+            <main className="space-y-6 lg:col-span-8">
               {/* 상품 기본 정보 */}
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <SectionTitle icon={<Package size={16} />} title="상품 기본 정보" />
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
@@ -718,13 +793,13 @@ export function SellerQuoteWrite() {
               </section>
 
               {/* 견적 품목 */}
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <SectionTitle icon={<FileText size={16} />} title="견적 품목" compact />
                   <button
                       type="button"
                       onClick={addQuoteItem}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-secondary"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
                   >
                     <Plus size={14} />
                     품목 추가
@@ -739,8 +814,8 @@ export function SellerQuoteWrite() {
                     const optionSummary = buildOptionSummary(item.optionValues);
 
                     return (
-                        <div key={itemIndex} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                          <div className="mb-4 flex items-start justify-between gap-3">
+                        <div key={itemIndex} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                          <div className="mb-4 flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
                             <div>
                               <p className="text-sm font-bold text-slate-900">품목 {itemIndex + 1}</p>
                               <p className="mt-0.5 text-xs text-slate-500">
@@ -758,7 +833,7 @@ export function SellerQuoteWrite() {
                             )}
                           </div>
 
-                          <div className="mb-4 space-y-2">
+                          <div className="mb-4 space-y-2 px-4">
                             {item.optionValues.map((option, optionIndex) => (
                                 <div key={optionIndex} className="grid grid-cols-[1fr_1fr_auto] gap-2">
                                   <input
@@ -795,14 +870,14 @@ export function SellerQuoteWrite() {
                             <button
                                 type="button"
                                 onClick={() => addOptionValue(itemIndex)}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 transition hover:text-primary"
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 transition hover:text-blue-700"
                             >
                               <Plus size={13} />
                               옵션 추가
                             </button>
                           </div>
 
-                          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                          <div className="grid grid-cols-1 gap-3 px-4 pb-4 md:grid-cols-3">
                             <div>
                               <FieldLabel required>수량</FieldLabel>
                               <input
@@ -844,8 +919,8 @@ export function SellerQuoteWrite() {
                           </div>
 
                           {optionSummary && (
-                              <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
-                                옵션 요약{" "}
+                              <div className="mx-4 mb-4 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                                <span className="font-bold text-blue-700">옵션 요약</span>{" "}
                                 <span className="ml-2 font-semibold text-slate-800">{optionSummary}</span>
                               </div>
                           )}
@@ -855,9 +930,12 @@ export function SellerQuoteWrite() {
                 </div>
               </section>
 
-              {/* 견적 조건 */}
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <SectionTitle icon={<Calendar size={16} />} title="견적 조건" />
+              {/* 납품 및 견적 조건 */}
+              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <SectionTitle icon={<Truck size={16} />} title="납품 및 견적 조건" />
+                <p className="-mt-2 mb-5 text-xs text-slate-500">
+                  견적 유효기간과 출고·배송 조건을 한 곳에서 설정합니다.
+                </p>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <FieldLabel>견적 유효 기간</FieldLabel>
@@ -887,14 +965,61 @@ export function SellerQuoteWrite() {
                               }}
                               onKeyDown={preventInvalidNumberKey}
                               placeholder="45"
-                              className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                              className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                           />
                           <span className="text-sm text-slate-500">일</span>
                         </div>
                     )}
                   </div>
+                  <div>
+                    <FieldLabel required>예상 출고 소요일</FieldLabel>
+                    <input
+                        type="number"
+                        value={form.leadTimeDays}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (value === "" || Number(value) >= 1) {
+                            updateForm("leadTimeDays", value);
+                          }
+                        }}
+                        onKeyDown={preventInvalidNumberKey}
+                        min="1"
+                        className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>배송사</FieldLabel>
+                    <select
+                        value={form.deliveryCompany}
+                        onChange={(event) => updateForm("deliveryCompany", event.target.value)}
+                        className={inputClass}
+                    >
+                      <option value="">선택</option>
+                      {SHIPPING_COMPANIES.map((company) => (
+                          <option key={company} value={company}>
+                            {company}
+                          </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>배송비</FieldLabel>
+                    <input
+                        type="number"
+                        value={form.shippingFee}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (value === "" || Number(value) >= 0) {
+                            updateForm("shippingFee", value);
+                          }
+                        }}
+                        onKeyDown={preventInvalidNumberKey}
+                        min="0"
+                        className={inputClass}
+                    />
+                  </div>
                   {initData?.needSample === "Y" && (
-                      <div>
+                      <div className="md:col-span-2">
                         <FieldLabel>샘플 제공 여부</FieldLabel>
                         <select
                             value={form.sampleAvailable}
@@ -912,7 +1037,7 @@ export function SellerQuoteWrite() {
               </section>
 
               {/* 샘플 제공 조건 */}
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <SectionTitle icon={<Package size={16} />} title="샘플 제공 조건" compact />
                   {initData?.needSample === "N" ? (
@@ -923,7 +1048,7 @@ export function SellerQuoteWrite() {
                       <button
                           type="button"
                           onClick={addSampleItem}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-secondary"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
                       >
                         <Plus size={14} />
                         샘플 추가
@@ -945,7 +1070,7 @@ export function SellerQuoteWrite() {
                         const totalPrice = quantity * unitPrice;
 
                         return (
-                            <div key={sampleIndex} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div key={sampleIndex} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                               <div className="mb-3 flex items-center justify-between">
                                 <p className="text-sm font-bold text-slate-900">샘플 {sampleIndex + 1}</p>
                                 {sampleItems.length > 1 && (
@@ -1025,62 +1150,8 @@ export function SellerQuoteWrite() {
                 )}
               </section>
 
-              {/* 출고 및 배송 정보 */}
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <SectionTitle icon={<Truck size={16} />} title="출고 및 배송 정보" />
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div>
-                    <FieldLabel required>예상 출고 소요일</FieldLabel>
-                    <input
-                        type="number"
-                        value={form.leadTimeDays}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          if (value === "" || Number(value) >= 1) {
-                            updateForm("leadTimeDays", value);
-                          }
-                        }}
-                        onKeyDown={preventInvalidNumberKey}
-                        min="1"
-                        className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>배송사</FieldLabel>
-                    <select
-                        value={form.deliveryCompany}
-                        onChange={(event) => updateForm("deliveryCompany", event.target.value)}
-                        className={inputClass}
-                    >
-                      <option value="">선택</option>
-                      {SHIPPING_COMPANIES.map((company) => (
-                          <option key={company} value={company}>
-                            {company}
-                          </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <FieldLabel>배송비</FieldLabel>
-                    <input
-                        type="number"
-                        value={form.shippingFee}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          if (value === "" || Number(value) >= 0) {
-                            updateForm("shippingFee", value);
-                          }
-                        }}
-                        onKeyDown={preventInvalidNumberKey}
-                        min="0"
-                        className={inputClass}
-                    />
-                  </div>
-                </div>
-              </section>
-
               {/* 셀러 메모 */}
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <SectionTitle icon={<FileText size={16} />} title="셀러 메모" />
                 <textarea
                     value={form.sellerMemo}
@@ -1091,24 +1162,7 @@ export function SellerQuoteWrite() {
                 />
               </section>
 
-              {/* 에러 메시지 */}
-              {submitErrors.length > 0 && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                    <div className="flex gap-3 text-sm leading-5 text-red-700">
-                      <AlertCircle size={15} className="mt-0.5 shrink-0" />
-                      <div>
-                        <p className="font-bold">입력 내용을 확인해주세요.</p>
-                        <ul className="mt-2 space-y-1">
-                          {submitErrors.map((error) => (
-                              <li key={error}>- {error}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-              )}
-
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
                 <div className="flex gap-3 text-xs leading-5 text-amber-800">
                   <AlertCircle size={15} className="mt-0.5 shrink-0" />
                   <div>
@@ -1120,64 +1174,115 @@ export function SellerQuoteWrite() {
             </main>
 
             {/* 사이드바 */}
-            <aside className="lg:sticky lg:top-6 lg:self-start">
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-sm font-bold text-slate-950">견적 요약</h2>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                  SUBMITTED
-                </span>
+            <aside className="space-y-4 lg:sticky lg:top-6 lg:col-span-4">
+              <section className="overflow-hidden rounded-lg border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-black text-blue-700">
+                    QUOTATION SUMMARY
+                  </p>
                 </div>
 
-                <div className="space-y-3 border-b border-slate-100 pb-4 text-sm">
-                  <SummaryRow label="상품 금액" value={formatPrice(subtotalAmount)} />
-                  <SummaryRow label="배송비" value={formatPrice(shippingFee)} />
-                </div>
+                <p className="mt-6 text-sm text-slate-500">총 견적 금액</p>
+                <p className="mt-1 text-3xl font-black text-slate-950">
+                  {formatPrice(totalAmount)}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  일반 상품과 샘플, 배송비를 포함한 금액입니다.
+                </p>
 
-                <div className="flex items-end justify-between border-b border-slate-100 py-5">
+                <div className="mt-6 grid grid-cols-3 gap-3 border-t border-slate-100 pt-5">
                   <div>
-                    <p className="text-xs text-slate-500">최종 견적 금액</p>
-                    <p className="mt-1 text-xs text-slate-400">샘플 금액은 메모성 조건으로 별도 표시</p>
+                    <p className="text-[11px] text-slate-500">총 수량</p>
+                    <p className="mt-1 text-sm font-black text-slate-900">
+                      {totalQuantity.toLocaleString()}벌
+                    </p>
                   </div>
-                  <p className="text-2xl font-black text-primary">{formatPrice(totalAmount)}</p>
+                  <div>
+                    <p className="text-[11px] text-slate-500">출고</p>
+                    <p className="mt-1 text-sm font-black text-slate-900">
+                      {form.leadTimeDays || 0}일
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500">유효기간</p>
+                    <p className="mt-1 text-sm font-black text-slate-900">
+                      {validDaysForDisplay || 0}일
+                    </p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 py-4 text-center">
-                  <Metric label="수량" value={`${totalQuantity.toLocaleString()}벌`} />
-                  <Metric label="출고" value={`${form.leadTimeDays || 0}일`} />
-                  <Metric label="유효" value={`${validDaysForDisplay || 0}일`} />
-                </div>
+                <dl className="mt-5 space-y-3 border-t border-slate-100 pt-5 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">일반 상품 금액</dt>
+                    <dd className="font-bold text-slate-900">
+                      {formatPrice(regularSubtotalAmount)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">샘플 금액</dt>
+                    <dd className="font-bold text-slate-900">
+                      {formatPrice(sampleSubtotalAmount)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">배송비</dt>
+                    <dd className="font-bold text-slate-900">{formatPrice(shippingFee)}</dd>
+                  </div>
+                  <div className="flex items-end justify-between gap-3 border-t border-slate-200 pt-4">
+                    <dt className="font-black text-slate-900">합계</dt>
+                    <dd className="text-lg font-black text-blue-700">
+                      {formatPrice(totalAmount)}
+                    </dd>
+                  </div>
+                </dl>
 
-                <div className="mb-4 flex gap-2 rounded-lg border border-primary/15 bg-secondary/60 px-3 py-2.5 text-xs leading-5 text-slate-700">
-                  <Info size={14} className="mt-0.5 shrink-0 text-primary" />
-                  <span>플랫폼 이용 수수료는 결제 단계에서 별도 계산됩니다.</span>
-                </div>
+                {submitErrors.length > 0 && (
+                  <div
+                    role="alert"
+                    className="mt-5 rounded-lg border border-rose-200 bg-rose-50 p-4"
+                  >
+                    <div className="flex gap-3 text-sm leading-5 text-rose-700">
+                      <AlertCircle size={17} className="mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-black">제출할 수 없는 항목이 있습니다.</p>
+                        <ul className="mt-2 space-y-1.5 text-xs">
+                          {submitErrors.map((error) => (
+                            <li key={error} className="flex gap-1.5">
+                              <span aria-hidden="true">•</span>
+                              <span>{error}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Send size={16} />
                   {submitting ? "제출 중..." : "견적서 제출"}
                 </button>
+              </section>
 
-                <Link
-                    to="/seller/sourcing-requests"
-                    className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
-                >
-                  취소
-                </Link>
-
-                <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-500">
-                  <div className="mb-1 flex items-center gap-1.5 font-semibold text-slate-700">
-                    <Clock size={13} />
-                    저장될 주요 값
-                  </div>
-                  제출 전 품목 금액, 배송비, 샘플 조건을 한 번 더 확인하세요.
-                </div>
+              <div className="flex gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <Info size={17} className="mt-0.5 shrink-0 text-blue-700" />
+                <p className="text-xs leading-5 text-slate-700">
+                  제출 전 옵션별 단가와 배송비를 확인하세요. 플랫폼 이용
+                  수수료는 결제 단계에서 별도로 계산됩니다.
+                </p>
               </div>
+
+              <Link
+                to="/seller/sourcing-requests"
+                className="inline-flex h-11 w-full items-center justify-center rounded-md border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50"
+              >
+                작성 취소
+              </Link>
             </aside>
           </div>
         </div>

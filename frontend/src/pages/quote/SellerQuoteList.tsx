@@ -22,6 +22,14 @@ type QuoteStatus =
   | "NOT_SELECTED"
   | "EXPIRED";
 
+type ContractStatus =
+  | "DRAFT"
+  | "SELLER_SIGNED"
+  | "BUYER_SIGNED"
+  | "COMPLETED"
+  | "CANCELED"
+  | "EXPIRED";
+
 type SellerQuote = {
   quoteId: number;
   quoteNo: string;
@@ -32,6 +40,7 @@ type SellerQuote = {
   validUntil: string;
   status: QuoteStatus;
   submittedAt: string;
+  contractStatus: ContractStatus | null;
 };
 
 type QuoteFilter = "ALL" | "ACTIVE" | "APPROVED" | "CLOSED";
@@ -453,7 +462,7 @@ export function SellerQuoteList() {
                           {formatPrice(quote.totalAmount)}
                         </td>
                         <td className="px-4 py-5 text-right">
-                          {quote.status === "APPROVED" ? (
+                          {quote.status === "APPROVED" && !quote.contractStatus ? (
                             <Link
                               to={`/seller/contracts/new/${quote.quoteId}`}
                               onClick={(event) => event.stopPropagation()}
@@ -462,6 +471,35 @@ export function SellerQuoteList() {
                               <FileSignature size={14} />
                               계약서 작성
                             </Link>
+                          ) : quote.status === "APPROVED" &&
+                            quote.contractStatus === "DRAFT" ? (
+                            <Link
+                              to={`/seller/contracts/new/${quote.quoteId}`}
+                              onClick={(event) => event.stopPropagation()}
+                              className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                            >
+                              <FileSignature size={14} />
+                              계약서 작성 계속
+                            </Link>
+                          ) : quote.status === "APPROVED" &&
+                            quote.contractStatus === "SELLER_SIGNED" ? (
+                            <span className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700">
+                              <Send size={14} />
+                              계약서 발송 완료
+                            </span>
+                          ) : quote.status === "APPROVED" &&
+                            (quote.contractStatus === "BUYER_SIGNED" ||
+                              quote.contractStatus === "COMPLETED") ? (
+                            <span className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700">
+                              <CheckCircle2 size={14} />
+                              계약 체결 완료
+                            </span>
+                          ) : quote.status === "APPROVED" &&
+                            (quote.contractStatus === "CANCELED" ||
+                              quote.contractStatus === "EXPIRED") ? (
+                            <span className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-md border border-slate-200 bg-slate-100 px-3 text-xs font-bold text-slate-600">
+                              계약 종료
+                            </span>
                           ) : quote.status === "NEGOTIATING" ? (
                             <button
                               type="button"

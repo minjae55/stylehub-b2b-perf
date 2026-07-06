@@ -9,6 +9,7 @@ import kr.remerge.stylehub.domain.quote.entity.Quote;
 import kr.remerge.stylehub.domain.quote.entity.QuoteItem;
 import kr.remerge.stylehub.domain.quote.repository.QuoteItemRepository;
 import kr.remerge.stylehub.domain.quote.repository.QuoteRepository;
+import kr.remerge.stylehub.domain.quote.pdf.QuotePdfGenerator;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequest;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingSupplier;
 import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingStatus;
@@ -40,6 +41,7 @@ public class QuoteService {
     private final UserReader userReader;
     private final SourcingRequestRepository sourcingRequestRepository;
     private final SourcingSupplierRepository sourcingSupplierRepository;
+    private final QuotePdfGenerator quotePdfGenerator;
 
     @Transactional
     public QuoteCreateResponse createQuote(
@@ -132,6 +134,12 @@ public class QuoteService {
                 = quoteItemRepository.findByQuote_QuoteId(quoteId);
 
         return QuoteDetailResponse.from(quote, items);
+    }
+
+    @Transactional
+    public byte[] generateQuotePdf(Integer userId, Integer quoteId) {
+        QuoteDetailResponse quote = getQuoteDetail(userId, quoteId);
+        return quotePdfGenerator.generate(quote);
     }
 
     private void validateQuoteAccess(User user, Quote quote) {

@@ -13,6 +13,9 @@ import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,6 +37,31 @@ public class QuoteController {
                 .getSellerSourcingDetail(sourcingRequestId, authUser.companyId());
 
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping(
+            value = "/{quoteId}/pdf",
+            produces = MediaType.APPLICATION_PDF_VALUE
+    )
+    public ResponseEntity<byte[]> getQuotePdf(
+            @LoginUser AuthUser authUser,
+            @PathVariable Integer quoteId
+    ) {
+        byte[] pdfBytes = quoteService.generateQuotePdf(
+                authUser.userId(),
+                quoteId
+        );
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline()
+                                .filename("quote-" + quoteId + ".pdf")
+                                .build()
+                                .toString()
+                )
+                .body(pdfBytes);
     }
 
     @PostMapping
