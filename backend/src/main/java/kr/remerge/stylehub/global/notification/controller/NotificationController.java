@@ -3,6 +3,7 @@ package kr.remerge.stylehub.global.notification.controller;
 import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.notification.SseEmitterManager;
+import kr.remerge.stylehub.global.notification.dto.NotificationPageResult;
 import kr.remerge.stylehub.global.notification.entity.Notification;
 import kr.remerge.stylehub.global.notification.service.NotificationService;
 import kr.remerge.stylehub.global.response.ApiResponse;
@@ -33,17 +34,20 @@ public class NotificationController {
         );
     }
 
-    // 알림 목록 조회
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Notification>>> getNotifications(
-            @LoginUser AuthUser authUser
+    public ResponseEntity<ApiResponse<NotificationPageResult>> getNotifications(
+            @LoginUser AuthUser authUser,
+            @RequestParam(required = false) Integer cursor,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        List<Notification> notifications = notificationService.getNotifications(
+        NotificationPageResult result = notificationService.getNotifications(
                 authUser.userId(),
                 authUser.companyId(),
-                authUser.role()
+                authUser.role(),
+                cursor,
+                size
         );
-        return ResponseEntity.ok(ApiResponse.success(notifications));
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 
     // 읽지 않은 알림 수

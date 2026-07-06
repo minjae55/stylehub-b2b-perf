@@ -32,6 +32,9 @@ public class SourcingRequestSellerDetailResponse {
     @JsonProperty("category_id")
     private Integer categoryId;
 
+    @JsonProperty("category_name")
+    private String categoryName;
+
     @JsonProperty("need_sample")
     private String needSample;
 
@@ -106,7 +109,8 @@ public class SourcingRequestSellerDetailResponse {
             SourcingRequest request,
             List<SourcingRequestItem> items,
             List<SourcingRequestFile> files,
-            SourcingSupplier mySupplier
+            SourcingSupplier mySupplier,
+            String categoryName
     ) {
         return SourcingRequestSellerDetailResponse.builder()
                 .sourcingRequestId(request.getSourcingRequestId())
@@ -116,6 +120,7 @@ public class SourcingRequestSellerDetailResponse {
                 .productName(request.getProductName())
                 .brandName(request.getBrandName())
                 .categoryId(request.getCategoryId())
+                .categoryName(categoryName)
                 .needSample(request.getNeedSample())
                 .mainMaterial(request.getMainMaterial())
                 .unitPrice(request.getUnitPrice())

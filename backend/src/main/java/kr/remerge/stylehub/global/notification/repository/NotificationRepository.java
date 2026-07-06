@@ -1,15 +1,33 @@
 package kr.remerge.stylehub.global.notification.repository;
 
 import kr.remerge.stylehub.global.notification.entity.Notification;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
 
 import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Integer> {
 
-    // 특정 유저의 알림 목록 (유저 직접 + 회사 + role 통합 조회)
+    @Query("""
+            SELECT n FROM Notification n
+            WHERE (n.targetUserId = :userId
+               OR n.targetCompanyId = :companyId
+               OR n.targetRole = :role)
+              AND (:cursor IS NULL OR n.notificationId < :cursor)
+            ORDER BY n.notificationId DESC
+            """)
+    List<Notification> findByTargetWithCursor(
+            @Param("userId") Integer userId,
+            @Param("companyId") Integer companyId,
+            @Param("role") String role,
+            @Param("cursor") Integer cursor,
+            Pageable pageable
+    );
+
+    // 기존 findByTarget, countUnread는 그대로 유지 (markAllAsRead 등에서 계속 사용)
     @Query("""
             SELECT n FROM Notification n
             WHERE n.targetUserId = :userId
@@ -23,7 +41,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
             @Param("role") String role
     );
 
-    // 읽지 않은 알림 수
     @Query("""
             SELECT COUNT(n) FROM Notification n
             WHERE (n.targetUserId = :userId

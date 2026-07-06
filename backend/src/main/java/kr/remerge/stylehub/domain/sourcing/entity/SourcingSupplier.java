@@ -73,6 +73,14 @@ public class SourcingSupplier extends BaseEntity {
         this.approvedAt = LocalDateTime.now();
     }
 
+    // 관리자가 SUGGESTED 단계에서 반려 (셀러에게 노출되지 않고 차단됨)
+    public void reject(User admin, String reason) {
+        this.assignedBy = admin;
+        this.status = SourcingSupplierStatus.REJECTED;
+        this.managerNote = reason;
+        this.respondedAt = LocalDateTime.now();
+    }
+
     public void decline(String feedback) {
         this.sellerFeedback = feedback;
         this.status = SourcingSupplierStatus.DECLINED;

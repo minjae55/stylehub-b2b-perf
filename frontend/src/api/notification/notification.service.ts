@@ -14,12 +14,25 @@ export interface NotificationResponse {
     createdAt: string;
 }
 
+// 백엔드 NotificationPageResult 기준 (커서 기반 페이지네이션)
+export interface NotificationPageResponse {
+    items: NotificationResponse[];
+    nextCursor: number | null;
+    hasNext: boolean;
+}
+
 // ───────────────────────────────────────────
 // 알림
 // ───────────────────────────────────────────
 
-export const getNotifications = async (): Promise<NotificationResponse[]> => {
-    return await api.get<NotificationResponse[]>("/notifications");
+// cursor 없이 호출하면 최신 알림부터 size개, 이후 페이지는 이전 응답의 nextCursor를 넘겨서 호출
+export const getNotifications = async (
+    cursor?: number,
+    size: number = 20
+): Promise<NotificationPageResponse> => {
+    return await api.get<NotificationPageResponse>("/notifications", {
+        params: { cursor, size },
+    });
 };
 
 export const getUnreadCount = async (): Promise<number> => {

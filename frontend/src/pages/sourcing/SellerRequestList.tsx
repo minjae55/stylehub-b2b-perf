@@ -578,7 +578,7 @@ export function SellerRequestList() {
               배정된 소싱 요청 <span className="text-accent">{requests.length}</span>건
             </h1>
             <p className="text-white/70 mb-6">
-              {activeTab === "READY" ? "바이어가 올린 사입 요청서에 단가를 제시하고 거래를 성사시키세요." : "바이어의 주문제작 요청서를 확인하고 제작 견적을 제출하세요."}
+              {activeTab === "READY" ? "바이어가 올린 소싱 요청서에 단가를 제시하고 거래를 성사시키세요." : "바이어의 주문제작 요청서를 확인하고 제작 견적을 제출하세요."}
             </p>
             {urgentCount > 0 && (
                 <div className="inline-flex items-center gap-2 bg-red-500/20 border border-red-400/40 text-red-300 px-4 py-2 rounded-full text-sm font-medium">
@@ -594,7 +594,7 @@ export function SellerRequestList() {
                 <button key={tab} onClick={() => handleTabChange(tab)}
                         className={`px-5 py-2 rounded text-sm font-semibold transition-colors ${activeTab === tab ? "bg-white text-foreground shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"}`}
                 >
-                  {tab === "READY" ? "🏷️ 기성품 사입" : "✂️ 주문제작"}
+                  {tab === "READY" ? "🏷️ 기성품" : "✂️ 주문제작"}
                 </button>
             ))}
           </div>

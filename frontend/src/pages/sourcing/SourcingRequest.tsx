@@ -24,26 +24,22 @@ type SourcingType = "READY" | "CUSTOM";
 const CUSTOM_DETAIL_PLACEHOLDER = `파일 외에 강조하고 싶은 사항을 자유롭게 적어주세요.
 (예: 3페이지 컬러 샘플은 블랙을 우선 진행 부탁드립니다)`;
 
-interface ReadyOptionPair {
+// ── 옵션 (READY/CUSTOM 공통 구조: 옵션명/옵션값 페어 + 수량) ──────────────
+interface OptionPair {
     optionName: string;
     optionValue: string;
 }
 
-interface ReadyOptionRow {
+interface OptionRow {
     id: string;
-    pairs: ReadyOptionPair[];
+    pairs: OptionPair[];
     quantity: string;
     sampleQuantity: string;
 }
 
-interface CustomOptionRow {
-    id: string;
-    optionName: string;
-    quantity: string;
-    sampleQuantity: string;
-}
+type OptionField = "readyOptions" | "customOptions";
 
-const makeReadyOption = (): ReadyOptionRow => ({
+const makeReadyOption = (): OptionRow => ({
     id: crypto.randomUUID(),
     pairs: [
         { optionName: "색상", optionValue: "" },
@@ -53,9 +49,9 @@ const makeReadyOption = (): ReadyOptionRow => ({
     sampleQuantity: "",
 });
 
-const makeCustomOption = (): CustomOptionRow => ({
+const makeCustomOption = (): OptionRow => ({
     id: crypto.randomUUID(),
-    optionName: "",
+    pairs: [{ optionName: "", optionValue: "" }],
     quantity: "",
     sampleQuantity: "",
 });
@@ -72,10 +68,10 @@ interface SourcingItem {
     categoryId: number | null;
     unitPrice: string;
     refUrl: string;
-    readyOptions: ReadyOptionRow[];
+    readyOptions: OptionRow[];
     refImageFile: File | null;
     totalBudget: string;
-    customOptions: CustomOptionRow[];
+    customOptions: OptionRow[];
     detail: string;
     workFiles: File[];
 }
@@ -100,19 +96,13 @@ const makeItem = (): SourcingItem => ({
     workFiles: [],
 });
 
-const sumReadyQty = (rows: ReadyOptionRow[]) =>
+const sumQty = (rows: OptionRow[]) =>
     rows.reduce((acc, r) => acc + (parseInt(r.quantity) || 0), 0);
 
-const sumReadySampleQty = (rows: ReadyOptionRow[]) =>
+const sumSampleQty = (rows: OptionRow[]) =>
     rows.reduce((acc, r) => acc + (parseInt(r.sampleQuantity) || 0), 0);
 
-const sumCustomQty = (rows: CustomOptionRow[]) =>
-    rows.reduce((acc, r) => acc + (parseInt(r.quantity) || 0), 0);
-
-const sumCustomSampleQty = (rows: CustomOptionRow[]) =>
-    rows.reduce((acc, r) => acc + (parseInt(r.sampleQuantity) || 0), 0);
-
-function buildOptionSummary(pairs: ReadyOptionPair[]) {
+function buildOptionSummary(pairs: OptionPair[]) {
     return pairs
         .filter((p) => p.optionName.trim() || p.optionValue.trim())
         .map((p) => `${p.optionName.trim()}: ${p.optionValue.trim()}`)
@@ -145,9 +135,9 @@ async function postSourcingRequest(item: SourcingItem): Promise<number> {
                         sampleQuantity: r.sampleQuantity ? Number(r.sampleQuantity) : null,
                     }))
                     : item.customOptions
-                        .filter((r) => r.optionName.trim() || r.quantity)
+                        .filter((r) => buildOptionSummary(r.pairs) || r.quantity)
                         .map((r) => ({
-                            optionSummary: r.optionName,
+                            optionSummary: buildOptionSummary(r.pairs),
                             quantity: Number(r.quantity) || 0,
                             sampleQuantity: r.sampleQuantity ? Number(r.sampleQuantity) : null,
                         })),
@@ -310,47 +300,188 @@ export function SourcingRequest() {
         updateItem(item.id, "workFiles", (item.workFiles ?? []).filter((_, i) => i !== idx));
     };
 
-    const addReadyOption = () =>
-        updateItem(item.id, "readyOptions", [...item.readyOptions, makeReadyOption()]);
+    // ── 옵션 행 조작 (READY/CUSTOM 공통, fieldKey로 대상 구분) ──────────────
+    const addOptionRow = (fieldKey: OptionField) =>
+        updateItem(item.id, fieldKey, [
+            ...item[fieldKey],
+            fieldKey === "readyOptions" ? makeReadyOption() : makeCustomOption(),
+        ]);
 
-    const removeReadyOption = (rid: string) =>
-        updateItem(item.id, "readyOptions", item.readyOptions.filter((r) => r.id !== rid));
+    const removeOptionRow = (fieldKey: OptionField, rid: string) =>
+        updateItem(item.id, fieldKey, item[fieldKey].filter((r) => r.id !== rid));
 
-    const updateReadyOptionField = (rid: string, f: "quantity" | "sampleQuantity", val: string) =>
-        updateItem(item.id, "readyOptions",
-            item.readyOptions.map((r) => r.id === rid ? { ...r, [f]: val } : r));
+    const updateOptionRowField = (fieldKey: OptionField, rid: string, f: "quantity" | "sampleQuantity", val: string) =>
+        updateItem(item.id, fieldKey,
+            item[fieldKey].map((r) => r.id === rid ? { ...r, [f]: val } : r));
 
-    const addOptionPair = (rid: string) =>
-        updateItem(item.id, "readyOptions",
-            item.readyOptions.map((r) =>
+    const addOptionPair = (fieldKey: OptionField, rid: string) =>
+        updateItem(item.id, fieldKey,
+            item[fieldKey].map((r) =>
                 r.id === rid ? { ...r, pairs: [...r.pairs, { optionName: "", optionValue: "" }] } : r));
 
-    const removeOptionPair = (rid: string, pairIndex: number) =>
-        updateItem(item.id, "readyOptions",
-            item.readyOptions.map((r) =>
+    const removeOptionPair = (fieldKey: OptionField, rid: string, pairIndex: number) =>
+        updateItem(item.id, fieldKey,
+            item[fieldKey].map((r) =>
                 r.id === rid ? { ...r, pairs: r.pairs.filter((_, i) => i !== pairIndex) } : r));
 
-    const updateOptionPair = (rid: string, pairIndex: number, key: keyof ReadyOptionPair, val: string) =>
-        updateItem(item.id, "readyOptions",
-            item.readyOptions.map((r) =>
+    const updateOptionPair = (fieldKey: OptionField, rid: string, pairIndex: number, key: keyof OptionPair, val: string) =>
+        updateItem(item.id, fieldKey,
+            item[fieldKey].map((r) =>
                 r.id === rid
                     ? { ...r, pairs: r.pairs.map((p, i) => i === pairIndex ? { ...p, [key]: val } : p) }
                     : r));
 
-    const addCustomOption = () =>
-        updateItem(item.id, "customOptions", [...item.customOptions, makeCustomOption()]);
+    const totalReadyQty = sumQty(item.readyOptions);
+    const totalReadySampleQty = sumSampleQty(item.readyOptions);
+    const totalCustomQty = sumQty(item.customOptions);
+    const totalCustomSampleQty = sumSampleQty(item.customOptions);
 
-    const removeCustomOption = (cid: string) =>
-        updateItem(item.id, "customOptions", item.customOptions.filter((r) => r.id !== cid));
+    // 옵션별 수량 카드 UI (READY/CUSTOM 공통)
+    const renderOptionRows = (
+        fieldKey: OptionField,
+        opts: {
+            required: boolean;
+            rowLabel: string;
+            addRowLabel: string;
+            pairPlaceholders: [string, string];
+            helperText?: string;
+        }
+    ) => {
+        const rows = item[fieldKey];
+        const totalQty = fieldKey === "readyOptions" ? totalReadyQty : totalCustomQty;
+        const totalSampleQty = fieldKey === "readyOptions" ? totalReadySampleQty : totalCustomSampleQty;
 
-    const updateCustomOption = (cid: string, key: keyof CustomOptionRow, val: string) =>
-        updateItem(item.id, "customOptions",
-            item.customOptions.map((r) => r.id === cid ? { ...r, [key]: val } : r));
+        return (
+            <div>
+                <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-foreground">
+                        옵션별 수량 {opts.required && <span className="text-primary">*</span>}
+                        {!opts.required && <span className="text-muted-foreground font-normal text-xs ml-1">(선택)</span>}
+                    </label>
+                    {totalQty > 0 && (
+                        <span className="text-xs text-muted-foreground flex gap-3">
+                            <span>총 <strong className="text-foreground">{totalQty.toLocaleString()}</strong>개</span>
+                            {item.needSample === "Y" && totalSampleQty > 0 && (
+                                <span className="text-primary">샘플 <strong>{totalSampleQty.toLocaleString()}</strong>개</span>
+                            )}
+                        </span>
+                    )}
+                </div>
+                {opts.helperText && (
+                    <p className="text-xs text-muted-foreground mb-2">{opts.helperText}</p>
+                )}
 
-    const totalReadyQty = sumReadyQty(item.readyOptions);
-    const totalReadySampleQty = sumReadySampleQty(item.readyOptions);
-    const totalCustomQty = sumCustomQty(item.customOptions);
-    const totalCustomSampleQty = sumCustomSampleQty(item.customOptions);
+                <div className="space-y-4">
+                    {rows.map((row, rowIndex) => {
+                        const summary = buildOptionSummary(row.pairs);
+                        return (
+                            <div key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="flex items-start justify-between gap-3 mb-4">
+                                    <div>
+                                        <p className="text-sm font-bold text-foreground">{opts.rowLabel} {rowIndex + 1}</p>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">옵션명과 옵션값을 입력하고 수량을 설정하세요.</p>
+                                    </div>
+                                    {rows.length > 1 && (
+                                        <button
+                                            onClick={() => removeOptionRow(fieldKey, row.id)}
+                                            className="rounded-lg p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2 mb-4">
+                                    {row.pairs.map((pair, pairIndex) => (
+                                        <div key={pairIndex} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                                            <input
+                                                type="text"
+                                                value={pair.optionName}
+                                                onChange={(e) => updateOptionPair(fieldKey, row.id, pairIndex, "optionName", e.target.value)}
+                                                placeholder={opts.pairPlaceholders[0]}
+                                                className={inputCls}
+                                            />
+                                            <input
+                                                type="text"
+                                                value={pair.optionValue}
+                                                onChange={(e) => updateOptionPair(fieldKey, row.id, pairIndex, "optionValue", e.target.value)}
+                                                placeholder={opts.pairPlaceholders[1]}
+                                                className={inputCls}
+                                            />
+                                            {row.pairs.length > 1 ? (
+                                                <button
+                                                    onClick={() => removeOptionPair(fieldKey, row.id, pairIndex)}
+                                                    className="rounded-lg border border-border bg-white px-2 text-muted-foreground hover:border-red-200 hover:text-red-500 transition-colors"
+                                                >
+                                                    <X size={15} />
+                                                </button>
+                                            ) : (
+                                                <div className="w-9" />
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button
+                                        onClick={() => addOptionPair(fieldKey, row.id)}
+                                        className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
+                                    >
+                                        <Plus size={13} /> 옵션 추가
+                                    </button>
+                                </div>
+
+                                <div className={`grid gap-3 ${item.needSample === "Y" ? "grid-cols-2" : "grid-cols-1"}`}>
+                                    <div>
+                                        <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                                            수량 {opts.required && <span className="text-primary">*</span>}
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                value={row.quantity}
+                                                onChange={(e) => updateOptionRowField(fieldKey, row.id, "quantity", e.target.value)}
+                                                placeholder="0"
+                                                type="number"
+                                                min="0"
+                                                className={`${inputCls} pr-6`}
+                                            />
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">개</span>
+                                        </div>
+                                    </div>
+                                    {item.needSample === "Y" && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-muted-foreground mb-1.5">샘플 수량</label>
+                                            <div className="relative">
+                                                <input
+                                                    value={row.sampleQuantity}
+                                                    onChange={(e) => updateOptionRowField(fieldKey, row.id, "sampleQuantity", e.target.value)}
+                                                    placeholder="0"
+                                                    type="number"
+                                                    min="0"
+                                                    className={`${inputCls} pr-6`}
+                                                />
+                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">개</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {summary && (
+                                    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-muted-foreground">
+                                        옵션 요약 <span className="ml-2 font-semibold text-foreground">{summary}</span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <button
+                    onClick={() => addOptionRow(fieldKey)}
+                    className="mt-3 w-full border border-dashed border-border hover:border-primary text-muted-foreground hover:text-primary rounded-lg py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                >
+                    <Plus size={13} /> {opts.addRowLabel}
+                </button>
+            </div>
+        );
+    };
 
     return (
         <div className="max-w-[760px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
@@ -507,130 +638,12 @@ export function SourcingRequest() {
                                 )}
                             </div>
 
-                            <div>
-                                <div className="flex items-center justify-between mb-3">
-                                    <label className="text-sm font-medium text-foreground">
-                                        옵션별 수량 <span className="text-primary">*</span>
-                                    </label>
-                                    {totalReadyQty > 0 && (
-                                        <span className="text-xs text-muted-foreground flex gap-3">
-                                            <span>총 <strong className="text-foreground">{totalReadyQty.toLocaleString()}</strong>개</span>
-                                            {item.needSample === "Y" && totalReadySampleQty > 0 && (
-                                                <span className="text-primary">샘플 <strong>{totalReadySampleQty.toLocaleString()}</strong>개</span>
-                                            )}
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="space-y-4">
-                                    {item.readyOptions.map((row, rowIndex) => {
-                                        const summary = buildOptionSummary(row.pairs);
-                                        return (
-                                            <div key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                                <div className="flex items-start justify-between gap-3 mb-4">
-                                                    <div>
-                                                        <p className="text-sm font-bold text-foreground">품목 {rowIndex + 1}</p>
-                                                        <p className="mt-0.5 text-xs text-muted-foreground">옵션명과 옵션값을 입력하고 수량을 설정하세요.</p>
-                                                    </div>
-                                                    {item.readyOptions.length > 1 && (
-                                                        <button
-                                                            onClick={() => removeReadyOption(row.id)}
-                                                            className="rounded-lg p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors"
-                                                        >
-                                                            <X size={16} />
-                                                        </button>
-                                                    )}
-                                                </div>
-
-                                                <div className="space-y-2 mb-4">
-                                                    {row.pairs.map((pair, pairIndex) => (
-                                                        <div key={pairIndex} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                                                            <input
-                                                                type="text"
-                                                                value={pair.optionName}
-                                                                onChange={(e) => updateOptionPair(row.id, pairIndex, "optionName", e.target.value)}
-                                                                placeholder="옵션명 예: 색상"
-                                                                className={inputCls}
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={pair.optionValue}
-                                                                onChange={(e) => updateOptionPair(row.id, pairIndex, "optionValue", e.target.value)}
-                                                                placeholder="옵션값 예: 블랙"
-                                                                className={inputCls}
-                                                            />
-                                                            {row.pairs.length > 1 ? (
-                                                                <button
-                                                                    onClick={() => removeOptionPair(row.id, pairIndex)}
-                                                                    className="rounded-lg border border-border bg-white px-2 text-muted-foreground hover:border-red-200 hover:text-red-500 transition-colors"
-                                                                >
-                                                                    <X size={15} />
-                                                                </button>
-                                                            ) : (
-                                                                <div className="w-9" />
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    <button
-                                                        onClick={() => addOptionPair(row.id)}
-                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
-                                                    >
-                                                        <Plus size={13} /> 옵션 추가
-                                                    </button>
-                                                </div>
-
-                                                <div className={`grid gap-3 ${item.needSample === "Y" ? "grid-cols-2" : "grid-cols-1"}`}>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                                                            수량 <span className="text-primary">*</span>
-                                                        </label>
-                                                        <div className="relative">
-                                                            <input
-                                                                value={row.quantity}
-                                                                onChange={(e) => updateReadyOptionField(row.id, "quantity", e.target.value)}
-                                                                placeholder="0"
-                                                                type="number"
-                                                                min="0"
-                                                                className={`${inputCls} pr-6`}
-                                                            />
-                                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">개</span>
-                                                        </div>
-                                                    </div>
-                                                    {item.needSample === "Y" && (
-                                                        <div>
-                                                            <label className="block text-xs font-medium text-muted-foreground mb-1.5">샘플 수량</label>
-                                                            <div className="relative">
-                                                                <input
-                                                                    value={row.sampleQuantity}
-                                                                    onChange={(e) => updateReadyOptionField(row.id, "sampleQuantity", e.target.value)}
-                                                                    placeholder="0"
-                                                                    type="number"
-                                                                    min="0"
-                                                                    className={`${inputCls} pr-6`}
-                                                                />
-                                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">개</span>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {summary && (
-                                                    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-muted-foreground">
-                                                        옵션 요약 <span className="ml-2 font-semibold text-foreground">{summary}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                <button
-                                    onClick={addReadyOption}
-                                    className="mt-3 w-full border border-dashed border-border hover:border-primary text-muted-foreground hover:text-primary rounded-lg py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
-                                >
-                                    <Plus size={13} /> 품목 추가
-                                </button>
-                            </div>
+                            {renderOptionRows("readyOptions", {
+                                required: true,
+                                rowLabel: "품목",
+                                addRowLabel: "품목 추가",
+                                pairPlaceholders: ["옵션명 예: 색상", "옵션값 예: 블랙"],
+                            })}
 
                             <div>
                                 <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -725,81 +738,13 @@ export function SourcingRequest() {
                                 )}
                             </div>
 
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-sm font-medium text-foreground">
-                                        옵션별 수량
-                                        <span className="text-muted-foreground font-normal text-xs ml-1">(선택)</span>
-                                    </label>
-                                    {totalCustomQty > 0 && (
-                                        <span className="text-xs text-muted-foreground flex gap-3">
-                                            <span>총 <strong className="text-foreground">{totalCustomQty.toLocaleString()}</strong>개</span>
-                                            {item.needSample === "Y" && totalCustomSampleQty > 0 && (
-                                                <span className="text-primary">샘플 <strong>{totalCustomSampleQty.toLocaleString()}</strong>개</span>
-                                            )}
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-muted-foreground mb-2">작업지시서에 포함된 경우 생략 가능합니다.</p>
-
-                                <div className={`grid gap-2 mb-1.5 px-1 ${item.needSample === "Y" ? "grid-cols-[1fr_100px_100px_32px]" : "grid-cols-[1fr_120px_32px]"}`}>
-                                    <span className="text-xs text-muted-foreground">옵션명 <span className="font-normal">(예: 소재 A, 패턴1)</span></span>
-                                    <span className="text-xs text-muted-foreground">수량</span>
-                                    {item.needSample === "Y" && <span className="text-xs text-muted-foreground">샘플 수량</span>}
-                                    <span />
-                                </div>
-
-                                <div className="space-y-2">
-                                    {item.customOptions.map((row) => (
-                                        <div key={row.id} className={`grid gap-2 items-center ${item.needSample === "Y" ? "grid-cols-[1fr_100px_100px_32px]" : "grid-cols-[1fr_120px_32px]"}`}>
-                                            <input
-                                                value={row.optionName}
-                                                onChange={(e) => updateCustomOption(row.id, "optionName", e.target.value)}
-                                                placeholder="예: 소재 A"
-                                                className={inputCls}
-                                            />
-                                            <div className="relative">
-                                                <input
-                                                    value={row.quantity}
-                                                    onChange={(e) => updateCustomOption(row.id, "quantity", e.target.value)}
-                                                    placeholder="0"
-                                                    type="number"
-                                                    min="0"
-                                                    className={`${inputCls} pr-6`}
-                                                />
-                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">개</span>
-                                            </div>
-                                            {item.needSample === "Y" && (
-                                                <div className="relative">
-                                                    <input
-                                                        value={row.sampleQuantity}
-                                                        onChange={(e) => updateCustomOption(row.id, "sampleQuantity", e.target.value)}
-                                                        placeholder="0"
-                                                        type="number"
-                                                        min="0"
-                                                        className={`${inputCls} pr-6`}
-                                                    />
-                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">개</span>
-                                                </div>
-                                            )}
-                                            <button
-                                                onClick={() => removeCustomOption(row.id)}
-                                                disabled={item.customOptions.length === 1}
-                                                className="flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <button
-                                    onClick={addCustomOption}
-                                    className="mt-2 w-full border border-dashed border-border hover:border-primary text-muted-foreground hover:text-primary rounded py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
-                                >
-                                    <Plus size={13} /> 옵션 추가
-                                </button>
-                            </div>
+                            {renderOptionRows("customOptions", {
+                                required: false,
+                                rowLabel: "아이템",
+                                addRowLabel: "아이템 추가",
+                                pairPlaceholders: ["옵션명 예: 소재", "옵션값 예: A"],
+                                helperText: "작업지시서에 포함된 경우 생략 가능합니다.",
+                            })}
 
                             <div>
                                 <label className="block text-sm font-medium text-foreground mb-1.5">

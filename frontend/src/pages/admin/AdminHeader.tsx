@@ -5,9 +5,12 @@ import { Link, useLocation, useNavigate } from "react-router"
 import {
   getNotifications,
   getUnreadCount,
+  markAsRead as apiMarkAsRead,
   markAllAsRead as apiMarkAllAsRead,
   type NotificationResponse,
 } from "@/api/notification/notification.service";
+import { useAuthStore } from "@/store/useAuthStore";
+import { logout as apiLogout } from "@/api/auth/auth.service";
 
 export interface NavItem {
   label: string;
@@ -93,9 +96,16 @@ export default function AdminHeader({
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const navigate = useNavigate();
 
-  // 마운트 시 안읽음 개수 + 목록 조회
+  // 무한 스크롤용 커서 페이지네이션 상태
+  const [notifCursor, setNotifCursor] = useState<number | null>(null);
+  const [notifHasNext, setNotifHasNext] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const navigate = useNavigate();
+  const clearUser = useAuthStore((state) => state.clearUser);
+
+  // 마운트 시 안읽음 개수 + 첫 페이지 목록 조회
   // (실시간 push는 AdminLayout의 useNotification 훅이 toast로 별도 처리하므로,
   //  여기선 자체 EventSource 없이 REST로만 최신 상태를 가져옴)
   useEffect(() => {
@@ -104,7 +114,11 @@ export default function AdminHeader({
         .catch((e) => console.error("안읽음 개수 조회 실패:", e));
 
     getNotifications()
-        .then((list) => setNotifications(list.map(toDisplayNotification)))
+        .then((page) => {
+          setNotifications(page.items.map(toDisplayNotification));
+          setNotifCursor(page.nextCursor);
+          setNotifHasNext(page.hasNext);
+        })
         .catch((e) => console.error("알림 목록 조회 실패:", e));
   }, []);
 
@@ -144,29 +158,69 @@ export default function AdminHeader({
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/admin/logout', { method: 'POST' });
+      await apiLogout();
     } catch (error) {
-      console.error('로그아웃 실패:', error);
+      console.error('로그아웃 API 요청 실패:', error);
     } finally {
+      clearUser();
       navigate('/auth/login', { replace: true });
       onUserMenuClick?.();
     }
   };
 
-  // 알림 벨 클릭 → 열기 + 전체 읽음 처리(서버 반영)
-  const handleBellClick = async () => {
-    const opening = !notifOpen;
-    setNotifOpen(opening);
+  // 알림 벨 클릭 → 드롭다운 열기/닫기만 수행 (읽음 처리는 별도 버튼)
+  const handleBellClick = () => {
+    setNotifOpen((prev) => !prev);
     onNotificationClick?.();
+  };
 
-    if (opening && notifCount > 0) {
-      setNotifCount(0);
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-      try {
-        await apiMarkAllAsRead();
-      } catch (e) {
-        console.error("알림 읽음 처리 실패:", e);
-      }
+  // 전체 읽음 버튼 클릭 → 화면 즉시 반영 + 서버 반영
+  const handleMarkAllRead = async () => {
+    if (notifCount === 0) return;
+    setNotifCount(0);
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await apiMarkAllAsRead();
+    } catch (e) {
+      console.error("알림 읽음 처리 실패:", e);
+    }
+  };
+
+  // 개별 알림 클릭 → 그 알림만 읽음 처리
+  const handleNotificationItemClick = async (n: Notification) => {
+    if (n.read) return;
+    setNotifications((prev) =>
+        prev.map((item) => item.id === n.id ? { ...item, read: true } : item)
+    );
+    setNotifCount((prev) => Math.max(0, prev - 1));
+    try {
+      await apiMarkAsRead(Number(n.id));
+    } catch (e) {
+      console.error("알림 읽음 처리 실패:", e);
+    }
+  };
+
+  // 다음 페이지 알림 로드 (무한 스크롤)
+  const loadMoreNotifications = async () => {
+    if (!notifHasNext || isLoadingMore || notifCursor == null) return;
+    setIsLoadingMore(true);
+    try {
+      const page = await getNotifications(notifCursor);
+      setNotifications((prev) => [...prev, ...page.items.map(toDisplayNotification)]);
+      setNotifCursor(page.nextCursor);
+      setNotifHasNext(page.hasNext);
+    } catch (e) {
+      console.error("추가 알림 조회 실패:", e);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // 알림 드롭다운 스크롤이 바닥 근처에 닿으면 다음 페이지 로드
+  const handleNotifScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+      loadMoreNotifications();
     }
   };
 
@@ -238,24 +292,50 @@ export default function AdminHeader({
                 <div style={styles.dropdown}>
                   <div style={styles.dropdownHeader}>
                     <span style={styles.dropdownTitle}>알림</span>
+                    <button
+                        onClick={handleMarkAllRead}
+                        disabled={notifCount === 0}
+                        style={{
+                          ...styles.clearBtn,
+                          color: notifCount === 0 ? 'var(--color-text-secondary)' : '#185FA5',
+                          cursor: notifCount === 0 ? 'default' : 'pointer',
+                        }}
+                    >
+                      전체 읽음
+                    </button>
                   </div>
 
-                  {notifications.length === 0 ? (
-                      <p style={styles.empty}>알림이 없습니다.</p>
-                  ) : (
-                      notifications.map(n => (
-                          <div key={n.id} style={{
-                            ...styles.notifItem,
-                            background: n.read ? 'transparent' : 'var(--color-background-secondary)',
-                          }}>
-                            {!n.read && <span style={styles.unreadDot} />}
-                            <div style={{ flex: 1 }}>
-                              <p style={styles.notifMsg}>{n.message}</p>
-                              <p style={styles.notifTime}>{n.time}</p>
-                            </div>
-                          </div>
-                      ))
-                  )}
+                  <div
+                      style={{ maxHeight: 384, overflowY: 'auto' }}
+                      onScroll={handleNotifScroll}
+                  >
+                    {notifications.length === 0 ? (
+                        <p style={styles.empty}>알림이 없습니다.</p>
+                    ) : (
+                        <>
+                          {notifications.map(n => (
+                              <div
+                                  key={n.id}
+                                  onClick={() => handleNotificationItemClick(n)}
+                                  style={{
+                                    ...styles.notifItem,
+                                    background: n.read ? 'transparent' : 'var(--color-background-secondary)',
+                                    cursor: 'pointer',
+                                  }}
+                              >
+                                {!n.read && <span style={styles.unreadDot} />}
+                                <div style={{ flex: 1 }}>
+                                  <p style={styles.notifMsg}>{n.message}</p>
+                                  <p style={styles.notifTime}>{n.time}</p>
+                                </div>
+                              </div>
+                          ))}
+                          {isLoadingMore && (
+                              <p style={{ ...styles.empty, padding: '10px 0' }}>불러오는 중...</p>
+                          )}
+                        </>
+                    )}
+                  </div>
                 </div>
             )}
           </div>

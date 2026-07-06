@@ -25,4 +25,17 @@ public interface SourcingRequestRepository extends JpaRepository<SourcingRequest
     GROUP BY r.status
 """)
     List<Tuple> countGroupedByStatus(@Param("buyerCompanyId") Integer buyerCompanyId, @Param("type") String type);
+
+    // 관리자용 - 전체 소싱 요청 조회 (회사 무관), 그룹 필터(여러 status)용
+    List<SourcingRequest> findAllByOrderByCreatedAtDesc();
+
+    List<SourcingRequest> findAllByStatusInOrderByCreatedAtDesc(List<SourcingStatus> statuses);
+
+    // 관리자용 - 전체 소싱 요청 상태별 통계 (회사 무관)
+    @Query("""
+        SELECT r.status as status, COUNT(r) as cnt
+        FROM SourcingRequest r
+        GROUP BY r.status
+        """)
+    List<Tuple> countAllGroupedByStatus();
 }

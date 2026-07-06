@@ -24,7 +24,7 @@ import {
     Building2,
     AlertTriangle,
 } from "lucide-react";
-import {useEffect, useRef, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {useAuthStore} from "@/store/useAuthStore";
 import {logout as apiLogout} from "@/api/auth/auth.service";
 import logoSvg from "@/assets/style_hub_logo.svg";
@@ -32,6 +32,7 @@ import {useNotification} from "@/api/notification/useNotification";
 import {
     getNotifications,
     getUnreadCount,
+    markAsRead as apiMarkAsRead,
     markAllAsRead as apiMarkAllAsRead,
     type NotificationResponse,
 } from "@/api/notification/notification.service";
@@ -243,6 +244,12 @@ export function Root() {
     const [notifOpen, setNotifOpen] = useState(false);
     const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
+
+    // 무한 스크롤용 커서 페이지네이션 상태
+    const [notifCursor, setNotifCursor] = useState<number | null>(null);
+    const [notifHasNext, setNotifHasNext] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+
     const notifRef = useRef<HTMLDivElement>(null);
     const [searchTab, setSearchTab] = useState<"product" | "category" | "brand">("product");
     const [tabDropOpen, setTabDropOpen] = useState(false);
@@ -256,14 +263,18 @@ export function Root() {
 
     useNotification(!!user);  // 로그인 상태일 때만 SSE 연결
 
-    // 마운트 시 알림 목록 + 안읽음 개수 조회
+    // 마운트 시 알림 첫 페이지 + 안읽음 개수 조회
     useEffect(() => {
         if (!user) return;
         getUnreadCount()
             .then(setUnreadCount)
             .catch((e) => console.error("안읽음 개수 조회 실패:", e));
         getNotifications()
-            .then(setNotifications)
+            .then((page) => {
+                setNotifications(page.items);
+                setNotifCursor(page.nextCursor);
+                setNotifHasNext(page.hasNext);
+            })
             .catch((e) => console.error("알림 목록 조회 실패:", e));
     }, [user]);
 
@@ -289,19 +300,58 @@ export function Root() {
         }
     };
 
-    // 알림 벨 클릭 → 열기 + 전체 읽음 처리(서버 반영)
-    const handleBellClick = async () => {
-        const opening = !notifOpen;
-        setNotifOpen(opening);
+    // 알림 벨 클릭 → 드롭다운 열기/닫기만 수행 (읽음 처리는 별도 버튼)
+    const handleBellClick = () => {
+        setNotifOpen((prev) => !prev);
+    };
 
-        if (opening && unreadCount > 0) {
-            setUnreadCount(0);
-            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-            try {
-                await apiMarkAllAsRead();
-            } catch (e) {
-                console.error("알림 읽음 처리 실패:", e);
-            }
+    // 전체 읽음 버튼 클릭 → 화면 즉시 반영 + 서버 반영
+    const handleMarkAllRead = async () => {
+        if (unreadCount === 0) return;
+        setUnreadCount(0);
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        try {
+            await apiMarkAllAsRead();
+        } catch (e) {
+            console.error("알림 읽음 처리 실패:", e);
+        }
+    };
+
+    // 개별 알림 클릭 → 그 알림만 읽음 처리
+    const handleNotificationItemClick = async (n: NotificationResponse) => {
+        if (n.isRead) return;
+        setNotifications((prev) =>
+            prev.map((item) => item.notificationId === n.notificationId ? { ...item, isRead: true } : item)
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+        try {
+            await apiMarkAsRead(n.notificationId);
+        } catch (e) {
+            console.error("알림 읽음 처리 실패:", e);
+        }
+    };
+
+    // 다음 페이지 알림 로드 (무한 스크롤)
+    const loadMoreNotifications = useCallback(async () => {
+        if (!notifHasNext || isLoadingMore || notifCursor == null) return;
+        setIsLoadingMore(true);
+        try {
+            const page = await getNotifications(notifCursor);
+            setNotifications((prev) => [...prev, ...page.items]);
+            setNotifCursor(page.nextCursor);
+            setNotifHasNext(page.hasNext);
+        } catch (e) {
+            console.error("추가 알림 조회 실패:", e);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [notifCursor, notifHasNext, isLoadingMore]);
+
+    // 알림 드롭다운 스크롤이 바닥 근처에 닿으면 다음 페이지 로드
+    const handleNotifScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const el = e.currentTarget;
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+            loadMoreNotifications();
         }
     };
 
@@ -524,45 +574,65 @@ export function Root() {
                                     className="absolute right-0 top-full mt-2 w-80 bg-white border border-border rounded-lg shadow-xl z-50">
                                     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                                         <span className="font-semibold text-foreground text-sm">알림</span>
-                                        <button onClick={() => setNotifOpen(false)}
-                                                className="text-muted-foreground hover:text-foreground">
-                                            <X size={14}/>
-                                        </button>
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={handleMarkAllRead}
+                                                disabled={unreadCount === 0}
+                                                className="text-xs font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline disabled:cursor-default"
+                                            >
+                                                전체 읽음
+                                            </button>
+                                            <button onClick={() => setNotifOpen(false)}
+                                                    className="text-muted-foreground hover:text-foreground">
+                                                <X size={14}/>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="divide-y divide-border max-h-96 overflow-y-auto">
+                                    <div
+                                        className="divide-y divide-border max-h-96 overflow-y-auto"
+                                        onScroll={handleNotifScroll}
+                                    >
                                         {notifications.length === 0 ? (
                                             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                                                 알림이 없습니다.
                                             </div>
                                         ) : (
-                                            notifications.map((n) => {
-                                                const meta = getNotificationMeta(n.type);
-                                                const Icon = meta.icon;
-                                                const isUnread = !n.isRead;
-                                                return (
-                                                    <div
-                                                        key={n.notificationId}
-                                                        className={`w-full text-left flex items-start gap-3 px-4 py-3 ${isUnread ? "bg-primary/5" : ""}`}
-                                                    >
-                                                        <div className={`mt-0.5 flex-shrink-0 ${meta.color}`}>
-                                                            <Icon size={16}/>
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <span
-                                                                    className={`text-sm font-medium ${isUnread ? "text-foreground" : "text-muted-foreground"}`}>
-                                                                    {meta.label}
-                                                                </span>
-                                                                {isUnread && <span
-                                                                    className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"/>}
+                                            <>
+                                                {notifications.map((n) => {
+                                                    const meta = getNotificationMeta(n.type);
+                                                    const Icon = meta.icon;
+                                                    const isUnread = !n.isRead;
+                                                    return (
+                                                        <div
+                                                            key={n.notificationId}
+                                                            onClick={() => handleNotificationItemClick(n)}
+                                                            className={`w-full text-left flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 transition-colors ${isUnread ? "bg-primary/5" : ""}`}
+                                                        >
+                                                            <div className={`mt-0.5 flex-shrink-0 ${meta.color}`}>
+                                                                <Icon size={16}/>
                                                             </div>
-                                                            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{n.message}</p>
-                                                            <span
-                                                                className="text-[11px] text-muted-foreground mt-1 block">{formatRelativeTime(n.createdAt)}</span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <span
+                                                                        className={`text-sm font-medium ${isUnread ? "text-foreground" : "text-muted-foreground"}`}>
+                                                                        {meta.label}
+                                                                    </span>
+                                                                    {isUnread && <span
+                                                                        className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"/>}
+                                                                </div>
+                                                                <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{n.message}</p>
+                                                                <span
+                                                                    className="text-[11px] text-muted-foreground mt-1 block">{formatRelativeTime(n.createdAt)}</span>
+                                                            </div>
                                                         </div>
+                                                    );
+                                                })}
+                                                {isLoadingMore && (
+                                                    <div className="px-4 py-3 text-center text-xs text-muted-foreground">
+                                                        불러오는 중...
                                                     </div>
-                                                );
-                                            })
+                                                )}
+                                            </>
                                         )}
                                     </div>
                                     <div className="px-4 py-2.5 border-t border-border">

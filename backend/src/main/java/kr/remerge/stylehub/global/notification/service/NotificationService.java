@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import kr.remerge.stylehub.global.notification.NotificationMessage;
 import kr.remerge.stylehub.global.notification.RedisPublisher;
+import kr.remerge.stylehub.global.notification.dto.NotificationPageResult;
 import kr.remerge.stylehub.global.notification.entity.Notification;
 import kr.remerge.stylehub.global.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,10 +56,21 @@ public class NotificationService {
         }
     }
 
-    // 알림 목록 조회
+    // hasNext 판단 위해 size+1개 요청 → 실제 반환은 size개로 자름
     @Transactional(readOnly = true)
-    public List<Notification> getNotifications(Integer userId, Integer companyId, String role) {
-        return notificationRepository.findByTarget(userId, companyId, role);
+    public NotificationPageResult getNotifications(
+            Integer userId, Integer companyId, String role,
+            Integer cursor, int size
+    ) {
+        List<Notification> fetched = notificationRepository.findByTargetWithCursor(
+                userId, companyId, role, cursor, PageRequest.of(0, size + 1)
+        );
+
+        boolean hasNext = fetched.size() > size;
+        List<Notification> items = hasNext ? fetched.subList(0, size) : fetched;
+        Integer nextCursor = hasNext ? items.get(items.size() - 1).getNotificationId() : null;
+
+        return new NotificationPageResult(items, nextCursor, hasNext);
     }
 
     // 읽지 않은 알림 수
@@ -81,4 +94,6 @@ public class NotificationService {
                 .filter(n -> !n.getIsRead())
                 .forEach(Notification::markAsRead);
     }
+
+
 }

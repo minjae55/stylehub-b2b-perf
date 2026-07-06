@@ -5,6 +5,7 @@ import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequest;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequestFile;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequestItem;
 import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingStatus;
+import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestFileRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestItemRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestRepository;
@@ -67,9 +68,14 @@ public class SourcingRequestService {
                         .map(SourcingRequestDto.FileResponse::from)
                         .toList();
 
+        // 관리자 승인 전(SUGGESTED) 또는 관리자가 반려(REJECTED)한 공급사는
+        // 아직 셀러에게조차 노출되지 않은 상태이므로 바이어 화면에도 보이면 안 됨.
+        // RECOMMENDED(승인됨) 이후 상태(QUOTED/DECLINED/EXPIRED)만 바이어에게 노출.
         List<SourcingRequestDto.BidResponse> bids =
                 sourcingSupplierRepository.findBySourcingRequest_SourcingRequestId(sourcingRequestId)
                         .stream()
+                        .filter(supplier -> supplier.getStatus() != SourcingSupplierStatus.SUGGESTED
+                                && supplier.getStatus() != SourcingSupplierStatus.REJECTED)
                         .map(supplier -> SourcingRequestDto.BidResponse.from(supplier, userId, role))
                         .toList();
 

@@ -78,6 +78,15 @@ public interface SourcingSupplierRepository extends JpaRepository<SourcingSuppli
             @Param("status") SourcingSupplierStatus status
     );
 
+    // SUGGESTED 상태 후보가 있는 sourcingRequestId + 그 개수를 함께 조회 (관리자 승인 대기 큐)
+    @Query("""
+        SELECT s.sourcingRequest.sourcingRequestId as requestId, COUNT(s) as cnt
+        FROM SourcingSupplier s
+        WHERE s.status = :status
+        GROUP BY s.sourcingRequest.sourcingRequestId
+        """)
+    List<Tuple> countByStatusGroupedByRequest(@Param("status") SourcingSupplierStatus status);
+
     Optional<SourcingSupplier> findBySourcingRequest_SourcingRequestIdAndSellerCompanyIdAndStatusIn(Integer sourcingRequestId, Integer companyId, List<SourcingSupplierStatus> suggested);
 
     // SourcingSupplierRepository.java

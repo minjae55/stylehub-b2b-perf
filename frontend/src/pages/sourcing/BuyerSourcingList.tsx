@@ -207,7 +207,7 @@ export function BuyerSourcingList() {
                           : "text-muted-foreground hover:text-foreground"
                   }`}
               >
-                {tab === "READY" ? "🏷️ 기성품 사입" : "✂️ 주문제작"}
+                {tab === "READY" ? "🏷️ 기성품" : "✂️ 주문제작"}
                 {activeTab === tab && !isLoading && (
                     <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full font-mono bg-primary text-white">
                 {counts.all}

@@ -33,6 +33,8 @@ type QuoteInitData = {
   sourcingNo: string;
   productName: string;
   brandName: string | null;
+  categoryId: number | null;
+  categoryName: string | null;
   material: string | null;
   deliveryDate: string | null;
   needSample: "Y" | "N";
@@ -43,6 +45,8 @@ type SourcingDetailResponse = {
   sourcing_no: string;
   product_name: string;
   brand_name: string | null;
+  category_id: number | null;
+  category_name: string | null;
   main_material: string | null;
   delivery_date: string | null;
   need_sample: "Y" | "N";
@@ -98,11 +102,34 @@ type QuoteErrorResponse = {
 
 // ─── 파싱 유틸 ──────────────────────────────────────────────────────────────
 
+// 바이어가 입력한 "색상: 블랙 / 사이즈: M" 형태의 optionSummary를
+// 견적 품목의 옵션값(optionName/optionValue) 행으로 되살려서 채워 넣음
+function parseOptionSummary(optionSummary: string): QuoteOptionValueRow[] {
+  if (!optionSummary || !optionSummary.trim()) {
+    return DEFAULT_OPTION_VALUES.map((option) => ({ ...option }));
+  }
+
+  const parsed = optionSummary
+      .split("/")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const [name, ...rest] = part.split(":");
+        return {
+          optionName: (name ?? "").trim(),
+          optionValue: rest.join(":").trim(),
+        };
+      })
+      .filter((row) => row.optionName || row.optionValue);
+
+  return parsed.length > 0 ? parsed : DEFAULT_OPTION_VALUES.map((option) => ({ ...option }));
+}
+
 function buildInitialForm(data: QuoteInitData): QuoteForm {
   return {
     brandName: data.brandName ?? "",
     productName: data.productName ?? "",
-    categoryName: "",
+    categoryName: data.categoryName ?? "",
     material: data.material ?? "",
     leadTimeDays: "7",
     deliveryCompany: "",
@@ -118,7 +145,7 @@ function buildInitialQuoteItems(data: QuoteInitData): QuoteItemRow[] {
   if (data.items.length === 0) return [makeDefaultQuoteItem()];
 
   return data.items.map((item) => ({
-    optionValues: DEFAULT_OPTION_VALUES.map((option) => ({ ...option })),
+    optionValues: parseOptionSummary(item.optionSummary),
     quantity: item.quantity ? String(item.quantity) : "",
     unitPrice: "",
   }));
@@ -377,6 +404,8 @@ export function SellerQuoteWrite() {
           sourcingNo: response.sourcing_no,
           productName: response.product_name,
           brandName: response.brand_name,
+          categoryId: response.category_id,
+          categoryName: response.category_name,
           material: response.main_material,
           deliveryDate: response.delivery_date,
           needSample: response.need_sample,
@@ -641,7 +670,7 @@ export function SellerQuoteWrite() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 bg-white p-4 md:grid-cols-4">
-                <RequestMetric label="카테고리" value="-" />
+                <RequestMetric label="카테고리" value={initData?.categoryName ?? "-"} />
                 <RequestMetric
                     label="희망 수량"
                     value={
