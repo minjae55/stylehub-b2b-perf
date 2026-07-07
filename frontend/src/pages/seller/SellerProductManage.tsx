@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import api from "../../api/axios";
+import { AlertModal, ConfirmModal } from "../../components/common/Modal";
 import {
   Package, Search, Edit2, Trash2, AlertTriangle,
   ShieldAlert, Plus, Loader2, PauseCircle, PlayCircle,
@@ -45,6 +46,18 @@ function isCertExpiringSoon(year: number | null, month: number | null): boolean 
   return diffMonths <= 2;
 }
 
+// [추가] 서버가 뭉뚱그린 일반 오류 메시지("서버 오류가 발생했습니다." 등)만 내려줄 때
+// 상품 삭제 실패는 거의 항상 "거래(주문/장바구니) 이력 때문"이라 이 경우 더 친절한 문구로 대체
+function resolveDeleteErrorMessage(err: any): string {
+  const raw = err?.message as string | undefined;
+  const genericPatterns = ["서버 오류가 발생했습니다", "예상치 못한 오류", "COMMON_003"];
+  const isGeneric = !raw || genericPatterns.some((p) => raw.includes(p));
+  if (isGeneric) {
+    return "거래중인 상품이라 삭제가 안 됩니다. 이미 주문되었거나 누군가의 장바구니에 담긴 상품은 삭제할 수 없어요. 대신 '판매중지' 처리를 이용해주세요.";
+  }
+  return raw;
+}
+
 export function SellerProductManage() {
   const [products, setProducts] = useState<ManageProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +66,14 @@ export function SellerProductManage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("전체");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  // [추가] alert()/confirm() 대체용 모달 상태
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    message: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -72,27 +93,32 @@ export function SellerProductManage() {
     }
   };
 
-  const handleDelete = async (productId: number, productName: string) => {
-    if (!window.confirm(`"${productName}" 상품을 삭제하시겠습니까?`)) return;
+  // [수정] 실제 삭제 실행 (확인 모달에서 "삭제" 눌렀을 때 호출됨)
+  const executeDelete = async (productId: number) => {
+    setConfirmState(null);
     setDeletingId(productId);
     try {
       await api.delete(`/products/${productId}`);
       setProducts((prev) => prev.filter((p) => p.productId !== productId));
     } catch (err: any) {
       console.error(err);
-      // axios 인터셉터가 error.message에 서버 메시지를 세팅해주므로 그대로 노출
-      alert(err?.message || "삭제 중 오류가 발생했습니다.");
+      setAlertMessage(resolveDeleteErrorMessage(err));
     } finally {
       setDeletingId(null);
     }
   };
 
-  const handleToggleActive = async (productId: number, currentActive: boolean) => {
-    const nextActive = !currentActive;
-    const confirmMsg = nextActive
-        ? "이 상품을 다시 판매하시겠습니까?"
-        : "이 상품을 판매 중지(숨김) 처리하시겠습니까? 실제로 삭제되지는 않아요.";
-    if (!window.confirm(confirmMsg)) return;
+  const handleDelete = (productId: number, productName: string) => {
+    setConfirmState({
+      message: `"${productName}" 상품을 삭제하시겠습니까?`,
+      danger: true,
+      onConfirm: () => executeDelete(productId),
+    });
+  };
+
+  // [수정] 실제 판매중지/재개 실행 (확인 모달에서 확인 눌렀을 때 호출됨)
+  const executeToggleActive = async (productId: number, nextActive: boolean) => {
+    setConfirmState(null);
     setTogglingId(productId);
     try {
       await api.patch(`/products/${productId}/active`, { isActive: nextActive });
@@ -101,10 +127,21 @@ export function SellerProductManage() {
       );
     } catch (err: any) {
       console.error(err);
-      alert(err?.message || "처리 중 오류가 발생했습니다.");
+      setAlertMessage(err?.message || "처리 중 오류가 발생했습니다.");
     } finally {
       setTogglingId(null);
     }
+  };
+
+  const handleToggleActive = (productId: number, currentActive: boolean) => {
+    const nextActive = !currentActive;
+    const message = nextActive
+        ? "이 상품을 다시 판매하시겠습니까?"
+        : "이 상품을 판매 중지(숨김) 처리하시겠습니까? 실제로 삭제되지는 않아요.";
+    setConfirmState({
+      message,
+      onConfirm: () => executeToggleActive(productId, nextActive),
+    });
   };
 
   const filtered = products.filter((p) => {
@@ -118,6 +155,18 @@ export function SellerProductManage() {
 
   return (
       <div className="max-w-[1100px] mx-auto px-4 py-8">
+        {alertMessage && (
+            <AlertModal message={alertMessage} onClose={() => setAlertMessage(null)} />
+        )}
+        {confirmState && (
+            <ConfirmModal
+                message={confirmState.message}
+                danger={confirmState.danger}
+                confirmLabel={confirmState.danger ? "삭제" : "확인"}
+                onConfirm={confirmState.onConfirm}
+                onCancel={() => setConfirmState(null)}
+            />
+        )}
         {/* Header */}
         <div className="bg-gradient-to-r from-[#1a1a2e] via-[#16213e] to-[#0f3460] text-white rounded-lg p-6 mb-6">
           <div className="flex items-center justify-between">
@@ -191,7 +240,7 @@ export function SellerProductManage() {
         {/* 상품 목록 */}
         {!loading && !error && (
             <div className="bg-white border border-border rounded-lg overflow-hidden">
-              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-3 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1.6fr] gap-4 px-5 py-3 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 <span>상품</span>
                 <span>단가 / MOQ</span>
                 <span>재고</span>
@@ -206,7 +255,7 @@ export function SellerProductManage() {
                   const certSoon = isCertExpiringSoon(p.certExpiryYear, p.certExpiryMonth);
 
                   return (
-                      <div key={p.productId} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center hover:bg-muted/20 transition-colors">
+                      <div key={p.productId} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1.6fr] gap-4 px-5 py-4 items-center hover:bg-muted/20 transition-colors">
                         {/* 상품명 */}
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
@@ -264,29 +313,29 @@ export function SellerProductManage() {
                         </div>
 
                         {/* 관리 버튼 */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <Link
                               to={`/seller/products/edit/${p.productId}`}
-                              className="flex items-center gap-1 text-xs border border-border text-foreground hover:border-primary hover:text-primary px-3 py-1.5 rounded transition-colors"
+                              className="flex items-center justify-center gap-1 text-xs border border-border text-foreground hover:border-primary hover:text-primary px-2 py-1.5 rounded transition-colors whitespace-nowrap"
                           >
-                            <Edit2 size={11} />
+                            <Edit2 size={11} className="flex-shrink-0" />
                             수정
                           </Link>
                           <button
                               onClick={() => handleToggleActive(p.productId, p.isActive)}
                               disabled={togglingId === p.productId}
-                              className="flex items-center gap-1 text-xs border border-border text-foreground hover:border-yellow-500 hover:text-yellow-600 px-3 py-1.5 rounded transition-colors disabled:opacity-50"
+                              className="flex items-center justify-center gap-1 text-xs border border-border text-foreground hover:border-yellow-500 hover:text-yellow-600 px-2 py-1.5 rounded transition-colors disabled:opacity-50 whitespace-nowrap"
                           >
-                            {p.isActive ? <PauseCircle size={11} /> : <PlayCircle size={11} />}
-                            {togglingId === p.productId ? "처리 중" : p.isActive ? "판매중지" : "판매재개"}
+                            {p.isActive ? <PauseCircle size={11} className="flex-shrink-0" /> : <PlayCircle size={11} className="flex-shrink-0" />}
+                            {togglingId === p.productId ? "처리중" : p.isActive ? "판매중지" : "판매재개"}
                           </button>
                           <button
                               onClick={() => handleDelete(p.productId, p.productName)}
                               disabled={deletingId === p.productId}
-                              className="flex items-center gap-1 text-xs border border-border text-foreground hover:border-red-400 hover:text-red-400 px-3 py-1.5 rounded transition-colors disabled:opacity-50"
+                              className="flex items-center justify-center gap-1 text-xs border border-border text-foreground hover:border-red-400 hover:text-red-400 px-2 py-1.5 rounded transition-colors disabled:opacity-50 whitespace-nowrap"
                           >
-                            <Trash2 size={11} />
-                            {deletingId === p.productId ? "삭제 중" : "삭제"}
+                            <Trash2 size={11} className="flex-shrink-0" />
+                            {deletingId === p.productId ? "삭제중" : "삭제"}
                           </button>
                         </div>
                       </div>

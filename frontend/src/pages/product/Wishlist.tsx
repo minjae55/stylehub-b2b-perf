@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import api from "../../api/axios";
+import { AlertModal } from "../../components/common/Modal";
 import {
-  Heart, ShoppingCart, Search, Grid3x3, List, ChevronDown,
-  FolderOpen, FolderPlus, Pencil, Trash2, Check, X, ChevronLeft
+  Heart, ShoppingCart, Search, Grid3x3, List,
+  FolderOpen, FolderPlus, ChevronLeft
 } from "lucide-react";
 
 interface ProductSummary {
@@ -22,10 +23,24 @@ interface ProductSummary {
   createdAt: string;
 }
 
-interface WishFolder {
-  id: string;
-  name: string;
-  productIds: number[];
+// [수정] 백엔드 WishlistDto.FolderResponse 그대로 매핑
+interface BackendFolder {
+  wishlistFolderId: number;
+  folderName: string;
+  isDefault: boolean;
+  sortOrder: number;
+  itemCount: number;
+}
+
+// [수정] 백엔드 WishlistDto.ItemResponse 그대로 매핑
+interface BackendItem {
+  wishlistId: number;
+  productId: number;
+  productName: string;
+  thumbnailUrl: string | null; // 백엔드에서 항상 null (임시처리 상태) - /products 목록과 매칭해서 채움
+  price: number;
+  brandName: string | null;
+  folderName: string; // 폴더 id가 아니라 이름으로 내려옴 (유저별 폴더명은 유니크)
 }
 
 function FolderPreview({ images }: { images: (string | null)[] }) {
@@ -64,206 +79,111 @@ function FolderPreview({ images }: { images: (string | null)[] }) {
   );
 }
 
-const DEFAULT_FOLDER_ID = "default";
-
-const categories = [
-  { id: "all", name: "전체", subCategories: [] },
-  { id: "tops", name: "상의", subCategories: ["티셔츠/탑", "블라우스/셔츠", "니트/스웨터", "후드/맨투맨", "재킷/블레이저"] },
-  { id: "bottoms", name: "하의", subCategories: ["팬츠/슬랙스", "스커트", "진/데님", "레깅스", "반바지"] },
-  { id: "dresses", name: "원피스/세트", subCategories: ["원피스", "점프수트", "투피스세트"] },
-  { id: "outerwear", name: "아우터", subCategories: ["코트", "재킷/점퍼", "가디건", "패딩"] },
-  { id: "innerwear", name: "이너/언더웨어", subCategories: ["이너웨어", "속옷", "잠옷/홈웨어"] },
-  { id: "sports", name: "스포츠/애슬레저", subCategories: ["스포츠탑", "스포츠레깅스", "트레이닝복", "스포츠세트"] },
-  { id: "accessories", name: "액세서리", subCategories: ["가방/백", "모자", "스카프/머플러", "벨트", "양말/타이즈"] },
-  { id: "shoes", name: "신발", subCategories: ["스니커즈", "부츠/앵클부츠", "플랫/로퍼", "힐/펌프스"] },
-];
-
-const categoryIdMap: Record<string, string> = {
-  tops: "상의", bottoms: "하의", dresses: "원피스/세트", outerwear: "아우터",
-  innerwear: "이너/언더웨어", sports: "스포츠/애슬레저", accessories: "액세서리", shoes: "신발",
-};
-
-const searchDummyCategories = [
-  { id: "tops", name: "상의", iconImg: "/images/top.png", alias: [] as string[], subCategories: ["티셔츠/탑", "블라우스/셔츠", "니트/스웨터", "후드/맨투맨", "재킷/블레이저"] },
-  { id: "bottoms", name: "하의", iconImg: "/images/bottom.png", alias: ["치마", "바지"], subCategories: ["팬츠/슬랙스", "스커트", "진/데님", "레깅스", "반바지"] },
-  { id: "dresses", name: "원피스/세트", iconImg: "/images/one_piece.png", alias: [] as string[], subCategories: ["원피스", "점프수트", "투피스세트"] },
-  { id: "outerwear", name: "아우터", iconImg: "/images/outer.png", alias: ["겉옷", "잠바", "코트", "재킷", "가디건"], subCategories: ["코트", "재킷/점퍼", "가디건", "패딩"] },
-  { id: "innerwear", name: "이너/언더웨어", iconImg: "/images/inner.png", alias: ["속옷", "잠옷"], subCategories: ["이너웨어", "속옷", "잠옷/홈웨어"] },
-  { id: "sports", name: "스포츠/애슬레저", iconImg: "/images/sports.png", alias: ["스포츠", "운동복"], subCategories: ["스포츠탑", "스포츠레깅스", "트레이닝복", "스포츠세트"] },
-  { id: "accessories", name: "액세서리", iconImg: "/images/accessory.png", alias: ["악세서리"], subCategories: ["가방/백", "모자", "스카프/머플러", "벨트", "양말/타이즈"] },
-  { id: "shoes", name: "신발", iconImg: "/images/shoes.png", alias: ["구두", "운동화"], subCategories: ["스니커즈", "부츠/앵클부츠", "플랫/로퍼", "힐/펌프스"] },
-];
-
-const searchDummyBrands = [
-  { name: "동대문패션", logo: "/images/brands/ddm.png" },
-  { name: "스타일컴퍼니", logo: "/images/brands/style.png" },
-  { name: "엘레강스모드", logo: "/images/brands/elegance.png" },
-  { name: "트렌드하우스", logo: "/images/brands/trend.png" },
-  { name: "페미닌스타일", logo: "/images/brands/feminine.png" },
-  { name: "내추럴보이", logo: "/images/brands/natural.png" },
-  { name: "세트스타일", logo: "/images/brands/set.png" },
-  { name: "코지니트", logo: "/images/brands/cozy.png" },
-  { name: "캐주얼하우스", logo: "/images/brands/casual.png" },
-  { name: "진워크스", logo: "/images/brands/jean.png" },
-  { name: "프리미엄어패럴", logo: "/images/brands/premium.png" },
-  { name: "액티브웨어코리아", logo: "/images/brands/active.png" },
-  { name: "스포츠라이프", logo: "/images/brands/sportslife.png" },
-  { name: "베이직이너", logo: "/images/brands/basic.png" },
-  { name: "코지홈", logo: "/images/brands/cozyhome.png" },
-  { name: "패션액세서리몰", logo: "/images/brands/acc.png" },
-  { name: "슈즈마켓", logo: "/images/brands/shoes.png" },
-];
-
-const CHOSUNG = ["전체", "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
-function getChosung(str: string): string {
-  const code = str.charCodeAt(0) - 0xAC00;
-  if (code < 0) return str[0];
-  return ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"][Math.floor(code / (21 * 28))];
-}
-
-function loadFolders(): WishFolder[] {
-  try {
-    const raw = localStorage.getItem("wishlistFolders");
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  try {
-    const old = localStorage.getItem("wishlist");
-    if (old) {
-      const ids: number[] = JSON.parse(old);
-      const folders: WishFolder[] = [{ id: DEFAULT_FOLDER_ID, name: "전체 찜", productIds: ids }];
-      localStorage.setItem("wishlistFolders", JSON.stringify(folders));
-      localStorage.removeItem("wishlist");
-      return folders;
-    }
-  } catch {}
-  return [{ id: DEFAULT_FOLDER_ID, name: "전체 찜", productIds: [] }];
-}
-
-function saveFolders(folders: WishFolder[]) {
-  localStorage.setItem("wishlistFolders", JSON.stringify(folders));
-}
-
-function genId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
 export function Wishlist() {
-  const [folders, setFolders] = useState<WishFolder[]>(loadFolders);
+  const [folders, setFolders] = useState<BackendFolder[]>([]);
+  const [wishItems, setWishItems] = useState<BackendItem[]>([]); // 내 찜 전체 (모든 폴더 합산)
   const [allProducts, setAllProducts] = useState<ProductSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
   const [viewType, setViewType] = useState<"folder" | "grid" | "list">("folder");
-  const [openFolderId, setOpenFolderId] = useState<string | null>(null);
-  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState("");
+  const [openFolderId, setOpenFolderId] = useState<number | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedBrand, setSelectedBrand] = useState("");
-  const [brandChosung, setBrandChosung] = useState("전체");
-  const [brandPanelOpen, setBrandPanelOpen] = useState(false);
-  const brandScrollRef = useRef<HTMLDivElement>(null);
-  const brandPanelRef = useRef<HTMLDivElement>(null);
-  const [brandVisibleCount, setBrandVisibleCount] = useState(10);
-  const [searchTab, setSearchTab] = useState<"product" | "category" | "brand">("product");
-  const [tabDropOpen, setTabDropOpen] = useState(false);
-  const [resultDropOpen, setResultDropOpen] = useState(false);
-  const tabDropRef = useRef<HTMLDivElement>(null);
-  const resultDropRef = useRef<HTMLDivElement>(null);
-  const newFolderInputRef = useRef<HTMLInputElement>(null);
-  const editingInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchWishlistData = async () => {
+    try {
+      const [folderData, itemData] = await Promise.all([
+        api.get<BackendFolder[]>("/wishlist/folders"),
+        api.get<BackendItem[]>("/wishlist"),
+      ]);
+      setFolders(folderData);
+      setWishItems(itemData);
+    } catch (err) {
+      console.error(err);
+      setAlertMessage("찜 목록을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
+    fetchWishlistData();
     api.get("/products").then(res => setAllProducts(res)).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    const mousedownHandler = (e: MouseEvent) => {
-      if (tabDropRef.current && !tabDropRef.current.contains(e.target as Node)) setTabDropOpen(false);
-      if (resultDropRef.current && !resultDropRef.current.contains(e.target as Node)) setResultDropOpen(false);
+  // 찜 항목 하나에 /products 목록의 이미지 등을 매칭해서 합친 표시용 타입
+  const enrichedItems = wishItems.map((item) => {
+    const full = allProducts.find((p) => p.productId === item.productId);
+    return {
+      ...item,
+      mainImageUrl: full?.mainImageUrl ?? item.thumbnailUrl,
+      brandName: item.brandName ?? full?.brandName ?? "",
     };
-    const clickHandler = (e: MouseEvent) => {
-      if (brandPanelRef.current && !brandPanelRef.current.contains(e.target as Node)) setBrandPanelOpen(false);
-    };
-    document.addEventListener("mousedown", mousedownHandler);
-    document.addEventListener("click", clickHandler);
-    return () => {
-      document.removeEventListener("mousedown", mousedownHandler);
-      document.removeEventListener("click", clickHandler);
-    };
-  }, []);
-
-  useEffect(() => { saveFolders(folders); }, [folders]);
-
-  // 전체 찜 ID (모든 폴더 합산 중복제거)
-  const allFavIds = [...new Set(folders.flatMap(f => f.productIds))];
-
-  // 현재 열린 폴더 상품 ID
-  // DEFAULT_FOLDER_ID("전체찜") 또는 null이면 → 전체 합산
-  // 그 외 폴더면 → 해당 폴더만
-  const currentFolderIds = openFolderId && openFolderId !== DEFAULT_FOLDER_ID
-      ? (folders.find(f => f.id === openFolderId)?.productIds ?? [])
-      : allFavIds;
-
-  const searchResults = searchQuery.trim().length < 1 ? [] : (() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (searchTab === "product") return allProducts.filter(p => p.productName.toLowerCase().includes(q) || p.brandName.toLowerCase().includes(q)).slice(0, 6);
-    if (searchTab === "category") return searchDummyCategories.filter(c => c.name.toLowerCase().includes(q) || c.subCategories.some(s => s.toLowerCase().includes(q)) || (c.alias ?? []).some(a => a.toLowerCase().includes(q))).slice(0, 6);
-    if (searchTab === "brand") return searchDummyBrands.filter(b => b.name.toLowerCase().includes(q)).slice(0, 6);
-    return [];
-  })();
-
-  const wishlistProducts = allProducts.filter((p) => {
-    const inFolder = currentFolderIds.includes(p.productId);
-    const matchCategory = selectedCategory === "all" || p.categoryName === categoryIdMap[selectedCategory];
-    const matchBrand = !selectedBrand || p.brandName === selectedBrand;
-    const matchSearch = !searchQuery || p.productName.toLowerCase().includes(searchQuery.toLowerCase()) || p.brandName.toLowerCase().includes(searchQuery.toLowerCase());
-    return inFolder && matchCategory && matchBrand && matchSearch;
   });
 
-  const removeFromAll = (productId: number) => {
-    setFolders(prev => prev.map(f => ({ ...f, productIds: f.productIds.filter(id => id !== productId) })));
+  const currentFolder = openFolderId != null ? folders.find(f => f.wishlistFolderId === openFolderId) : null;
+
+  const currentItems = currentFolder
+      ? enrichedItems.filter((it) => it.folderName === currentFolder.folderName)
+      : enrichedItems;
+
+  // 표시용 상품 목록 ("전체" 뷰에서는 같은 상품이 여러 폴더에 있어도 productId 기준 중복 제거)
+  const dedupedCurrentItems = currentFolder
+      ? currentItems
+      : Array.from(new Map(currentItems.map((it) => [it.productId, it])).values());
+
+  const wishlistProducts = dedupedCurrentItems.filter((p) =>
+      !searchQuery ||
+      p.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.brandName ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // 찜 삭제 - 폴더 안에서 뺄 땐 그 폴더의 항목 하나만, "전체" 뷰에서 뺄 땐 그 상품이 들어간 모든 폴더에서 다 삭제
+  const removeWishlistItem = async (productId: number, wishlistIdInThisView: number) => {
+    const targetIds = currentFolder
+        ? [wishlistIdInThisView]
+        : wishItems.filter((it) => it.productId === productId).map((it) => it.wishlistId);
+
+    try {
+      await Promise.all(targetIds.map((id) => api.delete(`/wishlist/${id}`)));
+      await fetchWishlistData();
+    } catch (err: any) {
+      console.error(err);
+      setAlertMessage(err?.message || "찜 삭제 중 오류가 발생했습니다.");
+    }
   };
 
-  const removeFromFolder = (folderId: string, productId: number) => {
-    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, productIds: f.productIds.filter(id => id !== productId) } : f));
-  };
-
-  const handleCategoryChange = (catId: string) => {
-    setSelectedCategory(catId);
-    if (viewType === "folder") { setViewType("grid"); setOpenFolderId(null); }
-  };
-
-  const createFolder = () => {
-    const name = (newFolderInputRef.current?.value ?? "").trim();
+  const createFolder = async () => {
+    const name = newFolderName.trim();
     if (!name) return;
-    const folder: WishFolder = { id: genId(), name, productIds: [] };
-    setFolders(prev => [...prev, folder]);
-    setCreatingFolder(false);
+    try {
+      await api.post("/wishlist/folders", { folderName: name });
+      setCreatingFolder(false);
+      setNewFolderName("");
+      await fetchWishlistData();
+    } catch (err: any) {
+      console.error(err);
+      setAlertMessage(err?.message || "폴더 생성 중 오류가 발생했습니다.");
+    }
   };
 
-  const renameFolder = (id: string) => {
-    const name = (editingInputRef.current?.value ?? "").trim();
-    if (!name) return;
-    setFolders(prev => prev.map(f => f.id === id ? { ...f, name } : f));
-    setEditingFolderId(null);
-  };
-
-  const deleteFolder = (id: string) => {
-    if (id === DEFAULT_FOLDER_ID) return;
-    setFolders(prev => prev.filter(f => f.id !== id));
-    if (openFolderId === id) setOpenFolderId(null);
-  };
-
-  // 폴더 썸네일 이미지: 전체찜 폴더는 allFavIds 기준
-  const getFolderImages = (folder: WishFolder, products: ProductSummary[], favIds: number[]) => {
-    const ids = folder.id === DEFAULT_FOLDER_ID ? favIds : folder.productIds;
-    const count = ids.length;
+  const getFolderImages = (folder: BackendFolder) => {
+    const idsInFolder = enrichedItems.filter((it) => it.folderName === folder.folderName);
+    const count = idsInFolder.length;
     if (count === 0) return [];
     const needed = count === 1 ? 1 : count < 4 ? 2 : 4;
-    return ids.slice(0, needed).map(id => products.find(p => p.productId === id)?.mainImageUrl ?? null);
+    return idsInFolder.slice(0, needed).map((it) => it.mainImageUrl ?? null);
   };
 
-  const currentFolder = openFolderId ? folders.find(f => f.id === openFolderId) : null;
+  if (loading) {
+    return (
+        <div className="max-w-[1280px] mx-auto px-4 py-16 text-center text-sm text-muted-foreground">
+          불러오는 중...
+        </div>
+    );
+  }
 
   const FolderListView = () => (
       <div>
@@ -281,56 +201,26 @@ export function Wishlist() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {folders.map((folder) => {
-            const images = getFolderImages(folder, allProducts, allFavIds);
-            const isEditing = editingFolderId === folder.id;
+            const images = getFolderImages(folder);
             return (
-                <div key={folder.id} className="group bg-white border border-border rounded-xl overflow-hidden hover:shadow-md hover:border-primary/40 transition-all">
+                <div key={folder.wishlistFolderId} className="group bg-white border border-border rounded-xl overflow-hidden hover:shadow-md hover:border-primary/40 transition-all">
                   <button
-                      onClick={() => { if (!isEditing) { setOpenFolderId(folder.id); setViewType("grid"); } }}
+                      onClick={() => { setOpenFolderId(folder.wishlistFolderId); setViewType("grid"); }}
                       className="w-full aspect-square overflow-hidden bg-muted block relative"
                   >
                     <FolderPreview images={images} />
                     <span className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full backdrop-blur-sm">
-                      {folder.id === DEFAULT_FOLDER_ID ? allFavIds.length : folder.productIds.length}개
+                      {folder.itemCount}개
                     </span>
                   </button>
                   <div className="px-3 py-2.5 flex items-center gap-1.5">
-                    {isEditing ? (
-                        <>
-                          <input
-                              ref={editingInputRef}
-                              autoFocus
-                              defaultValue={editingName}
-                              onKeyDown={e => { if (e.nativeEvent.isComposing) return; if (e.key === "Enter") renameFolder(folder.id); if (e.key === "Escape") setEditingFolderId(null); }}
-                              className="flex-1 text-sm outline-none border-b border-primary text-foreground bg-transparent"
-                          />
-                          <button onClick={() => renameFolder(folder.id)} className="text-primary"><Check size={13} /></button>
-                          <button onClick={() => setEditingFolderId(null)} className="text-muted-foreground"><X size={13} /></button>
-                        </>
-                    ) : (
-                        <>
-                          <span
-                              onClick={() => { setOpenFolderId(folder.id); setViewType("grid"); }}
-                              className="flex-1 text-sm font-medium text-foreground truncate cursor-pointer hover:text-primary transition-colors"
-                          >
-                            {folder.name}
-                          </span>
-                          <button
-                              onClick={() => { setEditingFolderId(folder.id); setEditingName(folder.name); }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          {folder.id !== DEFAULT_FOLDER_ID && (
-                              <button
-                                  onClick={() => deleteFolder(folder.id)}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                          )}
-                        </>
-                    )}
+                    <span
+                        onClick={() => { setOpenFolderId(folder.wishlistFolderId); setViewType("grid"); }}
+                        className="flex-1 text-sm font-medium text-foreground truncate cursor-pointer hover:text-primary transition-colors"
+                    >
+                      {folder.folderName}
+                    </span>
+                    {/* 폴더 이름변경/삭제는 백엔드에 아직 해당 API가 없어서 뺐어요 */}
                   </div>
                 </div>
             );
@@ -344,7 +234,6 @@ export function Wishlist() {
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-muted-foreground">
             총 <span className="font-bold text-foreground">{wishlistProducts.length}</span>개 상품
-            {selectedBrand && <span className="ml-2 text-primary font-medium">· {selectedBrand}</span>}
           </p>
         </div>
 
@@ -358,7 +247,7 @@ export function Wishlist() {
         ) : viewType === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {wishlistProducts.map((product) => (
-                  <div key={product.productId} className="bg-white border border-border rounded-lg overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all group">
+                  <div key={`${product.wishlistId}`} className="bg-white border border-border rounded-lg overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all group">
                     <Link to={`/products/${product.productId}`} className="block relative">
                       <div className="aspect-square overflow-hidden bg-muted">
                         {product.mainImageUrl
@@ -369,9 +258,7 @@ export function Wishlist() {
                       <button
                           onClick={(e) => {
                             e.preventDefault();
-                            openFolderId && openFolderId !== DEFAULT_FOLDER_ID
-                                ? removeFromFolder(openFolderId, product.productId)
-                                : removeFromAll(product.productId);
+                            removeWishlistItem(product.productId, product.wishlistId);
                           }}
                           className="absolute top-3 right-3 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm"
                       >
@@ -384,7 +271,7 @@ export function Wishlist() {
                         <h3 className="font-semibold text-foreground mb-2 line-clamp-2 hover:text-primary transition-colors">{product.productName}</h3>
                       </Link>
                       <div className="flex items-baseline gap-1 mb-3">
-                        <span className="text-xl font-bold text-primary">₩{product.unitPrice.toLocaleString()}</span>
+                        <span className="text-xl font-bold text-primary">₩{product.price.toLocaleString()}</span>
                         <span className="text-xs text-muted-foreground">/벌</span>
                       </div>
                       <button className="w-full bg-primary hover:bg-primary/90 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2">
@@ -397,7 +284,7 @@ export function Wishlist() {
         ) : (
             <div className="space-y-3">
               {wishlistProducts.map((product) => (
-                  <div key={product.productId} className="bg-white border border-border rounded-lg p-4 hover:shadow-md hover:border-primary/50 transition-all">
+                  <div key={`${product.wishlistId}`} className="bg-white border border-border rounded-lg p-4 hover:shadow-md hover:border-primary/50 transition-all">
                     <div className="flex gap-4">
                       <Link to={`/products/${product.productId}`} className="flex-shrink-0">
                         <div className="w-32 h-32 rounded-lg overflow-hidden bg-muted">
@@ -410,19 +297,17 @@ export function Wishlist() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-4 mb-2">
                           <div className="flex-1">
-                            <div className="text-xs text-muted-foreground mb-1">{product.brandName} · {product.categoryName}</div>
+                            <div className="text-xs text-muted-foreground mb-1">{product.brandName}</div>
                             <Link to={`/products/${product.productId}`}>
                               <h3 className="font-semibold text-foreground text-lg mb-1 hover:text-primary transition-colors">{product.productName}</h3>
                             </Link>
                             <div className="flex items-baseline gap-1 mb-2">
-                              <span className="text-2xl font-bold text-primary">₩{product.unitPrice.toLocaleString()}</span>
+                              <span className="text-2xl font-bold text-primary">₩{product.price.toLocaleString()}</span>
                               <span className="text-xs text-muted-foreground">/벌</span>
                             </div>
                           </div>
                           <button
-                              onClick={() => openFolderId && openFolderId !== DEFAULT_FOLDER_ID
-                                  ? removeFromFolder(openFolderId, product.productId)
-                                  : removeFromAll(product.productId)}
+                              onClick={() => removeWishlistItem(product.productId, product.wishlistId)}
                               className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"
                           >
                             <Heart size={16} className="fill-red-500 text-red-500" />
@@ -446,9 +331,14 @@ export function Wishlist() {
   );
 
   const isProductView = viewType === "grid" || viewType === "list";
+  const totalFavCount = new Set(wishItems.map((it) => it.productId)).size;
 
   return (
-      <div className="max-w-[1480px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
+      <div className="max-w-[1280px] mx-auto px-4 py-8 font-[Inter,sans-serif]">
+
+        {alertMessage && (
+            <AlertModal message={alertMessage} onClose={() => setAlertMessage(null)} />
+        )}
 
         {/* 새 폴더 생성 모달 */}
         {creatingFolder && (
@@ -461,8 +351,9 @@ export function Wishlist() {
                   <h2 className="text-lg font-bold text-foreground">새 폴더 만들기</h2>
                 </div>
                 <input
-                    ref={newFolderInputRef}
                     autoFocus
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
                     placeholder="폴더 이름을 입력하세요"
                     onKeyDown={e => { if (e.nativeEvent.isComposing) return; if (e.key === "Enter") createFolder(); if (e.key === "Escape") setCreatingFolder(false); }}
                     className="w-full border border-border rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors text-foreground placeholder:text-muted-foreground mb-5"
@@ -477,7 +368,7 @@ export function Wishlist() {
 
         {/* 헤더 */}
         <div className="mb-8 flex items-center gap-3">
-          {openFolderId && (
+          {openFolderId != null && (
               <button
                   onClick={() => { setOpenFolderId(null); setViewType("folder"); }}
                   className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
@@ -488,12 +379,12 @@ export function Wishlist() {
           <Heart size={24} className="text-primary fill-primary" />
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              {currentFolder ? currentFolder.name : "찜 목록"}
+              {currentFolder ? currentFolder.folderName : "찜 목록"}
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {isProductView
                   ? <>총 <span className="font-bold text-foreground">{wishlistProducts.length}</span>개 상품</>
-                  : <>폴더 <span className="font-bold text-foreground">{folders.length}</span>개 · 찜 상품 <span className="font-bold text-foreground">{allFavIds.length}</span>개</>
+                  : <>폴더 <span className="font-bold text-foreground">{folders.length}</span>개 · 찜 상품 <span className="font-bold text-foreground">{totalFavCount}</span>개</>
               }
             </p>
           </div>
@@ -502,80 +393,14 @@ export function Wishlist() {
         {/* Search Bar */}
         <div className="bg-white border border-border rounded-lg p-4 mb-6 flex items-center gap-4">
           <div className="flex-1 relative">
-            <div className="flex border border-border rounded-lg">
-              <div className="relative" ref={tabDropRef}>
-                <button
-                    onClick={() => setTabDropOpen((v) => !v)}
-                    className="flex items-center border-r border-border bg-muted px-3 gap-1 cursor-pointer hover:bg-muted/80 transition-colors text-sm text-foreground whitespace-nowrap h-full w-24 justify-between rounded-l-lg"
-                >
-                  {searchTab === "product" ? "상품명" : searchTab === "category" ? "카테고리" : "브랜드"}
-                  <ChevronDown size={14} />
-                </button>
-                {tabDropOpen && (
-                    <div className="absolute left-0 top-full mt-1 bg-white border border-border rounded shadow-lg z-[100] w-28">
-                      {(["product", "category", "brand"] as const).map((tab) => (
-                          <button key={tab} onClick={() => { setSearchTab(tab); setTabDropOpen(false); setSearchQuery(""); setResultDropOpen(false); }}
-                                  className={`w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors ${searchTab === tab ? "text-primary font-semibold" : "text-foreground"}`}>
-                            {tab === "product" ? "상품명" : tab === "category" ? "카테고리" : "브랜드"}
-                          </button>
-                      ))}
-                    </div>
-                )}
-              </div>
-              <div className="flex-1 relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input
-                    type="text"
-                    placeholder={searchTab === "product" ? "찜한 상품명으로 검색" : searchTab === "category" ? "카테고리명으로 검색" : "브랜드명으로 검색"}
-                    value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setResultDropOpen(true); setTabDropOpen(false); }}
-                    onFocus={() => { if (searchQuery.trim().length > 0) setResultDropOpen(true); }}
-                    className="w-full pl-9 pr-4 py-2.5 text-sm outline-none bg-white rounded-r-lg"
-                />
-              </div>
-            </div>
-            {resultDropOpen && searchQuery.trim().length > 0 && (
-                <div ref={resultDropRef} className="absolute left-0 right-0 mt-1 bg-white border border-border rounded shadow-xl z-[100] max-h-72 overflow-y-auto">
-                  {searchResults.length === 0 ? (
-                      <div className="px-4 py-3 text-sm text-muted-foreground">검색 결과가 없습니다.</div>
-                  ) : searchTab === "product" ? (
-                      (searchResults as ProductSummary[]).map((p) => (
-                          <Link key={p.productId} to={`/products/${p.productId}`} onClick={() => { setResultDropOpen(false); setSearchQuery(""); }}
-                                className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary transition-colors border-b border-border last:border-0">
-                            <div className="w-9 h-9 rounded overflow-hidden bg-muted flex-shrink-0">
-                              {p.mainImageUrl ? <img src={p.mainImageUrl} alt={p.productName} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-muted" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-foreground truncate">{p.productName}</div>
-                              <div className="text-xs text-muted-foreground">{p.brandName}</div>
-                            </div>
-                            <div className="text-primary text-sm font-bold flex-shrink-0">₩{p.unitPrice.toLocaleString()}</div>
-                          </Link>
-                      ))
-                  ) : searchTab === "category" ? (
-                      (searchResults as typeof searchDummyCategories).map((c) => (
-                          <button key={c.id} onClick={() => { handleCategoryChange(c.id); setResultDropOpen(false); setSearchQuery(""); }}
-                                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary transition-colors border-b border-border last:border-0 text-left">
-                            <img src={c.iconImg} alt={c.name} className="w-7 h-7 object-contain flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-foreground">{c.name}</div>
-                              <div className="text-xs text-muted-foreground truncate">{c.subCategories.join(" · ")}</div>
-                            </div>
-                          </button>
-                      ))
-                  ) : (
-                      (searchResults as typeof searchDummyBrands).map((b) => (
-                          <button key={b.name} onClick={() => { setResultDropOpen(false); setSearchQuery(""); }}
-                                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary transition-colors border-b border-border last:border-0 text-left">
-                            <div className="w-7 h-7 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              <img src={b.logo} alt={b.name} className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                            </div>
-                            <span className="text-sm text-foreground">{b.name}</span>
-                          </button>
-                      ))
-                  )}
-                </div>
-            )}
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+                type="text"
+                placeholder="찜한 상품명으로 검색"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 border border-border rounded-lg text-sm outline-none focus:border-primary transition-colors"
+            />
           </div>
 
           <div className="flex items-center gap-2">
@@ -603,84 +428,8 @@ export function Wishlist() {
           </div>
         </div>
 
-        <div className="grid grid-cols-[240px_1fr] gap-6">
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">카테고리</p>
-              <div className="space-y-1">
-                {categories.map((cat) => (
-                    <div key={cat.id}>
-                      <button
-                          onClick={() => handleCategoryChange(cat.id)}
-                          className={`w-full text-left px-4 py-2.5 rounded-lg transition-all text-sm ${selectedCategory === cat.id ? "bg-primary text-white font-semibold shadow-sm" : "bg-white border border-border text-foreground hover:border-primary hover:text-primary"}`}
-                      >
-                        {cat.name}
-                      </button>
-                    </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="relative" ref={brandPanelRef}>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">브랜드</p>
-              <button
-                  onClick={() => { if (selectedBrand) { setSelectedBrand(""); } else { setBrandPanelOpen(v => !v); } }}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-sm font-semibold transition-all border ${selectedBrand ? "bg-primary text-white border-primary" : "bg-white text-foreground border-border hover:border-primary hover:text-primary"}`}
-              >
-                <span>{selectedBrand || "브랜드 선택"}</span>
-                {selectedBrand ? <X size={14} /> : <ChevronDown size={14} className={`transition-transform ${brandPanelOpen ? "rotate-180" : ""}`} />}
-              </button>
-
-              {brandPanelOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border rounded-lg shadow-xl z-30">
-                    <div className="flex flex-wrap gap-1 p-2.5 border-b border-border">
-                      {CHOSUNG.map((c) => (
-                          <button key={c} onClick={() => { setBrandChosung(c); setBrandVisibleCount(10); }}
-                                  className={`text-xs px-1.5 py-0.5 rounded transition-colors ${brandChosung === c ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-primary"}`}>
-                            {c}
-                          </button>
-                      ))}
-                    </div>
-                    <div
-                        ref={brandScrollRef}
-                        onScroll={() => {
-                          const el = brandScrollRef.current;
-                          if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 10)
-                            setBrandVisibleCount(v => v + 10);
-                        }}
-                        className="max-h-56 overflow-y-auto"
-                    >
-                      {(() => {
-                        const filtered = brandChosung === "전체"
-                            ? searchDummyBrands
-                            : searchDummyBrands.filter(b => getChosung(b.name) === brandChosung);
-                        const visible = filtered.slice(0, brandVisibleCount);
-                        if (visible.length === 0)
-                          return <div className="text-center py-6 text-xs text-muted-foreground">해당 브랜드가 없습니다</div>;
-                        return visible.map((brand) => (
-                            <button
-                                key={brand.name}
-                                onClick={() => { setSelectedBrand(brand.name); setBrandPanelOpen(false); if (viewType === "folder") { setViewType("grid"); setOpenFolderId(null); } }}
-                                className={`w-full flex items-center gap-2.5 px-3 py-2 border-b border-border last:border-0 transition-colors text-left ${selectedBrand === brand.name ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground"}`}
-                            >
-                              <div className="w-7 h-7 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                <img src={brand.logo} alt={brand.name} className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                              </div>
-                              <span className="text-xs flex-1 truncate">{brand.name}</span>
-                              {selectedBrand === brand.name && <span className="text-primary font-bold text-xs">✓</span>}
-                            </button>
-                        ));
-                      })()}
-                    </div>
-                  </div>
-              )}
-            </div>
-          </div>
-
-          {/* 컨텐츠 */}
-          {viewType === "folder" ? <FolderListView /> : <ProductListView />}
-        </div>
+        {/* 컨텐츠 */}
+        {viewType === "folder" ? <FolderListView /> : <ProductListView />}
       </div>
   );
 }

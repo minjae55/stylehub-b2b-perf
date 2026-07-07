@@ -72,4 +72,19 @@ public class ProductOption extends BaseEntity {
     @OneToMany(mappedBy = "productOption", fetch = FetchType.LAZY)
     @OrderBy("isMain DESC, sortOrder ASC")
     private List<ProductImage> images = new ArrayList<>();
+
+    // [추가] 기존 옵션 row를 삭제/재생성하지 않고 필드만 갱신할 때 사용
+    // (주문/장바구니에서 이 옵션을 참조 중이어도 row 자체는 유지되므로 FK 제약과 무관하게 안전)
+    public void updateFields(String optionLabel, String sku, Integer stockQuantity, Long additionalPrice, Integer restockAlertQuantity) {
+        this.optionLabel = optionLabel;
+        this.sku = sku;
+        this.stockQuantity = stockQuantity;
+        this.additionalPrice = additionalPrice;
+        this.restockAlertQuantity = restockAlertQuantity;
+    }
+
+    // [추가] 판매중지/재개, 또는 삭제 대신 비활성화 처리할 때 사용
+    public void setActive(boolean active) {
+        this.isActive = active;
+    }
 }

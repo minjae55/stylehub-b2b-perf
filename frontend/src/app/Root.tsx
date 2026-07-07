@@ -4,6 +4,7 @@ import {
     CheckCircle,
     ChevronDown,
     ClipboardList,
+    Heart,
     Info,
     LogOut,
     MapPin,
@@ -650,8 +651,8 @@ export function Root() {
 
                         <Link to="/products/wishlist"
                               className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors relative">
-                            <Star size={25}/>
-                            <span className="text-[11px]">즐겨찾기</span>
+                            <Heart size={25}/>
+                            <span className="text-[11px]">찜목록</span>
                         </Link>
 
                         <Link to="/cart"

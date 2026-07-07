@@ -334,6 +334,12 @@ export function Home() {
 
         {/* Category Circles */}
         <div className="flex justify-center gap-6 mb-6">
+          <Link to="/products" className="flex flex-col items-center gap-2 group transition-transform hover:scale-105">
+            <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
+              <img src="/images/all.png" alt="전체보기" className="w-12 h-12 object-contain" />
+            </div>
+            <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">전체보기</span>
+          </Link>
           {categories.map((cat) => (
               <Link key={cat.id} to={`/products?category=${cat.id}`} className="flex flex-col items-center gap-2 group transition-transform hover:scale-105">
                 <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-3xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
@@ -342,24 +348,14 @@ export function Home() {
                 <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">{cat.name}</span>
               </Link>
           ))}
-          <Link to="/products" className="flex flex-col items-center gap-2 group transition-transform hover:scale-105">
-            <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
-              <img src="/images/all.png" alt="전체보기" className="w-12 h-12 object-contain" />
-            </div>
-            <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">전체보기</span>
-          </Link>
+
           <Link to="/suppliers" className="flex flex-col items-center gap-2 group transition-transform hover:scale-105">
             <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
               <img src="/images/brand.png" alt="브랜드" className="w-18 h-18 object-contain" />
             </div>
             <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">브랜드</span>
           </Link>
-          <Link to="/products" className="flex flex-col items-center gap-2 group transition-transform hover:scale-105">
-            <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
-              <img src="/images/discount.png" alt="시즌할인" className="w-18 h-18 object-contain" />
-            </div>
-            <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">시즌할인</span>
-          </Link>
+
         </div>
 
         {/* 신규 상품 - 6열 x 3줄로 꽉 채워서 노출 */}

@@ -23,12 +23,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -43,6 +47,7 @@ public class ProductService {
     private final ProductOptionValueRepository productOptionValueRepository;
     private final ProductImageRepository productImageRepository;
     private final ProductCertificationRepository productCertificationRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     // [CREATE] 상품 등록
     @Transactional
@@ -144,7 +149,7 @@ public class ProductService {
             }
         }
 
-        return ProductDto.DetailResponse.from(savedProduct, savedCertifications);
+        return ProductDto.DetailResponse.from(savedProduct, savedCertifications, java.util.Collections.emptyMap());
     }
 
     // [READ] 전체 상품 목록
@@ -162,7 +167,15 @@ public class ProductService {
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
         product.increaseViewCount();
         List<ProductCertification> certifications = productCertificationRepository.findByProduct_ProductId(productId);
-        return ProductDto.DetailResponse.from(product, certifications);
+
+        // [추가] 각 옵션이 주문/장바구니에서 참조 중인지 미리 계산 (프론트에서 수정 잠금 표시용)
+        java.util.Map<Integer, Boolean> hasOrdersByOptionId = product.getOptions().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        ProductOption::getProductOptionId,
+                        opt -> isOptionReferencedInOrdersOrCarts(opt.getProductOptionId())
+                ));
+
+        return ProductDto.DetailResponse.from(product, certifications, hasOrdersByOptionId);
     }
 
     // [READ] 내 상품 목록 (셀러용)
@@ -223,50 +236,90 @@ public class ProductService {
 
         product.update(request, category, brand);
 
-        // [추가] 옵션이 전달되면 기존 옵션(+옵션값+이미지) 전체 삭제 후 새로 저장
+        // [수정] 옵션이 전달되면 "조합(옵션값 세트)"을 키로 매칭해서
+        //  - 기존에 있던 조합 → 그대로 두고 필드(재고/가격/SKU 등)만 갱신
+        //  - 새로 추가된 조합 → 새로 생성
+        //  - 목록에서 빠진 조합 → 삭제 시도, 주문/장바구니에서 참조 중이라 FK로 막히면 삭제 대신 비활성화(is_active=false)
+        // 이렇게 하면 이미 주문/장바구니에 걸린 옵션이 있어도 다른 필드(설명, 가격 등) 수정이 막히지 않음
         if (request.options() != null) {
-            for (ProductOption opt : product.getOptions()) {
-                productImageRepository.deleteAll(opt.getImages());
-                productOptionValueRepository.deleteAll(opt.getOptionValues());
-            }
-            productOptionRepository.deleteAll(product.getOptions());
-            productOptionRepository.flush(); // [추가] 삭제를 즉시 DB에 반영 (동일 SKU 재사용 시 유니크 제약 충돌 방지)
+            Map<String, ProductOption> existingByComboKey = product.getOptions().stream()
+                    .collect(Collectors.toMap(this::buildComboKeyFromEntity, o -> o, (a, b) -> a));
 
-            ProductOption firstSavedOption = null;
+            java.util.Set<Integer> matchedOptionIds = new java.util.HashSet<>();
+            ProductOption imageCarrierOption = null; // 이미지들을 붙일 대표 옵션 (기존 이미지 있는 옵션 우선)
+
             for (ProductDto.OptionRequest optReq : request.options()) {
-                ProductOption option = ProductOption.builder()
-                        .product(product)
-                        .optionLabel(optReq.optionLabel())
-                        .sku(optReq.sku())
-                        .stockQuantity(optReq.stockQuantity() != null ? optReq.stockQuantity() : 0)
-                        .additionalPrice(optReq.additionalPrice() != null ? optReq.additionalPrice() : 0L)
-                        .restockAlertQuantity(optReq.restockAlertQuantity())
-                        .build();
-                ProductOption saved = productOptionRepository.save(option);
-                if (firstSavedOption == null) firstSavedOption = saved;
+                String comboKey = buildComboKeyFromRequest(optReq.optionValues());
+                ProductOption existing = existingByComboKey.get(comboKey);
 
-                if (optReq.optionValues() != null && !optReq.optionValues().isEmpty()) {
-                    int sortOrder = 0;
-                    for (ProductDto.OptionValueRequest ov : optReq.optionValues()) {
-                        productOptionValueRepository.save(
-                                ProductOptionValue.builder()
-                                        .productOption(saved)
-                                        .optionName(ov.optionName())
-                                        .optionValue(ov.optionValue())
-                                        .sortOrder(sortOrder++)
-                                        .createdAt(LocalDateTime.now())
-                                        .build()
-                        );
+                if (existing != null) {
+                    // 기존 조합 → 필드만 갱신 (row 자체는 유지되므로 FK 참조 안전)
+                    existing.updateFields(
+                            optReq.optionLabel(),
+                            optReq.sku(),
+                            optReq.stockQuantity() != null ? optReq.stockQuantity() : 0,
+                            optReq.additionalPrice() != null ? optReq.additionalPrice() : 0L,
+                            optReq.restockAlertQuantity()
+                    );
+                    existing.setActive(true); // 다시 살아난 조합이면 활성화
+                    matchedOptionIds.add(existing.getProductOptionId());
+                    if (imageCarrierOption == null && !existing.getImages().isEmpty()) {
+                        imageCarrierOption = existing;
                     }
+                } else {
+                    // 새로운 조합 → 신규 생성
+                    ProductOption newOption = ProductOption.builder()
+                            .product(product)
+                            .optionLabel(optReq.optionLabel())
+                            .sku(optReq.sku())
+                            .stockQuantity(optReq.stockQuantity() != null ? optReq.stockQuantity() : 0)
+                            .additionalPrice(optReq.additionalPrice() != null ? optReq.additionalPrice() : 0L)
+                            .restockAlertQuantity(optReq.restockAlertQuantity())
+                            .build();
+                    ProductOption saved = productOptionRepository.save(newOption);
+                    matchedOptionIds.add(saved.getProductOptionId());
+
+                    if (optReq.optionValues() != null) {
+                        int sortOrder = 0;
+                        for (ProductDto.OptionValueRequest ov : optReq.optionValues()) {
+                            productOptionValueRepository.save(
+                                    ProductOptionValue.builder()
+                                            .productOption(saved)
+                                            .optionName(ov.optionName())
+                                            .optionValue(ov.optionValue())
+                                            .sortOrder(sortOrder++)
+                                            .createdAt(LocalDateTime.now())
+                                            .build()
+                            );
+                        }
+                    }
+                    if (imageCarrierOption == null) imageCarrierOption = saved;
                 }
             }
 
-            // [추가] 이미지도 옵션과 함께 전달된 경우에만 재생성 (첫 옵션에 연결)
-            if (request.imageUrls() != null && !request.imageUrls().isEmpty() && firstSavedOption != null) {
+            // 목록에서 빠진(=더 이상 조합에 없는) 기존 옵션 처리
+            // [수정] "일단 삭제 시도 → 실패하면 catch"는 flush 실패 시 세션(트랜잭션)이 불안정해질 수 있어 위험함.
+            // 대신 삭제 전에 미리 cart_items/order_items에 참조가 있는지 확인해서 분기함 (더 안전)
+            for (ProductOption opt : new ArrayList<>(product.getOptions())) {
+                if (matchedOptionIds.contains(opt.getProductOptionId())) continue;
+
+                if (isOptionReferencedInOrdersOrCarts(opt.getProductOptionId())) {
+                    // 주문/장바구니에서 참조 중 → 삭제하지 않고 비활성화만 처리
+                    opt.setActive(false);
+                } else {
+                    productImageRepository.deleteAll(opt.getImages());
+                    productOptionValueRepository.deleteAll(opt.getOptionValues());
+                    productOptionRepository.delete(opt);
+                }
+            }
+
+            // 이미지는 대표 옵션(imageCarrierOption)에만 재연결
+            if (request.imageUrls() != null && imageCarrierOption != null) {
+                productImageRepository.deleteAll(imageCarrierOption.getImages());
                 for (int i = 0; i < request.imageUrls().size(); i++) {
                     productImageRepository.save(
                             ProductImage.builder()
-                                    .productOption(firstSavedOption)
+                                    .productOption(imageCarrierOption)
                                     .imageUrl(request.imageUrls().get(i))
                                     .sortOrder(i)
                                     .isMain(i == 0)
@@ -300,7 +353,15 @@ public class ProductService {
         }
 
         List<ProductCertification> certifications = productCertificationRepository.findByProduct_ProductId(productId);
-        return ProductDto.DetailResponse.from(product, certifications);
+
+        // [추가] 응답을 만들 때도 최신 옵션 목록 기준으로 hasOrders 재계산
+        java.util.Map<Integer, Boolean> hasOrdersByOptionId = product.getOptions().stream()
+                .collect(Collectors.toMap(
+                        ProductOption::getProductOptionId,
+                        opt -> isOptionReferencedInOrdersOrCarts(opt.getProductOptionId())
+                ));
+
+        return ProductDto.DetailResponse.from(product, certifications, hasOrdersByOptionId);
     }
 
     // [UPDATE] 판매 중지/재개 (실제 삭제 없이 노출만 제어, 주문 이력 있는 상품에도 안전)
@@ -335,5 +396,31 @@ public class ProductService {
             // 주문/장바구니 등에서 이 상품의 옵션을 참조 중이면 FK 제약으로 삭제 불가
             throw new IllegalStateException("이미 주문된 이력이 있는 상품은 삭제할 수 없습니다. 판매 중지(숨김) 처리를 이용해 주세요.");
         }
+    }
+
+    // [추가] 이 옵션이 order_items 또는 cart_items에서 참조되고 있는지 확인 (삭제 가능 여부 사전 판단용)
+    private boolean isOptionReferencedInOrdersOrCarts(Integer productOptionId) {
+        Integer orderCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM order_items WHERE product_option_id = ?", Integer.class, productOptionId);
+        Integer cartCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cart_items WHERE product_option_id = ?", Integer.class, productOptionId);
+        return (orderCount != null && orderCount > 0) || (cartCount != null && cartCount > 0);
+    }
+
+    // [추가] 기존 옵션(DB)의 옵션값 조합을 정렬해서 키 문자열로 변환 (예: "색상:블랙|사이즈:M")
+    private String buildComboKeyFromEntity(ProductOption option) {
+        return option.getOptionValues().stream()
+                .sorted(Comparator.comparing(ProductOptionValue::getOptionName))
+                .map(v -> v.getOptionName() + ":" + v.getOptionValue())
+                .collect(Collectors.joining("|"));
+    }
+
+    // [추가] 요청으로 들어온 옵션값 조합을 같은 방식으로 키 문자열로 변환 (매칭용, 위 메서드와 반드시 동일 로직 유지)
+    private String buildComboKeyFromRequest(List<ProductDto.OptionValueRequest> optionValues) {
+        if (optionValues == null) return "";
+        return optionValues.stream()
+                .sorted(Comparator.comparing(ProductDto.OptionValueRequest::optionName))
+                .map(v -> v.optionName() + ":" + v.optionValue())
+                .collect(Collectors.joining("|"));
     }
 }

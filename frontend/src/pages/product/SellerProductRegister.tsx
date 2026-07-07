@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router";
 import api from "../../api/axios";
+import { AlertModal, ConfirmModal } from "../../components/common/Modal";
 import {
   Shirt, Tag, LayoutGrid, Store, Settings, Palette,
   Award, FileText, Image, ChevronLeft, X, AlertCircle,
-  CheckCircle, CloudUpload, Upload, Plus, Trash2, Star, RotateCcw
+  CheckCircle, CloudUpload, Upload, Plus, Trash2, Star, RotateCcw, Lock
 } from "lucide-react";
 
 // 중분류 id 매핑 (DB categories 테이블 기준)
@@ -130,6 +131,7 @@ type FetchedOption = {
   productOptionId: number; optionLabel: string; sku: string | null;
   stockQuantity: number; additionalPrice: number; restockAlertQuantity: number | null;
   isActive: boolean; images: FetchedImage[]; optionValues: FetchedOptionValue[];
+  hasOrders?: boolean;
 };
 type FetchedCertification = { certName: string; fileUrl: string; expiryYear: number | null; expiryMonth: number | null };
 type FetchedDetail = {
@@ -163,20 +165,6 @@ function CertGroupLabel({ children }: { children: React.ReactNode }) {
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">{children}</span>
         <div className="flex-1 h-px bg-border" />
-      </div>
-  );
-}
-
-function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={(e) => e.stopPropagation()}>
-          <p className="text-sm text-foreground font-medium mb-6 text-center leading-relaxed">{message}</p>
-          <div className="flex gap-2 justify-center">
-            <button onClick={onCancel} className="border border-border text-foreground hover:border-primary hover:text-primary px-6 py-2 rounded text-sm font-medium transition-colors">취소</button>
-            <button onClick={onConfirm} className="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded text-sm font-semibold transition-colors">삭제</button>
-          </div>
-        </div>
       </div>
   );
 }
@@ -287,10 +275,15 @@ const labelOptionExamples = [
 function LabelOptionBuilder({
                               groups,
                               onChange,
+                              lockedKeys,
                             }: {
   groups: LabelOptionGroup[];
   onChange: (groups: LabelOptionGroup[]) => void;
+  lockedKeys?: Set<string>; // [추가] "그룹명:값" 형태. 주문/장바구니 이력이 있어 삭제 불가한 값들
 }) {
+  const isLocked = (groupName: string, value: string) =>
+      !!lockedKeys?.has(`${groupName}:${value}`);
+
   const updateGroupName = (id: string, name: string) =>
       onChange(groups.map((g) => (g.id === id ? { ...g, name } : g)));
 
@@ -337,6 +330,7 @@ function LabelOptionBuilder({
         <div className="space-y-2">
           {groups.map((g, groupIdx) => {
             const example = labelOptionExamples[groupIdx % labelOptionExamples.length];
+            const groupHasLockedValue = g.values.some((v) => isLocked(g.name, v));
             return (
                 <div key={g.id} className="flex items-center gap-2 flex-wrap">
                   <input
@@ -344,28 +338,43 @@ function LabelOptionBuilder({
                       value={g.name}
                       onChange={(e) => updateGroupName(g.id, e.target.value)}
                       placeholder={`예) ${example.name}`}
-                      className="border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors w-28"
+                      disabled={groupHasLockedValue}
+                      title={groupHasLockedValue ? "주문/장바구니 이력이 있어 라벨명을 변경할 수 없습니다" : undefined}
+                      className="border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors w-28 disabled:bg-muted/50 disabled:text-muted-foreground disabled:cursor-not-allowed"
                   />
-                  {g.values.map((val, idx) => (
-                      <div key={idx} className="flex items-center gap-1">
-                        <input
-                            type="text"
-                            value={val}
-                            onChange={(e) => updateGroupValue(g.id, idx, e.target.value)}
-                            placeholder={`예) ${example.value}`}
-                            className="border border-border rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors w-28"
-                        />
-                        {g.values.length > 1 && (
-                            <button
-                                type="button"
-                                onClick={() => removeValueInput(g.id, idx)}
-                                className="text-muted-foreground hover:text-red-500 transition-colors"
-                            >
-                              <X size={13} />
-                            </button>
-                        )}
-                      </div>
-                  ))}
+                  {g.values.map((val, idx) => {
+                    const locked = isLocked(g.name, val);
+                    return (
+                        <div key={idx} className="flex items-center gap-1">
+                          <input
+                              type="text"
+                              value={val}
+                              onChange={(e) => updateGroupValue(g.id, idx, e.target.value)}
+                              placeholder={`예) ${example.value}`}
+                              disabled={locked}
+                              title={locked ? "주문/장바구니 이력이 있어 삭제/변경할 수 없습니다" : undefined}
+                              className={`border rounded px-3 py-2 text-sm outline-none transition-colors w-28 ${
+                                  locked
+                                      ? "bg-muted/60 text-muted-foreground border-border cursor-not-allowed"
+                                      : "border-border focus:border-primary"
+                              }`}
+                          />
+                          {locked ? (
+                              <Lock size={13} className="text-muted-foreground flex-shrink-0" />
+                          ) : (
+                              g.values.length > 1 && (
+                                  <button
+                                      type="button"
+                                      onClick={() => removeValueInput(g.id, idx)}
+                                      className="text-muted-foreground hover:text-red-500 transition-colors"
+                                  >
+                                    <X size={13} />
+                                  </button>
+                              )
+                          )}
+                        </div>
+                    );
+                  })}
                   <button
                       type="button"
                       onClick={() => addValueInput(g.id)}
@@ -374,14 +383,20 @@ function LabelOptionBuilder({
                     <Plus size={12} /> 항목 추가
                   </button>
                   {groups.length > 1 && (
-                      <button
-                          type="button"
-                          onClick={() => removeGroup(g.id)}
-                          className="text-muted-foreground hover:text-red-500 transition-colors ml-1"
-                          title="라벨옵션 삭제"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      groupHasLockedValue ? (
+                          <span title="주문/장바구니 이력이 있는 값이 포함되어 있어 라벨옵션 자체를 삭제할 수 없습니다" className="text-muted-foreground/50 ml-1 cursor-not-allowed">
+                            <Trash2 size={13} />
+                          </span>
+                      ) : (
+                          <button
+                              type="button"
+                              onClick={() => removeGroup(g.id)}
+                              className="text-muted-foreground hover:text-red-500 transition-colors ml-1"
+                              title="라벨옵션 삭제"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                      )
                   )}
                 </div>
             );
@@ -475,9 +490,11 @@ export function SellerProductRegister() {
   const [certFiles, setCertFiles] = useState<Record<string, CertFile>>({});
   const [certModalTarget, setCertModalTarget] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null); // [추가] alert() 대체용
 
   const [labelGroups, setLabelGroups] = useState<LabelOptionGroup[]>([newLabelOptionGroup()]);
   const [combinationInputs, setCombinationInputs] = useState<Record<string, CombinationInput>>({});
+  const [lockedValueKeys, setLockedValueKeys] = useState<Set<string>>(new Set()); // [추가] "그룹명:값" 형태 - 주문/장바구니 이력으로 삭제 불가한 값들
 
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [imageUploading, setImageUploading] = useState(false);
@@ -552,6 +569,15 @@ export function SellerProductRegister() {
         }));
         setLabelGroups(restoredGroups.length > 0 ? restoredGroups : [newLabelOptionGroup()]);
 
+        // [추가] 주문/장바구니 이력이 있는 옵션(hasOrders)의 값들을 잠금 목록에 추가
+        const locked = new Set<string>();
+        detail.options.forEach((opt) => {
+          if (opt.hasOrders) {
+            opt.optionValues.forEach((ov) => locked.add(`${ov.optionName}:${ov.optionValue}`));
+          }
+        });
+        setLockedValueKeys(locked);
+
         const restoredInputs: Record<string, CombinationInput> = {};
         detail.options.forEach((opt) => {
           const combo: ComboValue[] = groupOrder.map((name) => {
@@ -601,7 +627,7 @@ export function SellerProductRegister() {
         }
       } catch (err) {
         console.error(err);
-        alert("상품 정보를 불러오지 못했습니다.");
+        setAlertMessage("상품 정보를 불러오지 못했습니다.");
       } finally {
         setLoadingDetail(false);
       }
@@ -782,7 +808,7 @@ export function SellerProductRegister() {
         },
       }));
     } catch {
-      alert("인증서 업로드 중 오류가 발생했습니다.");
+      setAlertMessage("인증서 업로드 중 오류가 발생했습니다.");
     }
     setCertModalTarget(null);
   };
@@ -790,7 +816,7 @@ export function SellerProductRegister() {
   const handleDetailPdfUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
-    if (file.type !== "application/pdf") { alert("PDF 파일만 업로드 가능합니다."); return; }
+    if (file.type !== "application/pdf") { setAlertMessage("PDF 파일만 업로드 가능합니다."); return; }
     setDetailPdfUploading(true);
     try {
       const formData = new FormData();
@@ -799,7 +825,7 @@ export function SellerProductRegister() {
       setDetailPdfUrl(res as string);
       setDetailPdfName(file.name);
     } catch {
-      alert("PDF 업로드 중 오류가 발생했습니다.");
+      setAlertMessage("PDF 업로드 중 오류가 발생했습니다.");
     }
     setDetailPdfUploading(false);
   };
@@ -826,23 +852,71 @@ export function SellerProductRegister() {
     setDetailPdfName("");
   };
 
-  const handleRegisterSubmit = async () => {
-    if (!form.productName || !form.mainCategory || !form.subCategory || !selectedCategoryId || !form.moq || !form.unitPrice || !form.mainMaterial || !form.description) {
-      alert("필수 입력 사항(*)을 모두 기재해 주세요.");
-      return;
+  // [추가] 폼 위에서부터 순서대로 검사해서 걸리는 첫 번째 항목만 반환 (string이면 실패 메시지, null이면 통과)
+  const validateForm = (): string | null => {
+    // 1. 제품 이미지 업로드
+    if (productImages.length === 0) {
+      return "제품 이미지를 최소 1장 이상 업로드해 주세요.";
     }
 
+    // 2. 카테고리
+    if (!form.mainCategory) {
+      return "카테고리 대분류를 선택해 주세요.";
+    }
+    if (!form.subCategory || !selectedCategoryId) {
+      return "카테고리 중분류를 선택해 주세요.";
+    }
+
+    // 3. 기본 제품 정보
+    if (!form.productName.trim()) {
+      return "제품명(한국어)을 입력해 주세요.";
+    }
+    if (!selectedBrandId) {
+      return "브랜드를 선택해 주세요.";
+    }
+
+    // 4. 상품 옵션 - 라벨/값
     if (combinations.length === 0) {
-      alert("옵션(예: 색상, 패턴 등) 라벨과 값을 최소 1개 이상 입력해 주세요.");
-      return;
+      return "옵션(예: 색상, 사이즈 등) 라벨과 값을 최소 1개 이상 입력해 주세요.";
     }
 
-    const missingStock = combinations.some((combo) => {
+    // 5. 상품 옵션 - 각 조합별 재고 수량 (첫 번째로 비어있는 조합만 짚어줌)
+    const missingStockCombo = combinations.find((combo) => {
       const input = combinationInputs[comboKey(combo)];
       return !input || input.stockQuantity.trim() === "" || isNaN(parseInt(input.stockQuantity, 10));
     });
-    if (missingStock) {
-      alert("모든 옵션 조합의 재고 수량을 입력해 주세요.");
+    if (missingStockCombo) {
+      return `"${comboLabel(missingStockCombo)}" 옵션 조합의 재고 수량을 입력해 주세요.`;
+    }
+
+    // 6. 제품 상세 설명
+    if (!form.mainMaterial.trim()) {
+      return "주요 소재를 입력해 주세요.";
+    }
+    if (!form.description.trim()) {
+      return "제품 특징 및 스타일링 포인트를 입력해 주세요.";
+    }
+
+    // 7. 거래 조건
+    if (!form.moq.trim()) {
+      return "최소 발주량(MOQ)을 입력해 주세요.";
+    }
+    if (!form.unitPrice.trim()) {
+      return "단가를 입력해 주세요.";
+    }
+
+    // 8. 반품 정책
+    if (!form.returnPolicy.trim()) {
+      return "반품 정책을 입력해 주세요.";
+    }
+
+    return null;
+  };
+
+  const handleRegisterSubmit = async () => {
+    const validationError = validateForm();
+    if (validationError) {
+      setAlertMessage(validationError);
       return;
     }
 
@@ -895,9 +969,10 @@ export function SellerProductRegister() {
         await api.post("/products", payload);
       }
       setSubmitted(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("제품 등록/수정 실패:", error);
-      alert("처리 중 문제가 발생했습니다. 관리자에게 문의하세요.");
+      // axios 인터셉터가 error.message에 서버 메시지를 세팅해주므로 그대로 노출
+      setAlertMessage(error?.message || "처리 중 문제가 발생했습니다. 관리자에게 문의하세요.");
     }
   };
 
@@ -939,6 +1014,9 @@ export function SellerProductRegister() {
 
   return (
       <div className="max-w-[900px] mx-auto px-4 py-8">
+        {alertMessage && (
+            <AlertModal message={alertMessage} onClose={() => setAlertMessage(null)} />
+        )}
         {certModalTarget && (
             <CertUploadModal
                 certName={certModalTarget}
@@ -949,6 +1027,7 @@ export function SellerProductRegister() {
         {confirmTarget && (
             <ConfirmModal
                 message="등록된 인증서를 삭제하시겠습니까?"
+                confirmLabel="삭제"
                 onConfirm={() => {
                   toggleItem(selectedCerts, setSelectedCerts, confirmTarget);
                   setCertFiles(prev => {
@@ -1093,7 +1172,7 @@ export function SellerProductRegister() {
                 <input type="text" value={form.engName} onChange={(e) => update("engName", e.target.value)} placeholder="Oversized Linen Shirt Blouse" className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">브랜드</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">브랜드 <span className="text-red-500">*</span></label>
                 <select value={selectedBrandId ?? ""} onChange={(e) => setSelectedBrandId(e.target.value ? Number(e.target.value) : null)} className="w-full border border-border rounded px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors">
                   <option value="">선택하세요</option>
                   {brands.map(b => (<option key={b.brandId} value={b.brandId}>{b.brandName}</option>))}
@@ -1217,7 +1296,12 @@ export function SellerProductRegister() {
               )}
             </div>
 
-            <LabelOptionBuilder groups={labelGroups} onChange={handleLabelGroupsChange} />
+            <LabelOptionBuilder groups={labelGroups} onChange={handleLabelGroupsChange} lockedKeys={lockedValueKeys} />
+            {lockedValueKeys.size > 0 && (
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Lock size={11} /> 자물쇠 표시된 값은 주문/장바구니 이력이 있어 삭제·수정할 수 없어요.
+                </p>
+            )}
 
             <div className="mt-5">
               {combinations.length === 0 ? (
@@ -1483,7 +1567,7 @@ export function SellerProductRegister() {
 
           {/* 10. 반품 정책 */}
           <div className="bg-white border border-border rounded-lg p-6">
-            <SectionTitle icon={<RotateCcw size={17} />}>반품 정책</SectionTitle>
+            <SectionTitle icon={<RotateCcw size={17} />}>반품 정책 <span className="text-red-500">*</span></SectionTitle>
             <textarea
                 value={form.returnPolicy}
                 onChange={(e) => update("returnPolicy", e.target.value)}

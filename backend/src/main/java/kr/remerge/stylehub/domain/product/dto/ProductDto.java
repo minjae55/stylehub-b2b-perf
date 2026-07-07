@@ -136,7 +136,8 @@ public class ProductDto {
             List<CertificationResponse> certifications,
             Boolean isActive
     ) {
-        public static DetailResponse from(Product p, List<ProductCertification> certifications) {
+        // [수정] optionId -> 주문/장바구니 참조 여부 맵을 받아서 각 옵션에 반영
+        public static DetailResponse from(Product p, List<ProductCertification> certifications, java.util.Map<Integer, Boolean> hasOrdersByOptionId) {
             return new DetailResponse(
                     p.getProductId(),
                     p.getSeller().getUserId(),
@@ -163,7 +164,9 @@ public class ProductDto {
                     p.getWhiteLabel(),
                     p.getCreatedAt(),
                     p.getUpdatedAt(),
-                    p.getOptions().stream().map(OptionResponse::from).toList(),
+                    p.getOptions().stream()
+                            .map(opt -> OptionResponse.from(opt, Boolean.TRUE.equals(hasOrdersByOptionId.get(opt.getProductOptionId()))))
+                            .toList(),
                     certifications.stream().map(CertificationResponse::from).toList(),
                     p.getIsActive()
             );
@@ -316,9 +319,11 @@ public class ProductDto {
             Integer restockAlertQuantity,
             Boolean isActive,
             List<ImageResponse> images,
-            List<OptionValueResponse> optionValues
+            List<OptionValueResponse> optionValues,
+            Boolean hasOrders
     ) {
-        public static OptionResponse from(ProductOption opt) {
+        // [수정] hasOrders는 DB 조회가 필요해서 외부(ProductService)에서 계산해 넘겨받음
+        public static OptionResponse from(ProductOption opt, boolean hasOrders) {
             return new OptionResponse(
                     opt.getProductOptionId(),
                     opt.getOptionLabel(),
@@ -328,7 +333,8 @@ public class ProductDto {
                     opt.getRestockAlertQuantity(),
                     opt.getIsActive(),
                     opt.getImages().stream().map(ImageResponse::from).toList(),
-                    opt.getOptionValues().stream().map(OptionValueResponse::from).toList()
+                    opt.getOptionValues().stream().map(OptionValueResponse::from).toList(),
+                    hasOrders
             );
         }
     }
