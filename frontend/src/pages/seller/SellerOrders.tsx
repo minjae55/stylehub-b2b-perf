@@ -256,6 +256,7 @@ const statusFilters: Array<{
   { value: "SHIPMENT_PENDING", label: "출고 대기" },
   { value: "SHIPPED", label: "배송 중" },
   { value: "DELIVERED", label: "배송 완료" },
+  { value: "COMPLETED", label: "거래 완료" },
 ];
 
 function formatPrice(value: number) {
