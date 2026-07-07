@@ -24,7 +24,7 @@ const certConfig: Record<CertKey, { label: string; bg: string; border: string; c
   "섬유품질":  { label: "섬유품질 적합",    bg: "#EEF2FF", border: "#C7D2FE", color: "#3730A3", iconBg: "#4338CA", icon: <CheckCircle size={11} /> },
 };
 
-// [추가] 상품 등록 시 사용하는 인증서 이름(certName) → CertBadge 키 매핑
+// 상품 등록 시 사용하는 인증서 이름(certName) → CertBadge 키 매핑
 const certNameToKeyMap: Record<string, CertKey> = {
   "KC 인증": "KC",
   "어린이제품 안전인증": "어린이안전",
@@ -75,7 +75,7 @@ function saveFolderData(folders: Folder[]) {
   localStorage.setItem("wishlistFolders", JSON.stringify(folders));
 }
 
-// [추가] 옵션 name/value 쌍 타입
+// 옵션 name/value 쌍 타입
 interface OptionValue {
   optionName: string;
   optionValue: string;
@@ -108,7 +108,8 @@ interface ProductDetailData {
   whiteLabel: boolean;
   createdAt: string;
   updatedAt: string;
-  certifications?: { certName: string }[]; // [추가] 백엔드 DetailResponse에 필드 추가 필요 (아래 설명 참고)
+  certifications?: { certName: string }[];
+  isActive?: boolean;
   options: {
     productOptionId: number;
     optionLabel: string;
@@ -117,7 +118,7 @@ interface ProductDetailData {
     additionalPrice: number;
     restockAlertQuantity: number;
     isActive: boolean;
-    optionValues: OptionValue[]; // [추가]
+    optionValues: OptionValue[];
     images: {
       productImageId: number;
       imageUrl: string;
@@ -134,7 +135,7 @@ export function ProductDetail() {
   const [product, setProduct] = useState<ProductDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOptionIdx, setSelectedOptionIdx] = useState(0); // 레거시(옵션값 없는 상품) 폴백용
-  const [selectedValues, setSelectedValues] = useState<Record<string, string>>({}); // [추가] 옵션 그룹별 선택값
+  const [selectedValues, setSelectedValues] = useState<Record<string, string>>({}); // 옵션 그룹별 선택값
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -151,7 +152,7 @@ export function ProductDetail() {
   const productId = product?.productId ?? null;
   const isFavorite = productId !== null && favorites.includes(productId);
 
-  // [수정] 자동 캐러셀 useEffect는 early return보다 반드시 위에 있어야 함 (Hook 개수/순서 일관성 유지)
+  // 자동 캐러셀 useEffect는 early return보다 반드시 위에 있어야 함 (Hook 개수/순서 일관성 유지)
   const allImagesForEffect = product?.options.flatMap(opt => opt.images).sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
   useEffect(() => {
     if (allImagesForEffect.length <= 1) return;
@@ -168,7 +169,7 @@ export function ProductDetail() {
         .then(res => {
           setProduct(res);
           setQuantity(res.moq ?? 1);
-          // [추가] 옵션값이 구조화되어 있으면 첫 옵션 조합으로 초기 선택
+          // 옵션값이 구조화되어 있으면 첫 옵션 조합으로 초기 선택
           const first = res.options?.[0];
           if (first?.optionValues?.length > 0) {
             const initial: Record<string, string> = {};
@@ -223,18 +224,21 @@ export function ProductDetail() {
     );
   }
 
+  // [추가] 판매중지된 상품인지 (false일 때만 중지, undefined/true는 정상 판매중으로 취급)
+  const isPaused = product.isActive === false;
+
   const allImages = product.options.flatMap(opt => opt.images).sort((a, b) => a.sortOrder - b.sortOrder);
   const mainImages = allImages.length > 0 ? allImages : [];
 
-  // [추가] 모든 옵션이 구조화된 optionValues를 갖고 있으면 그룹 선택 UI 사용, 아니면 기존 플랫 버튼 방식 폴백
+  // 모든 옵션이 구조화된 optionValues를 갖고 있으면 그룹 선택 UI 사용, 아니면 기존 플랫 버튼 방식 폴백
   const hasStructuredOptions = product.options.length > 0 && product.options.every(o => o.optionValues && o.optionValues.length > 0);
 
-  // [추가] 옵션 그룹 이름 목록 (예: ["색상", "마루세트"]) — 등장 순서 유지
+  // 옵션 그룹 이름 목록 (예: ["색상", "세트"]) — 등장 순서 유지
   const optionGroupNames: string[] = hasStructuredOptions
       ? Array.from(new Set(product.options.flatMap(o => o.optionValues.map(v => v.optionName))))
       : [];
 
-  // [추가] 그룹별 선택 가능한 값 목록 (예: {색상: ["옐로우","핑크"], 마루세트: ["상의만"]})
+  // 그룹별 선택 가능한 값 목록 (예: {색상: ["네이비","블랙"], 세트: ["상의만","세트","하의만"]})
   const optionGroupValues: Record<string, string[]> = {};
   optionGroupNames.forEach(name => {
     optionGroupValues[name] = Array.from(new Set(
@@ -242,7 +246,7 @@ export function ProductDetail() {
     ));
   });
 
-  // [추가] 현재 선택된 조합(selectedValues)과 정확히 일치하는 옵션(SKU) 찾기
+  // 현재 선택된 조합(selectedValues)과 정확히 일치하는 옵션(SKU) 찾기
   const matchedOptionIdx = hasStructuredOptions
       ? product.options.findIndex(o =>
           o.optionValues.length === Object.keys(selectedValues).length &&
@@ -254,9 +258,19 @@ export function ProductDetail() {
       ? (matchedOptionIdx >= 0 ? product.options[matchedOptionIdx] : null)
       : (product.options[selectedOptionIdx] ?? null);
 
+  // [추가] 특정 그룹의 특정 값(name=value)을 골랐을 때, 현재 선택된 다른 그룹 값들과 합친 조합에 해당하는 옵션을 찾는 헬퍼
+  // 버튼 옆 추가금액 표시 및 클릭 가능 여부(exists) 판단에 공용으로 사용
+  const findOptionForCandidate = (name: string, value: string) => {
+    const candidate = { ...selectedValues, [name]: value };
+    return product.options.find(o =>
+        o.optionValues.length === Object.keys(candidate).length &&
+        o.optionValues.every(v => candidate[v.optionName] === v.optionValue)
+    ) ?? null;
+  };
+
   const total = (product.unitPrice + (selectedOption?.additionalPrice ?? 0)) * quantity;
 
-  // [추가] 등록된 인증서 이름을 뱃지 키로 변환, 중복 제거
+  // 등록된 인증서 이름을 뱃지 키로 변환, 중복 제거
   const certBadgeKeys: CertKey[] = Array.from(new Set(
       (product.certifications ?? [])
           .map(c => certNameToKeyMap[c.certName])
@@ -268,7 +282,7 @@ export function ProductDetail() {
     if (next >= product.moq) setQuantity(next);
   };
 
-  // [추가] 이미지 슬라이더 전용 이동 함수 — 수동 클릭 시에도 이 함수를 거치도록 통일 (자동 전환 타이머는 selectedImage 변경마다 재시작됨)
+  // 이미지 슬라이더 전용 이동 함수 — 수동 클릭 시에도 이 함수를 거치도록 통일 (자동 전환 타이머는 selectedImage 변경마다 재시작됨)
   const goToImage = (index: number) => {
     if (mainImages.length === 0) return;
     const next = ((index % mainImages.length) + mainImages.length) % mainImages.length;
@@ -276,7 +290,7 @@ export function ProductDetail() {
   };
 
   const handleAddToCart = async () => {
-    if (isAddingToCart || !selectedOption) return;
+    if (isPaused || isAddingToCart || !selectedOption) return;
     try {
       setIsAddingToCart(true);
       await api.post("/carts", {
@@ -368,6 +382,13 @@ export function ProductDetail() {
           상품 목록으로 돌아가기
         </Link>
 
+        {/* [추가] 판매중지 안내 배너 */}
+        {isPaused && (
+            <div className="mb-6 bg-gray-100 border border-gray-300 rounded-lg px-5 py-3 text-sm text-gray-700 font-medium">
+              판매자가 잠시 판매를 중지한 상품 입니다.
+            </div>
+        )}
+
         <div className="grid grid-cols-[500px_1fr] gap-8 mb-8">
           {/* Left: Images */}
           <div>
@@ -423,6 +444,9 @@ export function ProductDetail() {
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  {isPaused && (
+                      <span className="inline-block bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded font-semibold">판매중지</span>
+                  )}
                   {product.oemAvailable && (
                       <span className="inline-block bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded font-semibold">OEM/ODM · 자체 라벨 가능</span>
                   )}
@@ -432,7 +456,7 @@ export function ProductDetail() {
                   {product.whiteLabel && (
                       <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded font-semibold">화이트라벨</span>
                   )}
-                  {/* [추가] 보유 인증서 뱃지 */}
+                  {/* 보유 인증서 뱃지 */}
                   {certBadgeKeys.map(key => (
                       <CertBadge key={key} certKey={key} />
                   ))}
@@ -465,7 +489,7 @@ export function ProductDetail() {
               <div className="text-sm text-muted-foreground mb-5">최소 주문 수량: {product.moq.toLocaleString()}벌</div>
 
               <div className="space-y-4">
-                {/* [수정] 옵션 선택 — 그룹(옵션명)별로 벨류 버튼을 보여주는 방식. 구조화된 값이 없는 레거시 상품은 기존 플랫 버튼으로 폴백 */}
+                {/* 옵션 선택 — 그룹(옵션명)별로 벨류 버튼을 보여주는 방식. 구조화된 값이 없는 레거시 상품은 기존 플랫 버튼으로 폴백 */}
                 {hasStructuredOptions ? (
                     <div className="space-y-4">
                       {optionGroupNames.map(name => (
@@ -474,12 +498,10 @@ export function ProductDetail() {
                             <div className="flex flex-wrap gap-2">
                               {optionGroupValues[name].map(value => {
                                 const isSelected = selectedValues[name] === value;
-                                // 이 값을 선택했을 때, 현재 선택 중인 다른 그룹 값들과 조합했을 때 실제로 존재하는 SKU인지 확인
-                                const candidate = { ...selectedValues, [name]: value };
-                                const exists = product.options.some(o =>
-                                    o.optionValues.length === Object.keys(candidate).length &&
-                                    o.optionValues.every(v => candidate[v.optionName] === v.optionValue)
-                                );
+                                // [수정] 이 값을 선택했을 때 현재 다른 그룹 선택값들과 합쳐지는 조합의 옵션을 찾음
+                                // → 존재 여부(exists) 판단과 추가금액 표시 모두 여기서 가져옴
+                                const candidateOption = findOptionForCandidate(name, value);
+                                const exists = candidateOption !== null;
                                 return (
                                     <button
                                         key={value}
@@ -495,6 +517,12 @@ export function ProductDetail() {
                                         }`}
                                     >
                                       {value}
+                                      {/* [수정] 이 조합의 추가금액을 버튼 옆에 괄호로 표시 (0원이면 표시 안 함, 마이너스는 -₩ 로 표시) */}
+                                      {exists && candidateOption!.additionalPrice !== 0 && (
+                                          <span className="ml-1 opacity-70">
+                                            ({candidateOption!.additionalPrice > 0 ? "+" : "-"}₩{Math.abs(candidateOption!.additionalPrice).toLocaleString()})
+                                          </span>
+                                      )}
                                     </button>
                                 );
                               })}
@@ -504,7 +532,9 @@ export function ProductDetail() {
                       {selectedOption ? (
                           <p className="text-xs text-muted-foreground">
                             재고: {selectedOption.stockQuantity.toLocaleString()}벌
-                            {selectedOption.additionalPrice > 0 && <> · 추가금 +₩{selectedOption.additionalPrice.toLocaleString()}</>}
+                            {selectedOption.additionalPrice !== 0 && (
+                                <> · 추가금 {selectedOption.additionalPrice > 0 ? "+" : "-"}₩{Math.abs(selectedOption.additionalPrice).toLocaleString()}</>
+                            )}
                           </p>
                       ) : (
                           <p className="text-xs text-red-500">선택하신 조합은 현재 판매하지 않는 옵션입니다.</p>
@@ -526,7 +556,11 @@ export function ProductDetail() {
                                     }`}
                                 >
                                   {opt.optionLabel}
-                                  {opt.additionalPrice > 0 && <span className="ml-1 opacity-70">(+₩{opt.additionalPrice.toLocaleString()})</span>}
+                                  {opt.additionalPrice !== 0 && (
+                                      <span className="ml-1 opacity-70">
+                                        ({opt.additionalPrice > 0 ? "+" : "-"}₩{Math.abs(opt.additionalPrice).toLocaleString()})
+                                      </span>
+                                  )}
                                 </button>
                             ))}
                           </div>
@@ -565,18 +599,30 @@ export function ProductDetail() {
                 </div>
 
                 <div className="flex gap-3 pt-1">
-                  <button
-                      type="button"
-                      onClick={handleAddToCart}
-                      disabled={isAddingToCart || !selectedOption}
-                      className="flex-1 bg-white border-2 border-primary text-primary hover:bg-secondary py-3.5 rounded font-semibold transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <ShoppingCart size={18} />
-                    {isAddingToCart ? "담는 중..." : "장바구니 담기"}
-                  </button>
-                  <Link to="/checkout" className="flex-1 bg-primary hover:bg-primary/90 text-white py-3.5 rounded font-semibold transition-colors flex items-center justify-center">
-                    바로 구매하기
-                  </Link>
+                  {isPaused ? (
+                      <button
+                          type="button"
+                          disabled
+                          className="flex-1 bg-gray-100 border-2 border-gray-200 text-gray-400 py-3.5 rounded font-semibold cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        현재 판매중인 상품이 아닙니다.
+                      </button>
+                  ) : (
+                      <>
+                        <button
+                            type="button"
+                            onClick={handleAddToCart}
+                            disabled={isAddingToCart || !selectedOption}
+                            className="flex-1 bg-white border-2 border-primary text-primary hover:bg-secondary py-3.5 rounded font-semibold transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <ShoppingCart size={18} />
+                          {isAddingToCart ? "담는 중..." : "장바구니 담기"}
+                        </button>
+                        <Link to="/checkout" className="flex-1 bg-primary hover:bg-primary/90 text-white py-3.5 rounded font-semibold transition-colors flex items-center justify-center">
+                          바로 구매하기
+                        </Link>
+                      </>
+                  )}
                 </div>
               </div>
             </div>

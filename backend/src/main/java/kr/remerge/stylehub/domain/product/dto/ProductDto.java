@@ -4,11 +4,13 @@ import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.product.entity.Product;
 import kr.remerge.stylehub.domain.product.entity.ProductImage;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
-import kr.remerge.stylehub.domain.product.entity.ProductOptionValue; // [추가]
-import kr.remerge.stylehub.domain.product.entity.ProductCertification; // [추가]
+import kr.remerge.stylehub.domain.product.entity.ProductOptionValue;
+import kr.remerge.stylehub.domain.product.entity.ProductCertification;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 public class ProductDto {
 
@@ -57,11 +59,11 @@ public class ProductDto {
             Integer stockQuantity,
             Long additionalPrice,
             Integer restockAlertQuantity,
-            List<OptionValueRequest> optionValues // [추가] 옵션 name/value 쌍 목록 (예: 색상-옐로우, 마루세트-상의만)
+            List<OptionValueRequest> optionValues // 옵션 name/value 쌍 목록 (예: 색상-옐로우, 마루세트-상의만)
     ) {}
 
     // ───────────────────────────────────────────
-    // [CREATE] 옵션 name/value 쌍 요청 [추가]
+    // [CREATE] 옵션 name/value 쌍 요청
     // ───────────────────────────────────────────
     public record OptionValueRequest(
             String optionName,
@@ -72,6 +74,8 @@ public class ProductDto {
     // [UPDATE] 상품 수정 요청
     // ───────────────────────────────────────────
     public record UpdateRequest(
+            Integer categoryId,        // [추가] null이면 카테고리 변경 안 함
+            Integer brandId,           // [추가] null이면 브랜드 변경 안 함
             String productName,
             String productEngName,
             String returnPolicy,
@@ -86,7 +90,17 @@ public class ProductDto {
             String productUrl,
             Boolean oemAvailable,
             Boolean sampleAvailable,
-            Boolean whiteLabel
+            Boolean whiteLabel,
+            List<String> imageUrls,                 // [추가] null이면 이미지 변경 안 함, 값이 있으면 전체 교체
+            List<OptionRequest> options,             // [추가] null이면 옵션 변경 안 함, 값이 있으면 전체 교체
+            List<CertificationRequest> certifications // [추가] null이면 인증서 변경 안 함, 값이 있으면 전체 교체
+    ) {}
+
+    // ───────────────────────────────────────────
+    // [UPDATE] 판매 중지/재개 요청 [추가]
+    // ───────────────────────────────────────────
+    public record SetActiveRequest(
+            Boolean isActive
     ) {}
 
     // ───────────────────────────────────────────
@@ -119,9 +133,9 @@ public class ProductDto {
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
             List<OptionResponse> options,
-            List<CertificationResponse> certifications // [추가]
+            List<CertificationResponse> certifications,
+            Boolean isActive
     ) {
-        // [수정] 인증서 목록을 함께 받도록 파라미터 추가
         public static DetailResponse from(Product p, List<ProductCertification> certifications) {
             return new DetailResponse(
                     p.getProductId(),
@@ -150,13 +164,14 @@ public class ProductDto {
                     p.getCreatedAt(),
                     p.getUpdatedAt(),
                     p.getOptions().stream().map(OptionResponse::from).toList(),
-                    certifications.stream().map(CertificationResponse::from).toList() // [추가]
+                    certifications.stream().map(CertificationResponse::from).toList(),
+                    p.getIsActive()
             );
         }
     }
 
     // ───────────────────────────────────────────
-    // [RESPONSE] 인증서 [추가]
+    // [RESPONSE] 인증서
     // ───────────────────────────────────────────
     public record CertificationResponse(
             String certName,
@@ -175,7 +190,7 @@ public class ProductDto {
     }
 
     // ───────────────────────────────────────────
-    // [RESPONSE] 상품 목록용 요약 [수정]
+    // [RESPONSE] 상품 목록용 요약
     // ───────────────────────────────────────────
     public record SummaryResponse(
             Integer productId,
@@ -184,9 +199,9 @@ public class ProductDto {
             Integer brandId,
             String brandName,
             Integer categoryId,
-            String categoryName,        // [추가]
-            Integer parentCategoryId,   // [추가] null이면 자기자신이 대분류
-            String parentCategoryName,  // [추가]
+            String categoryName,
+            Integer parentCategoryId,
+            String parentCategoryName,
             Long unitPrice,
             Integer moq,
             Boolean oemAvailable,
@@ -212,15 +227,79 @@ public class ProductDto {
                     p.getBrand().getBrandId(),
                     p.getBrand().getBrandName(),
                     cat.getCategoryId(),
-                    cat.getCategoryName(),                                    // [추가]
-                    parent != null ? parent.getCategoryId() : null,           // [추가]
-                    parent != null ? parent.getCategoryName() : null,         // [추가]
+                    cat.getCategoryName(),
+                    parent != null ? parent.getCategoryId() : null,
+                    parent != null ? parent.getCategoryName() : null,
                     p.getUnitPrice(),
                     p.getMoq(),
                     p.getOemAvailable(),
                     p.getSampleAvailable(),
                     mainImageUrl,
                     p.getCreatedAt()
+            );
+        }
+    }
+
+    // ───────────────────────────────────────────
+    // [RESPONSE] 셀러 상품 관리 페이지 전용 요약 [추가]
+    // ───────────────────────────────────────────
+    public record ManageResponse(
+            Integer productId,
+            String productName,
+            String brandName,
+            String categoryName,
+            Long unitPrice,
+            Integer moq,
+            Integer totalStock,
+            Integer stockAlertThreshold,
+            Boolean isLowStock,
+            String mainImageUrl,
+            LocalDateTime createdAt,
+            Integer certExpiryYear,
+            Integer certExpiryMonth,
+            Boolean isActive
+    ) {
+        public static ManageResponse from(Product p, List<ProductCertification> certs) {
+            int totalStock = p.getOptions().stream()
+                    .mapToInt(o -> o.getStockQuantity() != null ? o.getStockQuantity() : 0)
+                    .sum();
+
+            Integer alertThreshold = p.getOptions().stream()
+                    .map(ProductOption::getRestockAlertQuantity)
+                    .filter(Objects::nonNull)
+                    .min(Integer::compareTo)
+                    .orElse(null);
+
+            boolean isLowStock = alertThreshold != null && totalStock <= alertThreshold;
+
+            String mainImageUrl = p.getOptions().stream()
+                    .flatMap(opt -> opt.getImages().stream())
+                    .filter(ProductImage::getIsMain)
+                    .findFirst()
+                    .map(ProductImage::getImageUrl)
+                    .orElse(null);
+
+            // 가장 임박한 인증서 만료 (연/월 기준)
+            ProductCertification nearest = certs.stream()
+                    .filter(c -> c.getExpiryYear() != null && c.getExpiryMonth() != null)
+                    .min(Comparator.comparingInt(c -> c.getExpiryYear() * 100 + c.getExpiryMonth()))
+                    .orElse(null);
+
+            return new ManageResponse(
+                    p.getProductId(),
+                    p.getProductName(),
+                    p.getBrand().getBrandName(),
+                    p.getCategory().getCategoryName(),
+                    p.getUnitPrice(),
+                    p.getMoq(),
+                    totalStock,
+                    alertThreshold,
+                    isLowStock,
+                    mainImageUrl,
+                    p.getCreatedAt(),
+                    nearest != null ? nearest.getExpiryYear() : null,
+                    nearest != null ? nearest.getExpiryMonth() : null,
+                    p.getIsActive()
             );
         }
     }
@@ -237,7 +316,7 @@ public class ProductDto {
             Integer restockAlertQuantity,
             Boolean isActive,
             List<ImageResponse> images,
-            List<OptionValueResponse> optionValues // [추가]
+            List<OptionValueResponse> optionValues
     ) {
         public static OptionResponse from(ProductOption opt) {
             return new OptionResponse(
@@ -249,13 +328,13 @@ public class ProductDto {
                     opt.getRestockAlertQuantity(),
                     opt.getIsActive(),
                     opt.getImages().stream().map(ImageResponse::from).toList(),
-                    opt.getOptionValues().stream().map(OptionValueResponse::from).toList() // [추가]
+                    opt.getOptionValues().stream().map(OptionValueResponse::from).toList()
             );
         }
     }
 
     // ───────────────────────────────────────────
-    // [RESPONSE] 옵션 name/value 쌍 [추가]
+    // [RESPONSE] 옵션 name/value 쌍
     // ───────────────────────────────────────────
     public record OptionValueResponse(
             String optionName,

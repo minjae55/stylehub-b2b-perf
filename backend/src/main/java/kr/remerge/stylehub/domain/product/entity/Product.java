@@ -93,14 +93,23 @@ public class Product extends BaseEntity {
     @Column(name = "white_label", nullable = false)
     private Boolean whiteLabel = false;
 
+    // [추가] 판매 중지(숨김) 여부 - 실제 삭제 없이 목록/노출에서만 제외
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
     @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
+    @OrderBy("productOptionId ASC")
     @Builder.Default
     private List<ProductOption> options = new ArrayList<>();
 
     // ───────────────────────────────────────────
     // 수정 메서드
     // ───────────────────────────────────────────
-    public void update(ProductDto.UpdateRequest request) {
+    // [수정] 카테고리/브랜드 변경을 지원하기 위해 파라미터 추가 (null이면 변경 안 함)
+    public void update(ProductDto.UpdateRequest request, Category category, Brand brand) {
+        if (category != null) this.category = category;
+        if (brand != null) this.brand = brand;
         if (request.productName() != null) this.productName = request.productName();
         if (request.productEngName() != null) this.productEngName = request.productEngName();
         if (request.returnPolicy() != null) this.returnPolicy = request.returnPolicy();
@@ -119,5 +128,10 @@ public class Product extends BaseEntity {
     }
     public void increaseViewCount() {
         this.viewCount = (this.viewCount == null ? 0 : this.viewCount) + 1;
+    }
+
+    // [추가] 판매 중지/재개 토글
+    public void setActive(boolean active) {
+        this.isActive = active;
     }
 }
