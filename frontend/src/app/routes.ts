@@ -166,6 +166,7 @@ export const router = createBrowserRouter([
                 children: [
                     {index: true, Component: SellerDashboard},
                     {path: "products/new", Component: SellerProductRegister},
+                    {path: "products/edit/:id", Component: SellerProductRegister}, //수정페이지
                     {path: "products", Component: SellerProductManage},
                     {path: "sourcing-requests", Component: SellerRequestList},
                     {path: "orders", Component: SellerOrders},

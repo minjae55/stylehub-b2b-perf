@@ -61,6 +61,14 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(productService.getMy(userDetails)));
     }
 
+    // [GET] 내 상품 관리 목록 (재고/인증서 포함, 셀러 상품관리 페이지 전용) [추가]
+    @GetMapping("/my/manage")
+    public ResponseEntity<ApiResponse<List<ProductDto.ManageResponse>>> getMyManaged(
+            @LoginUser AuthUser userDetails
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(productService.getMyManaged(userDetails)));
+    }
+
     // [PATCH] 상품 수정
     @PatchMapping("/{productId}")
     public ResponseEntity<ApiResponse<ProductDto.DetailResponse>> update(
@@ -68,6 +76,16 @@ public class ProductController {
             @RequestBody ProductDto.UpdateRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(productService.update(productId, request)));
+    }
+
+    // [PATCH] 판매 중지/재개 (실제 삭제 없이 노출만 제어) [추가]
+    @PatchMapping("/{productId}/active")
+    public ResponseEntity<ApiResponse<Void>> setActive(
+            @PathVariable Integer productId,
+            @RequestBody ProductDto.SetActiveRequest request
+    ) {
+        productService.setActive(productId, request.isActive());
+        return ResponseEntity.ok(ApiResponse.success());
     }
 
     // [DELETE] 상품 삭제

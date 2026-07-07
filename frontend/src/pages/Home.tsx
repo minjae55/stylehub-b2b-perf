@@ -2,15 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router";
 import api from "../api/axios";
 import {
-  Truck,
-  Shield,
   ChevronRight,
   ArrowRight,
   TrendingUp,
-  Award,
-  CheckCircle,
   ShoppingCart,
-  Tag,
   Heart,
   FolderOpen,
   Check,
@@ -27,13 +22,6 @@ const categories = [
   { name: "스포츠/애슬레저", id: "sports", icon: "🏃", iconImg: "/images/sports.png" },
   { name: "액세서리", id: "accessories", icon: "👜", iconImg: "/images/accessory.png" },
   { name: "신발", id: "shoes", icon: "👠", iconImg: "/images/shoes.png" },
-];
-
-const suppliers = [
-  { name: "동대문패션(주)", category: "상의/하의", products: 842, years: 18, verified: true },
-  { name: "트렌드하우스", category: "원피스/세트", products: 560, years: 12, verified: true },
-  { name: "프리미엄어패럴", category: "아우터", products: 320, years: 22, verified: true },
-  { name: "액티브웨어코리아", category: "스포츠/애슬레저", products: 215, years: 8, verified: true },
 ];
 
 const heroSlides = [
@@ -374,7 +362,7 @@ export function Home() {
           </Link>
         </div>
 
-        {/* 신규 상품 */}
+        {/* 신규 상품 - 6열 x 3줄로 꽉 채워서 노출 */}
         <section className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-foreground">신규 상품</h2>
@@ -415,58 +403,6 @@ export function Home() {
               <div className="text-center text-muted-foreground text-sm py-10">등록된 신규 상품이 없습니다</div>
           )}
         </section>
-
-        {/* Suppliers + Why Us */}
-        <div className="grid grid-cols-[1fr_340px] gap-4 mb-6">
-          <section className="bg-white rounded border border-border overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
-              <h2 className="font-bold text-foreground flex items-center gap-2"><Award size={16} className="text-primary" />인증 셀러</h2>
-              <Link to="/suppliers" className="text-xs text-primary hover:underline">더보기</Link>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-              <tr className="bg-muted text-muted-foreground text-xs uppercase tracking-wide">
-                <th className="px-5 py-2.5 text-left font-medium">업체명</th>
-                <th className="px-3 py-2.5 text-left font-medium">카테고리</th>
-                <th className="px-3 py-2.5 text-right font-mono font-medium">상품수</th>
-                <th className="px-3 py-2.5 text-right font-mono font-medium">업력</th>
-                <th className="px-5 py-2.5 text-center font-medium">인증</th>
-              </tr>
-              </thead>
-              <tbody>
-              {suppliers.map((s, i) => (
-                  <tr key={s.name} className={`border-t border-border hover:bg-secondary transition-colors ${i % 2 === 0 ? "" : "bg-muted/30"}`}>
-                    <td className="px-5 py-3 font-medium text-foreground hover:text-primary cursor-pointer">{s.name}</td>
-                    <td className="px-3 py-3"><span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded">{s.category}</span></td>
-                    <td className="px-3 py-3 text-right font-mono text-muted-foreground">{s.products.toLocaleString()}</td>
-                    <td className="px-3 py-3 text-right font-mono text-muted-foreground">{s.years}년</td>
-                    <td className="px-5 py-3 text-center">{s.verified && <CheckCircle size={16} className="text-green-500 mx-auto" />}</td>
-                  </tr>
-              ))}
-              </tbody>
-            </table>
-          </section>
-
-          <section className="bg-white rounded border border-border p-5">
-            <h2 className="font-bold text-foreground mb-4 flex items-center gap-2"><Shield size={16} className="text-primary" />스타일허브를 선택하는 이유</h2>
-            <div className="space-y-4">
-              {[
-                { icon: <Shield size={18} />, title: "안전 결제 보장", desc: "에스크로 기반 결제로 사기 위험 Zero" },
-                { icon: <CheckCircle size={18} />, title: "인증 셀러만 입점", desc: "사업자등록 확인 완료된 신뢰 업체만 등록" },
-                { icon: <Truck size={18} />, title: "빠른 국내 배송", desc: "주문 확정 후 2~3일 이내 전국 배송" },
-                { icon: <Tag size={18} />, title: "도매 최저가", desc: "중간 유통 단계 없는 합리적인 도매가" },
-              ].map((item) => (
-                  <div key={item.title} className="flex items-start gap-3 group">
-                    <div className="text-primary mt-0.5 flex-shrink-0">{item.icon}</div>
-                    <div>
-                      <div className="text-sm font-semibold text-foreground">{item.title}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
-                    </div>
-                  </div>
-              ))}
-            </div>
-          </section>
-        </div>
 
       </div>
   );
