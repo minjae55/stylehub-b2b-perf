@@ -339,7 +339,8 @@ public class BuyerOrderService {
                 orderItemResponseList,
                 orderAmountSummaryResponse,
                 order.getStatus(),
-                orderLogResponseList
+                orderLogResponseList,
+                order.getQuote() != null ? order.getQuote().getQuoteId() : null
         );
     }
 

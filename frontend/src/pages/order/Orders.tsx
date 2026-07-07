@@ -56,6 +56,7 @@ type BuyerOrderListResponse = {
   createdAt: string;
   canceledAt: string | null;
   canceledReason: string | null;
+  quoteId: number | null;
 };
 
 type BuyerOrderItemResponse = {
@@ -92,6 +93,7 @@ type BuyerOrderOverviewResponse = {
   amountSummary: BuyerOrderSummaryResponse;
   orderStatus: OrderStatus;
   logs: BuyerOrderLogResponse[];
+  quoteId: number | null;
 };
 type StepKey =
   | "PENDING"
@@ -140,6 +142,7 @@ type Order = {
   isExample?: boolean;
   stepTimestamps?: Partial<Record<StepKey, string>>;
   issueMemo?: string;
+  quoteId?: number | null;
 };
 
 const STEP_LABELS: Record<StepKey, string> = {
@@ -340,13 +343,15 @@ function mapOrderType(orderType: ApiOrderType, isSample: boolean): OrderType {
 }
 
 function mapOrderResponse(order: BuyerOrderListResponse): Order {
+  const type = mapOrderType(order.orderType, order.isSample);
+
   return {
     orderId: order.orderId,
     id: order.orderNo,
     date: formatOrderDate(order.createdAt),
     supplier: "판매사 정보 확인 중",
     buyer: "내 주문",
-    type: mapOrderType(order.orderType, order.isSample),
+    type,
     items: [
       {
         name: order.representativeProductName,
@@ -358,7 +363,7 @@ function mapOrderResponse(order: BuyerOrderListResponse): Order {
     ],
     itemCount: order.itemCount,
     totalQuantity: order.totalQuantity,
-    status: order.orderStatus,
+    status: resolveDisplayOrderStatus(type, order.orderStatus),
     subtotal: order.totalAmount ?? 0,
     platformFee: 0,
     shippingFee: 0,
@@ -368,6 +373,7 @@ function mapOrderResponse(order: BuyerOrderListResponse): Order {
     receiverAddress: "상세 화면에서 확인",
     receiverAddressDetail: null,
     issueMemo: order.canceledReason ?? undefined,
+    quoteId: order.quoteId,
   };
 }
 
@@ -386,7 +392,7 @@ items: overview.items.map((item) => ({
 })),
     itemCount: overview.items.length,
     totalQuantity: overview.items.reduce((total, item) => total + item.quantity, 0),
-    status: overview.orderStatus,
+    status: resolveDisplayOrderStatus(order.type, overview.orderStatus),
     subtotal: summary.subtotalAmount,
     platformFee: summary.platformFee,
     shippingFee: summary.shippingFee,
@@ -395,6 +401,7 @@ items: overview.items.map((item) => ({
     receiverAddress: summary.receiverAddress ?? "배송지 정보 없음",
     receiverAddressDetail: summary.receiverAddressDetail,
     stepTimestamps: buildStepTimestamps(order.type, overview.logs ?? []),
+    quoteId: overview.quoteId,
   };
 }
 
@@ -470,6 +477,14 @@ function resolveStepKeyForStatus(type: OrderType, status: OrderStatus): StepKey 
   const alias = STATUS_STEP_ALIAS[type]?.[status];
   if (alias) return alias;
   return sequence.includes(status as StepKey) ? (status as StepKey) : null;
+}
+
+// 화면 곳곳(액션 버튼, 다음 행동 안내, 배너 등)의 분기가 SAMPLE_DELIVERED 같은
+// 유형별 상태 이름을 기준으로 짜여 있는데, 백엔드는 그 이름을 절대 내려주지 않는다
+// (샘플 주문도 실제로는 그냥 DELIVERED로 옴). 그래서 매핑 시점에 한 번 치환해두면
+// 아래에서 SAMPLE_DELIVERED를 참조하는 모든 분기가 실제로 동작하게 된다.
+function resolveDisplayOrderStatus(type: OrderType, rawStatus: OrderStatus): OrderStatus {
+  return STATUS_STEP_ALIAS[type]?.[rawStatus] ?? rawStatus;
 }
 
 function buildStepTimestamps(
@@ -624,6 +639,9 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [renegotiateTarget, setRenegotiateTarget] = useState<Order | null>(null);
   const [renegotiateText, setRenegotiateText] = useState("");
+  const [renegotiateType, setRenegotiateType] = useState("색상 수정");
+  const [isSubmittingRenegotiate, setIsSubmittingRenegotiate] = useState(false);
+  const [renegotiateError, setRenegotiateError] = useState("");
   const [selectedPaymentOrderIds, setSelectedPaymentOrderIds] = useState<number[]>([]);
   const [cancelReason, setCancelReason] = useState("");
   const [isCanceling, setIsCanceling] = useState(false);
@@ -956,11 +974,49 @@ const handleOpenDispute = async (order: Order) => {
     }
   };
 
-  const handleRenegotiate = () => {
-    if (!renegotiateText.trim()) return;
+  const closeRenegotiateModal = () => {
     setRenegotiateTarget(null);
     setRenegotiateText("");
-    alert("재협상 요청이 접수되었습니다. 공급사가 검토 후 수정안을 전달합니다.");
+    setRenegotiateType("색상 수정");
+    setRenegotiateError("");
+  };
+
+  const handleRenegotiate = async () => {
+    if (
+      !renegotiateTarget
+      || !renegotiateText.trim()
+      || isSubmittingRenegotiate
+    ) {
+      return;
+    }
+
+    if (!renegotiateTarget.quoteId) {
+      setRenegotiateError("이 주문은 연결된 견적 정보를 찾을 수 없어 재협상을 요청할 수 없습니다.");
+      return;
+    }
+
+    try {
+      setIsSubmittingRenegotiate(true);
+      setRenegotiateError("");
+
+      await api.post("/negotiations", {
+        quoteId: renegotiateTarget.quoteId,
+        negotiationType: "QUOTE",
+        content: `[${renegotiateType}] ${renegotiateText.trim()}`,
+      });
+
+      closeRenegotiateModal();
+      alert("재협상 요청이 접수되었습니다. 공급사가 검토 후 수정안을 전달합니다.");
+    } catch (error) {
+      console.error("재협상 요청 실패", error);
+      setRenegotiateError(
+        error instanceof Error
+          ? error.message
+          : "재협상 요청을 접수하지 못했습니다."
+      );
+    } finally {
+      setIsSubmittingRenegotiate(false);
+    }
   };
 
   return (
@@ -1109,7 +1165,7 @@ const handleOpenDispute = async (order: Order) => {
         )}
 
         {renegotiateTarget && (
-          <BaseModal onClose={() => setRenegotiateTarget(null)} icon={<RefreshCw size={26} />} tone="orange" title="샘플 재협상 요청">
+          <BaseModal onClose={isSubmittingRenegotiate ? () => undefined : closeRenegotiateModal} icon={<RefreshCw size={26} />} tone="orange" title="샘플 재협상 요청">
             <p className="mb-4 text-sm leading-6 text-slate-500">
               샘플 확인 후 수정이 필요한 부분을 정해진 양식으로 남깁니다.
             </p>
@@ -1117,7 +1173,11 @@ const handleOpenDispute = async (order: Order) => {
             <div className="mt-4 space-y-3">
               <div>
                 <label className="mb-1.5 block text-xs font-bold text-slate-500">재협상 유형</label>
-                <select className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+                <select
+                  value={renegotiateType}
+                  onChange={(event) => setRenegotiateType(event.target.value)}
+                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                >
                   <option>색상 수정</option>
                   <option>소재 변경</option>
                   <option>디자인 수정</option>
@@ -1136,13 +1196,17 @@ const handleOpenDispute = async (order: Order) => {
                   className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
                 />
               </div>
-              <div className="rounded-md border-2 border-dashed border-slate-200 p-4 text-center text-xs font-medium text-slate-500">
-                참고 이미지 첨부
-              </div>
+              {renegotiateError && (
+                <p className="text-xs font-semibold text-red-600">
+                  {renegotiateError}
+                </p>
+              )}
             </div>
             <div className="mt-5 flex gap-2">
-              <ModalButton variant="ghost" onClick={() => setRenegotiateTarget(null)}>취소</ModalButton>
-              <ModalButton disabled={!renegotiateText.trim()} onClick={handleRenegotiate}>요청하기</ModalButton>
+              <ModalButton variant="ghost" disabled={isSubmittingRenegotiate} onClick={closeRenegotiateModal}>취소</ModalButton>
+              <ModalButton disabled={!renegotiateText.trim() || isSubmittingRenegotiate} onClick={handleRenegotiate}>
+                {isSubmittingRenegotiate ? "요청 중..." : "요청하기"}
+              </ModalButton>
             </div>
           </BaseModal>
         )}
