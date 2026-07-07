@@ -46,6 +46,10 @@ public class BankTransferPayment {
     private BankTransferStatus status = BankTransferStatus.WAITING;
 
     private LocalDateTime confirmedAt;
+    private LocalDateTime canceledAt;
+
+    @Column(length = 255)
+    private String cancelReason;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -59,5 +63,15 @@ public class BankTransferPayment {
     public void confirm() {
         this.status = BankTransferStatus.CONFIRMED;
         this.confirmedAt = LocalDateTime.now();
+    }
+
+    public void markAsCanceled(String cancelReason) {
+        this.status = BankTransferStatus.CANCELED;
+        this.canceledAt = LocalDateTime.now();
+        this.cancelReason = cancelReason;
+    }
+
+    public boolean isCanceled() {
+        return this.status == BankTransferStatus.CANCELED;
     }
 }

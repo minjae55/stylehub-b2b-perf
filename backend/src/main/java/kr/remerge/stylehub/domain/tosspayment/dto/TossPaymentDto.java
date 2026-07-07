@@ -22,4 +22,12 @@ public class TossPaymentDto {
             String status,
             String orderNo
     ) {}
+
+    // 결제 취소 결과 응답
+    public record CancelResult(
+            String paymentKey,
+            String status,
+            java.time.LocalDateTime canceledAt,
+            String cancelReason
+    ) {}
 }

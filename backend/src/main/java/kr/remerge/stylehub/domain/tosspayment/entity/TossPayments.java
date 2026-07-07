@@ -1,6 +1,7 @@
 package kr.remerge.stylehub.domain.tosspayment.entity;
 
 import jakarta.persistence.*;
+import kr.remerge.stylehub.domain.tosspayment.enumtype.PaymentStatus;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -23,6 +24,12 @@ public class TossPayments {
 
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
+
+    @Column(name = "canceled_at")
+    private LocalDateTime canceledAt;
+
+    @Column(name = "cancel_resaon", length = 2000)
+    private String cancelReason;
 
     @Column(length = 30)
     private String method;
@@ -60,5 +67,19 @@ public class TossPayments {
     public void markAsDone(LocalDateTime approvedAt) {
         this.status = "DONE";
         this.approvedAt = approvedAt;
+    }
+
+    public void markAsCanceled(String cancelReason) {
+        this.status = PaymentStatus.CANCELED.name();
+        this.canceledAt = LocalDateTime.now();
+        this.cancelReason = cancelReason;
+    }
+
+    public boolean isDone() {
+        return PaymentStatus.DONE.name().equals(this.status);
+    }
+
+    public boolean isCanceled() {
+        return PaymentStatus.CANCELED.name().equals(this.status);
     }
 }
