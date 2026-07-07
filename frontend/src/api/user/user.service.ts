@@ -60,7 +60,7 @@ export const updateProfileInfo = async (payload: UpdateProfilePayload) => {
  */
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
     // axios 인터셉터가 ApiResponse를 언랩하므로 리턴 타입을 void로 처리합니다.
-    await api.post("/api/users/me/password", {
+    await api.post("/users/me/password", {
         currentPassword,
         newPassword
     });
