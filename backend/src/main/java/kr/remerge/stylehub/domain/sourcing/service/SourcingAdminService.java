@@ -4,9 +4,13 @@ import jakarta.persistence.Tuple;
 import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.category.repository.CategoryRepository;
 import kr.remerge.stylehub.domain.company.entity.Company;
+import kr.remerge.stylehub.domain.company.enumtype.CompanyStatus;
+import kr.remerge.stylehub.domain.company.enumtype.SellerStatus;
+import kr.remerge.stylehub.domain.company.repository.CompanyHandledCategoryRepository;
 import kr.remerge.stylehub.domain.company.repository.CompanyRepository;
 import kr.remerge.stylehub.domain.sourcing.dto.AdminSourcingRequestResponse;
 import kr.remerge.stylehub.domain.sourcing.dto.AdminSourcingStatsResponse;
+import kr.remerge.stylehub.domain.sourcing.dto.AssignableCompanyResponse;
 import kr.remerge.stylehub.domain.sourcing.dto.SourcingReviewQueueResponse;
 import kr.remerge.stylehub.domain.sourcing.dto.SourcingSupplierResponse;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequest;
@@ -17,6 +21,8 @@ import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingSupplierRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
+import kr.remerge.stylehub.global.exception.BusinessException;
+import kr.remerge.stylehub.global.exception.ErrorCode;
 import kr.remerge.stylehub.global.notification.NotificationMessage;
 import kr.remerge.stylehub.global.notification.enumtype.NotificationType;
 import kr.remerge.stylehub.global.notification.service.NotificationService;
@@ -37,6 +43,7 @@ public class SourcingAdminService {
     private final SourcingRequestRepository sourcingRequestRepository;
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
+    private final CompanyHandledCategoryRepository companyHandledCategoryRepository;
     private final CategoryRepository categoryRepository;
     private final NotificationService notificationService;
 
@@ -48,6 +55,7 @@ public class SourcingAdminService {
             List.of(SourcingStatus.COMPLETED);
     private static final List<SourcingStatus> CLOSED_STATUSES =
             List.of(SourcingStatus.CANCELLED, SourcingStatus.WITHDRAWN, SourcingStatus.EXPIRED);
+    private final SourcingAutoCancelService sourcingAutoCancelService;
 
     // ───────────────────────────────────────────
     // 전체 소싱 요청 현황 (회사 무관)
@@ -106,7 +114,7 @@ public class SourcingAdminService {
             case "TRADING" -> TRADING_STATUSES;
             case "COMPLETED" -> COMPLETED_STATUSES;
             case "CLOSED" -> CLOSED_STATUSES;
-            default -> throw new IllegalArgumentException("알 수 없는 필터: " + filter);
+            default -> throw new BusinessException(ErrorCode.INVALID_INPUT);
         };
     }
 
@@ -152,7 +160,7 @@ public class SourcingAdminService {
                     long cnt = t.get("cnt", Long.class);
 
                     SourcingRequest request = sourcingRequestRepository.findById(requestId)
-                            .orElseThrow(() -> new IllegalArgumentException("소싱 요청 없음: " + requestId));
+                            .orElseThrow(() -> new BusinessException(ErrorCode.SOURCING_NOT_FOUND));
 
                     String buyerCompanyName = companyRepository.findById(request.getBuyerCompanyId())
                             .map(Company::getName)
@@ -182,10 +190,10 @@ public class SourcingAdminService {
     @Transactional
     public void approve(Integer sourcingSupplierId, Integer adminId) {
         SourcingSupplier supplier = sourcingSupplierRepository.findById(sourcingSupplierId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 공급사 배정 없음: " + sourcingSupplierId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SOURCING_SUPPLIER_NOT_FOUND));
 
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 관리자 없음: " + adminId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         supplier.approve(admin);
 
@@ -200,13 +208,17 @@ public class SourcingAdminService {
     @Transactional
     public void reject(Integer sourcingSupplierId, Integer adminId, String reason) {
         SourcingSupplier supplier = sourcingSupplierRepository.findById(sourcingSupplierId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 공급사 배정 없음: " + sourcingSupplierId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SOURCING_SUPPLIER_NOT_FOUND));
 
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 관리자 없음: " + adminId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         supplier.reject(admin, reason);
+
+        Integer sourcingRequestId = supplier.getSourcingRequest().getSourcingRequestId();
+        sourcingAutoCancelService.checkAndAutoCancel(sourcingRequestId);
     }
+
 
     @Transactional(readOnly = true)
     public List<SourcingSupplierResponse> getUnassignedRequests() {
@@ -216,10 +228,82 @@ public class SourcingAdminService {
                 .toList();
     }
 
+    // ───────────────────────────────────────────
+    // 관리자 수동배정 화면 - 배정 가능한 회사 검색
+    // ───────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<AssignableCompanyResponse> getAssignableCompanies(
+            Integer sourcingRequestId, String keyword, boolean includeAllCategories
+    ) {
+        SourcingRequest sourcingRequest = sourcingRequestRepository.findById(sourcingRequestId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SOURCING_NOT_FOUND));
+
+        Integer categoryId = sourcingRequest.getCategoryId();
+        Integer buyerCompanyId = sourcingRequest.getBuyerCompanyId();
+
+        // 이미 배정된 회사(상태 무관)는 검색 결과에서 제외 - manualAssign의 중복 배정 방지와 동일한 기준
+        List<Integer> alreadyAssignedIds = sourcingSupplierRepository
+                .findAllBySourcingRequest_SourcingRequestId(sourcingRequestId)
+                .stream()
+                .map(SourcingSupplier::getSellerCompanyId)
+                .toList();
+
+        String safeKeyword = keyword == null ? "" : keyword.trim();
+
+        List<Integer> candidateIds = companyRepository.findAllByNameContainingIgnoreCase(safeKeyword)
+                .stream()
+                .map(Company::getCompanyId)
+                .filter(id -> !id.equals(buyerCompanyId))
+                .filter(id -> !alreadyAssignedIds.contains(id))
+                .toList();
+
+        if (candidateIds.isEmpty()) {
+            return List.of();
+        }
+
+        // 기본은 카테고리 매칭 필터를 적용. includeAllCategories=true면 건너뛰어 전체 검색
+        // (셀러가 취급 카테고리 등록을 누락/오기입한 경우, 관리자가 상품명 보고 직접 판단해서
+        //  이름 검색으로 찾을 수 있도록 하는 예외 통로)
+        if (!includeAllCategories && categoryId != null) {
+            List<Integer> categoryMatchIds = companyHandledCategoryRepository.findCompanyIdsByCategoryId(categoryId);
+            candidateIds = candidateIds.stream()
+                    .filter(categoryMatchIds::contains)
+                    .toList();
+        }
+
+        if (candidateIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Integer> approvedIds = companyRepository.findIdsByIdInAndStatusAndSellerStatus(
+                candidateIds, CompanyStatus.APPROVED, SellerStatus.APPROVED
+        );
+
+        if (approvedIds.isEmpty()) {
+            return List.of();
+        }
+
+        return companyRepository.findAllById(approvedIds).stream()
+                .map(AssignableCompanyResponse::from)
+                .toList();
+    }
+
     @Transactional
     public void manualAssign(Integer sourcingRequestId, Integer companyId) {
         SourcingRequest sourcingRequest = sourcingRequestRepository.findById(sourcingRequestId)
-                .orElseThrow(() -> new IllegalArgumentException("소싱 요청 없음: " + sourcingRequestId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SOURCING_NOT_FOUND));
+
+        if (sourcingRequest.getBuyerCompanyId().equals(companyId)) {
+            throw new BusinessException(ErrorCode.SOURCING_SELF_COMPANY_NOT_ALLOWED);
+        }
+
+        boolean alreadyAssigned = sourcingSupplierRepository
+                .findBySourcingRequest_SourcingRequestIdAndSellerCompanyId(sourcingRequestId, companyId)
+                .isPresent();
+        if (alreadyAssigned) {
+            throw new BusinessException(ErrorCode.SOURCING_SUPPLIER_ALREADY_ASSIGNED);
+        }
 
         SourcingSupplier supplier = SourcingSupplier.builder()
                 .sourcingRequest(sourcingRequest)

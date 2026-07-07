@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   FileText, ChevronDown, ChevronUp, Calendar, User, Package, DollarSign,
-  Send, Loader2, CheckCircle2, XCircle,
+  Send, Loader2, CheckCircle2, XCircle, UserPlus, Search,
 } from "lucide-react";
 import {
   getAllSourcingRequests,
@@ -9,11 +9,14 @@ import {
   getSuggestedSuppliers,
   approveSupplier,
   rejectSupplier,
+  getAssignableCompanies,
+  manualAssignSupplier,
   type AdminSourcingRequestResponse,
   type AdminSourcingStatsResponse,
   type SourcingGroupFilter,
   type SourcingStatus,
   type SourcingSupplierResponse,
+  type AssignableCompanyResponse,
 } from "@/api/sourcing/sourcingAdmin.service";
 
 // ── 개별 요청의 실제 상태 라벨/스타일 ──────────────────────────────────────
@@ -53,8 +56,8 @@ const STAT_CARDS: Array<{ value: SourcingGroupFilter; label: string; color: stri
   { value: "CLOSED",    label: "거래중단", color: "bg-muted border border-border",         countKey: "closed" },
 ];
 
-// 후보 업체 검토가 더 이상 의미 없는 상태 (거래가 완료됐거나 성사되지 않고 끝난 경우)
-const REQUEST_DONE_STATUSES: SourcingStatus[] = ["COMPLETED", "CANCELLED", "WITHDRAWN", "EXPIRED"];
+// 후보 업체 검토가 더 이상 의미 없는 상태 (거래가 성사되어 진행중이거나, 완료됐거나, 성사되지 않고 끝난 경우)
+const REQUEST_DONE_STATUSES: SourcingStatus[] = ["TRADING", "COMPLETED", "CANCELLED", "WITHDRAWN", "EXPIRED"];
 function isRequestDone(status: SourcingStatus): boolean {
   return REQUEST_DONE_STATUSES.includes(status);
 }
@@ -279,6 +282,134 @@ function SuccessToast({ message, detail }: { message: string; detail: string }) 
   );
 }
 
+// ── 수동배정 모달 - 후보 업체가 없거나(자동배정 OFF 등) 관리자가 직접 특정 회사를 배정하고 싶을 때 사용 ──
+function ManualAssignModal({
+                             sourcingRequestId, onClose, onAssigned,
+                           }: {
+  sourcingRequestId: number;
+  onClose: () => void;
+  onAssigned: () => void;
+}) {
+  const [keyword, setKeyword] = useState("");
+  const [includeAllCategories, setIncludeAllCategories] = useState(false);
+  const [companies, setCompanies] = useState<AssignableCompanyResponse[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [assigningId, setAssigningId] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      setErrorMessage(null);
+      try {
+        const result = await getAssignableCompanies(sourcingRequestId, keyword.trim(), includeAllCategories);
+        setCompanies(result);
+      } catch (e) {
+        setErrorMessage("회사 목록을 불러오지 못했습니다.");
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300); // 디바운스
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyword, includeAllCategories, sourcingRequestId]);
+
+  const handleAssign = async (companyId: number) => {
+    setAssigningId(companyId);
+    setErrorMessage(null);
+    try {
+      await manualAssignSupplier(sourcingRequestId, companyId);
+      onAssigned();
+      onClose();
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : "배정 중 오류가 발생했습니다.");
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
+  return (
+      <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={onClose}
+      >
+        <div
+            className="w-full max-w-md rounded-lg bg-white p-5 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-foreground flex items-center gap-1.5">
+              <UserPlus size={16} className="text-primary" />
+              수동 배정
+            </h3>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-sm">
+              닫기
+            </button>
+          </div>
+
+          <div className="relative mb-2">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+                type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="회사명으로 검색"
+                autoFocus
+                className="w-full text-sm border border-border rounded pl-8 pr-3 py-2 outline-none focus:border-primary"
+            />
+          </div>
+
+          <label className="flex items-center gap-1.5 mb-3 text-xs text-muted-foreground cursor-pointer select-none">
+            <input
+                type="checkbox"
+                checked={includeAllCategories}
+                onChange={(e) => setIncludeAllCategories(e.target.checked)}
+                className="accent-primary"
+            />
+            카테고리 무관 전체보기
+            <span className="text-muted-foreground/70">
+              (셀러가 취급 카테고리를 등록 안 했거나 잘못 등록한 경우 체크)
+            </span>
+          </label>
+
+          {errorMessage && (
+              <p className="text-xs text-red-500 mb-2">{errorMessage}</p>
+          )}
+
+          <div className="max-h-72 overflow-y-auto border border-border rounded">
+            {isSearching ? (
+                <div className="flex items-center justify-center py-6 text-muted-foreground">
+                  <Loader2 size={16} className="animate-spin mr-2" />
+                  <span className="text-xs">검색 중...</span>
+                </div>
+            ) : companies.length === 0 ? (
+                <div className="text-center py-6 text-xs text-muted-foreground">
+                  배정 가능한 회사가 없습니다.
+                </div>
+            ) : (
+                <ul className="divide-y divide-border">
+                  {companies.map((c) => (
+                      <li key={c.companyId} className="flex items-center justify-between px-3 py-2">
+                        <span className="text-sm text-foreground">{c.name}</span>
+                        <button
+                            onClick={() => handleAssign(c.companyId)}
+                            disabled={assigningId === c.companyId}
+                            className="text-xs px-3 py-1.5 rounded bg-primary text-white font-semibold hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1.5"
+                        >
+                          {assigningId === c.companyId && <Loader2 size={11} className="animate-spin" />}
+                          배정
+                        </button>
+                      </li>
+                  ))}
+                </ul>
+            )}
+          </div>
+        </div>
+      </div>
+  );
+}
+
 // ── 메인 ─────────────────────────────────────────────────────────────────
 export function AdminSourcingRequests() {
   const [requests, setRequests] = useState<AdminSourcingRequestResponse[]>([]);
@@ -292,6 +423,9 @@ export function AdminSourcingRequests() {
   const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; detail: string } | null>(null);
+
+  // 수동배정 모달을 띄운 소싱 요청 id (닫혀있으면 null)
+  const [manualAssignRequestId, setManualAssignRequestId] = useState<number | null>(null);
 
   useEffect(() => {
     getSourcingStats()
@@ -351,16 +485,45 @@ export function AdminSourcingRequests() {
 
   // 승인 - 체크박스로 선택된 여러 업체를 한 번에 처리
   const handleBulkApprove = async (requestId: number, ids: number[]) => {
-    await Promise.all(ids.map((id) => approveSupplier(id)));
-    removeSuppliersFromState(requestId, ids);
-    showToast("승인 완료", `${ids.length}개 업체가 셀러에게 노출됩니다`);
+    try {
+      await Promise.all(ids.map((id) => approveSupplier(id)));
+      removeSuppliersFromState(requestId, ids);
+      showToast("승인 완료", `${ids.length}개 업체가 셀러에게 노출됩니다`);
+    } catch (e) {
+      // 이미 처리된 배정(다른 탭/관리자가 먼저 처리한 경우 등)에 재시도한 경우 등
+      showToast("승인 실패", "이미 처리되었거나 상태가 변경된 항목이 있습니다. 목록을 새로고침해 주세요.");
+      throw e; // 호출부(SupplierReviewPanel)의 processing 상태 해제를 위해 재throw
+    }
   };
 
   // 반려 - 업체마다 사유가 다를 수 있어 한 번에 하나씩 처리
   const handleReject = async (requestId: number, id: number, reason: string) => {
-    await rejectSupplier(id, reason);
-    removeSuppliersFromState(requestId, [id]);
-    showToast("반려 완료", "해당 업체가 반려되었습니다");
+    try {
+      await rejectSupplier(id, reason);
+      removeSuppliersFromState(requestId, [id]);
+      showToast("반려 완료", "해당 업체가 반려되었습니다");
+    } catch (e) {
+      showToast("반려 실패", "이미 처리되었거나 상태가 변경된 항목입니다. 목록을 새로고침해 주세요.");
+      throw e;
+    }
+  };
+
+  // 수동배정 - 배정 직후엔 SUGGESTED 상태이므로 후보 목록/대기 카운트를 새로 불러와 반영
+  const handleManualAssigned = async (requestId: number) => {
+    try {
+      const suppliers = await getSuggestedSuppliers(requestId);
+      setSuppliersByRequest((prev) => ({ ...prev, [requestId]: suppliers }));
+      setRequests((prev) =>
+          prev.map((r) =>
+              r.sourcingRequestId === requestId
+                  ? { ...r, pendingSupplierCount: suppliers.length }
+                  : r
+          )
+      );
+      showToast("배정 완료", "관리자 승인 대기 목록에 추가되었습니다");
+    } catch (e) {
+      console.error("수동배정 후 후보 목록 갱신 실패:", e);
+    }
   };
 
   return (
@@ -540,16 +703,24 @@ export function AdminSourcingRequests() {
                                   </div>
                               )}
 
-                              <div className="pt-3 border-t border-border">
-                                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                                  <Send size={12} />
-                                  후보 업체 검토
-                                </h4>
-                                {done ? (
-                                    <div className="text-center py-4 text-xs text-muted-foreground">
-                                      {STATUS_LABEL[req.status]} 상태의 요청은 후보 업체 검토가 필요하지 않습니다.
+                              {!done && (
+                                  <div className="pt-3 border-t border-border">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5">
+                                        <Send size={12} />
+                                        후보 업체 검토
+                                      </h4>
+                                      <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setManualAssignRequestId(req.sourcingRequestId);
+                                          }}
+                                          className="text-xs px-2.5 py-1 rounded border border-primary text-primary hover:bg-primary/5 font-medium flex items-center gap-1"
+                                      >
+                                        <UserPlus size={12} />
+                                        수동배정
+                                      </button>
                                     </div>
-                                ) : (
                                     <SupplierReviewPanel
                                         request={req}
                                         suppliers={suppliersByRequest[req.sourcingRequestId]}
@@ -557,8 +728,8 @@ export function AdminSourcingRequests() {
                                         onBulkApprove={(ids) => handleBulkApprove(req.sourcingRequestId, ids)}
                                         onReject={(id, reason) => handleReject(req.sourcingRequestId, id, reason)}
                                     />
-                                )}
-                              </div>
+                                  </div>
+                              )}
                             </div>
                         )}
                       </div>
@@ -576,6 +747,14 @@ export function AdminSourcingRequests() {
         )}
 
         {toast && <SuccessToast message={toast.message} detail={toast.detail} />}
+
+        {manualAssignRequestId !== null && (
+            <ManualAssignModal
+                sourcingRequestId={manualAssignRequestId}
+                onClose={() => setManualAssignRequestId(null)}
+                onAssigned={() => handleManualAssigned(manualAssignRequestId)}
+            />
+        )}
       </div>
   );
 }

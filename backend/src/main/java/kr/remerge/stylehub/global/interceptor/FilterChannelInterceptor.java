@@ -1,7 +1,7 @@
 package kr.remerge.stylehub.global.interceptor;
 
 import io.jsonwebtoken.Claims;
-import kr.remerge.stylehub.global.auth.dto.login.AuthUser; // 기존에 쓰시던 AuthUser DTO 객체
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.jwt.JwtProvider;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;

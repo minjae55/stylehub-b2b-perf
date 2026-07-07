@@ -35,6 +35,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 	implementation 'net.nurigo:sdk:4.3.2'                                        // CoolSMS(누리고) SDK
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
     // ── 서명 전용  ───────────────────────────
     implementation 'com.itextpdf:kernel:9.6.0'

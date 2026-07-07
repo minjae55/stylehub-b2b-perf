@@ -2,6 +2,7 @@ package kr.remerge.stylehub.domain.company;
 
 import kr.remerge.stylehub.domain.company.client.NtsApiClient;
 import kr.remerge.stylehub.domain.company.client.OcrApiClient;
+import kr.remerge.stylehub.domain.company.dto.request.UpdateCompanyRequest;
 import kr.remerge.stylehub.domain.company.dto.response.*;
 import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.company.repository.CompanyRepository;
@@ -130,6 +131,48 @@ public class CompanyService {
     }
 
     /**
+     * 소속 회사 상세 정보 조회
+     */
+    public CompanyDetailResponse getCompanyDetail(Integer companyId, AuthUser authUser) {
+        // 보안 검증: 대표(PRESIDENT)나 직원 권한일 때 본인 소속 회사가 아니라면 차단 (ADMIN은 허용 가능)
+        if (!"ADMIN".equals(authUser.role()) && !companyId.equals(authUser.companyId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.COMPANY_NOT_FOUND));
+
+        return CompanyDetailResponse.from(company);
+    }
+
+    /**
+     * 회사 정보 변경 및 셀러 권한 심사 신청
+     */
+    @Transactional
+    public void updateCompanyDetail(Integer companyId, UpdateCompanyRequest request, AuthUser authUser) {
+        // 보안 검증: 본인 회사 정보만 수정 가능하도록 제한
+        if (!"ADMIN".equals(authUser.role()) && !companyId.equals(authUser.companyId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.COMPANY_NOT_FOUND));
+
+        company.updateDetails(
+                request.companyName(),
+                request.businessNumber().replace("-", ""),
+                request.representativeName(),
+                request.representativePhone(),
+                request.websiteUrl(),
+                request.description(),
+                request.address(),
+                request.addressDetail(),
+                request.logoUrl(),
+                request.businessLicenseUrl()
+        );
+    }
+
+    /**
      * 1. ADMIN용 — 전체 회사 목록 조회
      */
     public List<CompanyResponse> getAllCompanies(AuthUser authUser) {
@@ -146,7 +189,7 @@ public class CompanyService {
     /**
      * 2. PRESIDENT용 — 본인 회사 소속 직원 목록 조회
      */
-    public List<EmployeeResponse> getEmployeesByCompanyId(Integer companyId, AuthUser authUser) {
+    public List<EmployeeResponse> getInquiryByCompanyId(Integer companyId, AuthUser authUser) {
         // 보안 검증: 대표자(PRESIDENT)가 요청했을 때, 본인의 회사 ID와 주소창의 companyId가 일치하는지 확인
         // 만약 다르면 다른 회사 정보를 훔쳐보려는 시도이므로 차단합니다.
         if ("PRESIDENT".equals(authUser.role()) && !authUser.companyId().equals(companyId)) {
@@ -158,6 +201,22 @@ public class CompanyService {
         List<User> employees = userRepository.findByCompany_CompanyIdAndRole(companyId, UserRole.EMPLOYEE);
 
         return employees.stream()
+                .filter(user -> user.getRole() != UserRole.PRESIDENT)
+                .map(EmployeeResponse::ofSimple)
+                .collect(Collectors.toList());
+    }
+
+    public List<EmployeeResponse> getEmployeesByCompanyId(Integer companyId, AuthUser authUser) {
+        // 보안 검증
+        if ("PRESIDENT".equals(authUser.role()) && !authUser.companyId().equals(companyId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        // 대표 본인을 제외한 소속 모든 유저 조회
+        List<User> employees = userRepository.findByCompany_CompanyIdAndRole(companyId, UserRole.EMPLOYEE);
+
+        return employees.stream()
+                .filter(user -> user.getRole() != UserRole.PRESIDENT)
                 .map(EmployeeResponse::from)
                 .collect(Collectors.toList());
     }

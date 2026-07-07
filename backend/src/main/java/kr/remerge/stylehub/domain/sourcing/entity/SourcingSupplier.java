@@ -5,6 +5,8 @@ import kr.remerge.stylehub.domain.quote.entity.Quote;
 import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.global.entity.BaseEntity;
+import kr.remerge.stylehub.global.exception.BusinessException;
+import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -68,6 +70,9 @@ public class SourcingSupplier extends BaseEntity {
     private Quote quote;
 
     public void approve(User admin) {
+        if (this.status != SourcingSupplierStatus.SUGGESTED) {
+            throw new BusinessException(ErrorCode.INVALID_SOURCING_SUPPLIER_STATUS);
+        }
         this.assignedBy = admin;
         this.status = SourcingSupplierStatus.RECOMMENDED;
         this.approvedAt = LocalDateTime.now();
@@ -75,6 +80,9 @@ public class SourcingSupplier extends BaseEntity {
 
     // 관리자가 SUGGESTED 단계에서 반려 (셀러에게 노출되지 않고 차단됨)
     public void reject(User admin, String reason) {
+        if (this.status != SourcingSupplierStatus.SUGGESTED) {
+            throw new BusinessException(ErrorCode.INVALID_SOURCING_SUPPLIER_STATUS);
+        }
         this.assignedBy = admin;
         this.status = SourcingSupplierStatus.REJECTED;
         this.managerNote = reason;
@@ -82,6 +90,9 @@ public class SourcingSupplier extends BaseEntity {
     }
 
     public void decline(String feedback) {
+        if (this.status != SourcingSupplierStatus.RECOMMENDED) {
+            throw new BusinessException(ErrorCode.INVALID_SOURCING_SUPPLIER_STATUS);
+        }
         this.sellerFeedback = feedback;
         this.status = SourcingSupplierStatus.DECLINED;
         this.respondedAt = LocalDateTime.now();

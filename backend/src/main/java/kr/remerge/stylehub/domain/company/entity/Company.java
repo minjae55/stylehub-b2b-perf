@@ -132,39 +132,62 @@ public class Company extends BaseEntity {
     // 상태 변경 메서드
     // ───────────────────────────────────────────
 
-    // 회사 승인
-    public void approve() {
-        this.status = CompanyStatus.APPROVED;
-    }
-
-    // 회사 정지
-    public void suspend() {
-        this.status = CompanyStatus.SUSPENDED;
-    }
-
     // 회사 삭제
     public void delete() {
         this.status = CompanyStatus.DELETED;
         this.deletedAt = LocalDateTime.now();
     }
 
-    // 셀러 신청
-    public void applyForSeller() {
-        this.sellerStatus = SellerStatus.PENDING;
-    }
-
-    // 셀러 승인
-    public void approveSeller() {
-        this.sellerStatus = SellerStatus.APPROVED;
-    }
-
-    // 셀러 거절
-    public void rejectSeller() {
-        this.sellerStatus = SellerStatus.REJECTED;
-    }
-
     // 기본 반품지 변경
     public void updateDefaultReturnAddress(Address address) {
         this.defaultReturnAddress = address;
+    }
+
+    // ───────────────────────────────────────────
+    // 비즈니스 변경 및 도메인 로직 메서드
+    // ───────────────────────────────────────────
+
+    /**
+     * 회사 상세 정보 업데이트 및 2차 검증 로직
+     */
+    public void updateDetails(
+            String name,
+            String businessNumber,
+            String representativeName,
+            String representativePhone,
+            String websiteUrl,
+            String description,
+            String address,
+            String addressDetail,
+            String logoUrl,
+            String businessLicenseUrl
+    ) {
+        if (this.sellerStatus == SellerStatus.PENDING) {
+            throw new BusinessException(ErrorCode.FORBIDDEN); // 혹은 적절한 권한/상태 에러코드 사용
+        }
+
+        this.name = name;
+        this.businessNumber = businessNumber;
+        this.representativeName = representativeName;
+        this.representativePhone = representativePhone;
+        this.websiteUrl = websiteUrl;
+        this.description = description;
+        this.address = address;
+        this.addressDetail = addressDetail;
+        this.logoUrl = logoUrl;
+        this.businessLicenseUrl = businessLicenseUrl;
+
+        // 정보가 수정되면 자동으로 셀러 권한 심사 상태를 PENDING(대기)으로 업데이트
+        // 단, 기존이 APPROVED(완료) 상태일 때 수정할 경우 바로 PENDING으로 내릴지 유지할지는 정책에 따라 결정하면 됩니다.
+        if (this.sellerStatus == SellerStatus.NONE || this.sellerStatus == SellerStatus.REJECTED) {
+            this.sellerStatus = SellerStatus.PENDING;
+        }
+    }
+
+    /**
+     * 필요 시 외부(예: ADMIN 심사)에서 상태를 강제 제어하기 위한 메서드
+     */
+    public void changeSellerStatus(SellerStatus sellerStatus) {
+        this.sellerStatus = sellerStatus;
     }
 }

@@ -49,6 +49,12 @@ export interface SourcingSupplierResponse {
     managerNote: string | null;
 }
 
+// 백엔드 AssignableCompanyResponse 기준 (관리자 수동배정 화면 - 회사 검색 결과)
+export interface AssignableCompanyResponse {
+    companyId: number;
+    name: string;
+}
+
 // ───────────────────────────────────────────
 // 전체 소싱 요청 현황 (회사 무관)
 // ───────────────────────────────────────────
@@ -88,4 +94,33 @@ export const rejectSupplier = async (
     reason: string
 ): Promise<void> => {
     await api.patch<void>(`/admin/sourcing/suppliers/${sourcingSupplierId}/reject`, { reason });
+};
+
+// ───────────────────────────────────────────
+// 관리자 수동배정
+// ───────────────────────────────────────────
+
+// 배정 가능한 회사 검색 - keyword가 빈 문자열이면 전체(카테고리/승인상태 필터만 적용)
+// includeAllCategories=true면 카테고리 매칭 필터를 건너뛰고 전체 검색 (셀러 카테고리 등록 누락 등 예외 상황용)
+export const getAssignableCompanies = async (
+    sourcingRequestId: number,
+    keyword: string,
+    includeAllCategories: boolean = false
+): Promise<AssignableCompanyResponse[]> => {
+    return await api.get<AssignableCompanyResponse[]>(
+        `/admin/sourcing/${sourcingRequestId}/assignable-companies`,
+        { params: { keyword, includeAllCategories } }
+    );
+};
+
+// 특정 회사를 해당 소싱 요청에 수동 배정 (SUGGESTED 상태로 생성되어 기존 승인/반려 큐에 들어감)
+export const manualAssignSupplier = async (
+    sourcingRequestId: number,
+    companyId: number
+): Promise<void> => {
+    await api.post<void>(
+        `/admin/sourcing/${sourcingRequestId}/suppliers`,
+        null,
+        { params: { companyId } }
+    );
 };

@@ -78,8 +78,8 @@ export const sendInquiryMessage = async (
 /**
  * PRESIDENT 화면의 직원 필터용 — 본인 회사 소속 직원 목록
  */
-export const getCompanyEmployees = async (companyId: number): Promise<EmployeeResponse[]> => {
-    return await api.get<EmployeeResponse[]>(`company/${companyId}/employees`);
+export const getInquiryEmployees = async (companyId: number): Promise<EmployeeResponse[]> => {
+    return await api.get<EmployeeResponse[]>(`company/${companyId}/inquiry-employees`);
 };
 
 /**

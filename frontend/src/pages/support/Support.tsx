@@ -1,5 +1,6 @@
 import {useState} from "react";
 import {ChevronDown, ChevronUp, Clock, Mail, MessageSquare, Phone, Send} from "lucide-react";
+import {Link} from "react-router";
 
 // ── 데이터 ────────────────────────────────────────────────────────────────────
 
@@ -122,7 +123,8 @@ export function Support() {
                             title: "1:1 채팅",
                             detail: "실시간 상담",
                             sub: "평균 응답 5분 이내",
-                            action: "채팅 시작"
+                            action: "채팅 시작",
+                            to: "/support/inquiry"
                         },
                         {
                             icon: <Mail size={26}/>,
@@ -143,10 +145,20 @@ export function Support() {
                             <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-4">
                                 <Clock size={11}/> {c.sub}
                             </div>
-                            <button
-                                className="border border-primary text-primary hover:bg-primary hover:text-white text-xs px-5 py-2 rounded-lg font-semibold transition-colors w-full">
-                                {c.action}
-                            </button>
+                            {c.to ? (
+                                <Link
+                                    to={c.to}
+                                    className="block text-center border border-primary text-primary hover:bg-primary hover:text-white text-xs px-5 py-2 rounded-lg font-semibold transition-colors w-full"
+                                >
+                                    {c.action}
+                                </Link>
+                            ) : (
+                                <button
+                                    className="border border-primary text-primary hover:bg-primary hover:text-white text-xs px-5 py-2 rounded-lg font-semibold transition-colors w-full"
+                                >
+                                    {c.action}
+                                </button>
+                            )}
                         </div>
                     ))}
                 </div>

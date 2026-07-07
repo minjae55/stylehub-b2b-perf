@@ -97,10 +97,12 @@ export const router = createBrowserRouter([
                 Component: Root,
                 children: [
                     {index: true, Component: Home},
+
                     {path: "support", Component: Support},
+                    {path: "support/inquiry", Component: Inquiry},
+
                     {path: "restricted-businesses", Component: RestrictedBusinessTypes},
                     {path: "supplier-register", Component: SupplierRegister},
-                    {path: "inquiry", Component: Inquiry},
                     {path: "mypage", Component: MyPage},
                     {path: "settings", Component: CompanySettings},
                     {path: "partner", Component: PartnerPlan},

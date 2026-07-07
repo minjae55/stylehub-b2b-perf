@@ -46,9 +46,9 @@ import {
 import {
     createInquiry,
     getCompanies,
-    getCompanyEmployees,
     getInquiries,
     getInquiryDetail,
+    getInquiryEmployees,
     getInquiryMessages,
     readInquiryMessages,
     sendInquiryMessage,
@@ -704,6 +704,8 @@ function ChatPanel({inquiry, messages, viewerRole, currentUserId, isLoading, err
         setInput("");
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
+            // 전송 후에도 포커스가 유지되어 바로 다음 메시지를 이어서 칠 수 있게 함
+            textareaRef.current.focus();
         }
         onSend(text);
     };
@@ -831,7 +833,6 @@ function ChatPanel({inquiry, messages, viewerRole, currentUserId, isLoading, err
                         <textarea
                             ref={textareaRef}
                             value={input}
-                            disabled={sending}
                             onChange={(e) => {
                                 setInput(e.target.value);
                                 e.currentTarget.style.height = "auto";
@@ -845,7 +846,7 @@ function ChatPanel({inquiry, messages, viewerRole, currentUserId, isLoading, err
                             }}
                             placeholder="메시지를 입력하세요... (Enter 전송 / Shift+Enter 줄바꿈)"
                             rows={1}
-                            className="flex-1 resize-none border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors max-h-[120px] leading-relaxed disabled:opacity-60"
+                            className="flex-1 resize-none border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors max-h-[120px] leading-relaxed"
                         />
                         <button
                             onClick={handleSend}
@@ -889,6 +890,12 @@ export function Inquiry({ embedded = false }: InquiryProps) {
     const selectedInquiry = inquiries.find((i) => i.inquiryId === selectedId) ?? null;
     const currentMessages = selectedId ? (allMessages[selectedId] ?? []) : [];
 
+    // 실시간 상태 업데이트를 위한 ref 참조 (SSE 이벤트 핸들러에서 최신 selectedId를 참조하기 위함)
+    const selectedIdRef = useRef<number | null>(null);
+    useEffect(() => {
+        selectedIdRef.current = selectedId;
+    }, [selectedId]);
+
     // ── 문의 목록 조회: GET /support/inquiries ──────────────────────────────
     const loadInquiries = useCallback(async () => {
         setIsLoadingList(true);
@@ -903,10 +910,90 @@ export function Inquiry({ embedded = false }: InquiryProps) {
         }
     }, []);
 
+    // ── 특정 컴포넌트 안에서만 동작하는 SSE 실시간 목록 업데이트 로직 ──
+    useEffect(() => {
+        if (!user) return;
+
+        // 1. SSE 연결 수립 (인증 정보를 쿠키나 세션으로 넘기거나 필요시 쿼리파라미터/백엔드 규격에 맞춤)
+        // 위 컨트롤러 명세에 맞춰 /api/notifications/subscribe 호출
+        const eventSource = new EventSource("/api/notifications/subscribe");
+
+        // 2. 연결 성공 시
+        eventSource.onopen = () => {
+            console.log("[SSE] 1:1 문의 목록 실시간 알림 채널 연결 성공");
+        };
+
+        // 3. 백엔드에서 채팅방 업데이트 이벤트(예: CHAT_LIST_UPDATE)를 발행했을 때 수신 처리
+        // 백엔드 SseEmitterManager에서 설정한 event name이 있다면 맞추어 줍니다. (기본 listen은 'message')
+        const handleChatUpdate = (event: MessageEvent) => {
+            try {
+                const data = JSON.parse(event.data);
+                // 백엔드가 줄 데이터 예시: { inquiryId: 12, message: "안녕하세요", createdAt: "2026-07-05...", senderId: 1, senderName: "홍길동" }
+
+                const {inquiryId, message, createdAt, senderId, senderName, senderRole, messageId} = data;
+
+                // 상황 A: 내가 현재 그 방을 '보고 있지 않을 때만' 리스트의 unreadCount를 올림
+                const isCurrentRoom = selectedIdRef.current === inquiryId;
+
+                // 1) 문의 목록 리스트 실시간 업데이트
+                setInquiries((prev) =>
+                    prev.map((inq) =>
+                        inq.inquiryId === inquiryId
+                            ? {
+                                ...inq,
+                                lastMessagePreview: message,
+                                lastMessageAt: createdAt,
+                                unreadCount: isCurrentRoom ? 0 : inq.unreadCount + 1,
+                            }
+                            : inq
+                    )
+                );
+
+                // 2) 만약 내가 그 방에 들어가 있다면, 대화창 메시지 리스트에도 실시간 추가 (웹소켓 백업 역할)
+                if (isCurrentRoom) {
+                    setAllMessages((prev) => {
+                        const currentRoomMessages = prev[inquiryId] ?? [];
+                        const isDuplicate = currentRoomMessages.some((m) => m.messageId === messageId);
+                        if (isDuplicate) return prev;
+
+                        const newMsg: InquiryMessage = {
+                            messageId,
+                            inquiryId,
+                            message,
+                            senderId,
+                            senderName,
+                            senderRole,
+                            createdAt,
+                        };
+                        return {...prev, [inquiryId]: [...currentRoomMessages, newMsg]};
+                    });
+                }
+            } catch (err) {
+                console.error("[SSE] 데이터 파싱 에러:", err);
+            }
+        };
+
+        // 백엔드에서 특정 이벤트 명(예: "CHAT_LIST_UPDATE")으로 주면addEventListener를 쓰고,
+        // 그냥 일반 알림(통합)으로 준다면 eventSource.onmessage = handleChatUpdate; 로 처리합니다.
+        eventSource.addEventListener("CHAT_LIST_UPDATE", handleChatUpdate);
+        // 혹시 모르니 일반 message 이벤트로도 들어올 수 있다면 등록 가능
+        // eventSource.onmessage = handleChatUpdate;
+
+        eventSource.onerror = (err) => {
+            console.error("[SSE] 연결 오류 발생:", err);
+        };
+
+        // 4. 컴포넌트가 화면에서 사라질 때(Unmount) 연결을 명시적으로 끊어줌
+        return () => {
+            console.log("[SSE] 컴포넌트 언마운트 - 실시간 채널 연결 해제");
+            eventSource.close();
+        };
+    }, [user]);
+
     // PRESIDENT: 직원 목록 조회
     useEffect(() => {
         if (!user || user.role !== "PRESIDENT") return;
-        getCompanyEmployees(user.companyId)
+        getInquiryEmployees(user.companyId)
             .then(setEmployees)
             .catch((e) => console.error("직원 목록 조회 실패:", e));
     }, [user]);
@@ -926,7 +1013,7 @@ export function Inquiry({ embedded = false }: InquiryProps) {
             setEmployees([]);
             return;
         }
-        getCompanyEmployees(companyFilter)
+        getInquiryEmployees(companyFilter)
             .then(setEmployees)
             .catch((e) => console.error("직원 목록 조회 실패:", e));
     }, [user, companyFilter]);
@@ -1007,7 +1094,6 @@ export function Inquiry({ embedded = false }: InquiryProps) {
     const {sendSocketMessage} = useInquirySocket(selectedId, handleSocketMessage);
 
     // ── 메시지 전송: POST /support/inquiries/{id}/messages ──────────────────
-    // (웹소켓 연동 완료 시 이 부분을 socket publish로 교체)
     const handleSend = async (text: string) => {
         if (!selectedId) return;
         setIsSending(true);
@@ -1063,6 +1149,14 @@ export function Inquiry({ embedded = false }: InquiryProps) {
 
     return (
         <div className="max-w-5xl mx-auto px-4 py-8">
+            {/* 페이지 헤더 */}
+            <div className="mb-5">
+                <h1 className="text-2xl font-bold text-foreground">1:1 문의</h1>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                    관리자와 실시간으로 문의하고 답변을 받아보세요.
+                </p>
+            </div>
+
             {/* 2패널 레이아웃 */}
             <div className={ embedded
             ? "flex h-full w-full overflow-hidden"

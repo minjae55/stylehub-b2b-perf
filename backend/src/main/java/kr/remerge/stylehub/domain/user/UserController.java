@@ -102,6 +102,17 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    /**
+     * 비밀번호 변경
+     */
+    @PostMapping("/me/password")
+    public ResponseEntity<Void> changePassword(
+            @LoginUser AuthUser authUser,
+            @Valid @RequestBody PasswordChangeRequest request
+    ) {
+        userService.changePassword(authUser.userId(), request);
+        return ResponseEntity.ok().build();
+    }
     // ───────────────────────────────────────────
     // 회원 탈퇴
     // ───────────────────────────────────────────

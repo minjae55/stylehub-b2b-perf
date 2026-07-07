@@ -2,6 +2,7 @@ package kr.remerge.stylehub.domain.user;
 
 import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.category.repository.CategoryRepository;
+import kr.remerge.stylehub.domain.company.dto.request.UpdateMemberRoleRequest;
 import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.company.entity.CompanyHandledCategory;
 import kr.remerge.stylehub.domain.company.enumtype.SellerStatus;
@@ -16,9 +17,11 @@ import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.entity.UserPreferredCategory;
 import kr.remerge.stylehub.domain.user.enumtype.BusinessRole;
 import kr.remerge.stylehub.domain.user.enumtype.UserRole;
+import kr.remerge.stylehub.domain.user.enumtype.UserStatus;
 import kr.remerge.stylehub.domain.user.repository.UserPreferredCategoryRepository;
 import kr.remerge.stylehub.domain.user.repository.UserRepository;
 import kr.remerge.stylehub.global.auth.AuthService;
+import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -223,7 +226,7 @@ public class UserService {
     }
 
     // ───────────────────────────────────────────
-    // 회원 조회 / 수정 / 탈퇴 로직 (원본 유지)
+    // 회원 조회 / 수정 / 탈퇴 로직
     // ───────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -282,9 +285,69 @@ public class UserService {
     }
 
     @Transactional
+    public void changePassword(Integer userId, PasswordChangeRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 1. 현재 패스워드 일치 여부 검증
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
+            throw new BusinessException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        // 2. 새 패스워드가 기존 패스워드와 동일한지 검증
+        if (passwordEncoder.matches(request.newPassword(), user.getPassword())) {
+            throw new BusinessException(ErrorCode.SAME_AS_CURRENT_PASSWORD);
+        }
+
+        // 3. 패스워드 암호화 후 변경
+        String encodedPassword = passwordEncoder.encode(request.newPassword());
+        user.updatePassword(encodedPassword);
+
+        // 4. 기존 발급된 모든 인증 토큰 만료 처리 (리프레시 토큰 제거)
+        authService.logout(userId);
+    }
+
+    @Transactional
     public void deleteMe(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         user.delete();
+    }
+
+    @Transactional
+    public void updateMemberRole(Integer userId, UpdateMemberRoleRequest request, AuthUser authUser) {
+        if (!"PRESIDENT".equals(authUser.role()) && !"ADMIN".equals(authUser.role())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        // 1. 수정 대상 직원 조회
+        User targetUser = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 2. 권한 검증: 요청자가 대표(PRESIDENT)인 경우, 같은 회사 소속인지 체크
+        if (UserRole.PRESIDENT.name().equals(authUser.role())) {
+            if (!authUser.companyId().equals(targetUser.getCompany().getCompanyId())) {
+                throw new BusinessException(ErrorCode.FORBIDDEN);
+            }
+        }
+
+        // 3. 엔티티 내부 메서드를 통한 선택적 수정 (더티 체킹 발동)
+        targetUser.updateRoles(request.role(), request.businessRole());
+    }
+
+    @Transactional
+    public void updateUserStatus(Integer userId, UserStatus newStatus, AuthUser authUser) {
+        // 1. 상태를 바꿀 유저 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 2. 보안 검증: 대표(PRESIDENT)가 바꾸는 경우, 본인 회사 소속의 직원이 맞는지 확인
+        if ("PRESIDENT".equals(authUser.role()) && !authUser.companyId().equals(user.getCompany().getCompanyId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        // 3. 비즈니스 로직에 따른 상태 변경 처리 (JPA 더티 체킹 활용)
+        // 엔티티 내부에 user.changeStatus(newStatus) 같은 메서드가 있다면 그것을 호출하는 것이 좋습니다.
+        user.updateStatus(newStatus);
     }
 }

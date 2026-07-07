@@ -56,4 +56,10 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     // 특정 회사 소속이면서 특정 권한을 가진 유저 목록 조회
     List<User> findByCompany_CompanyIdAndRole(Integer companyId, UserRole role);
+
+    // 특정 회사 코드를 가진 유저 중 ROLE이 PRESIDENT인 사람 단건 조회
+    @Query("SELECT u FROM User u WHERE u.company.companyId = :companyId AND u.role = 'PRESIDENT'")
+    Optional<User> findPresidentByCompanyId(@Param("companyId") Integer companyId);
+
+    List<User> findByCompany_CompanyId(Integer companyId);
 }

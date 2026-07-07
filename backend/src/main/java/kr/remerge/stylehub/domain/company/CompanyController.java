@@ -1,14 +1,19 @@
 package kr.remerge.stylehub.domain.company;
 
+import jakarta.validation.Valid;
 import kr.remerge.stylehub.domain.company.dto.request.CompanyVerifyRequest;
-import kr.remerge.stylehub.domain.company.dto.response.CompanyLookupResponse;
-import kr.remerge.stylehub.domain.company.dto.response.CompanyResponse;
-import kr.remerge.stylehub.domain.company.dto.response.EmployeeResponse;
-import kr.remerge.stylehub.domain.company.dto.response.OcrParseResponse;
+import kr.remerge.stylehub.domain.company.dto.request.UpdateCompanyRequest;
+import kr.remerge.stylehub.domain.company.dto.request.UpdateMemberRoleRequest;
+import kr.remerge.stylehub.domain.company.dto.request.UpdateMemberStatusRequest;
+import kr.remerge.stylehub.domain.company.dto.response.*;
 import kr.remerge.stylehub.domain.company.repository.BrandRepository;
+import kr.remerge.stylehub.domain.user.UserService;
+import kr.remerge.stylehub.domain.user.enumtype.UserRole;
 import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
-import kr.remerge.stylehub.global.response.ApiResponse; // 💡 공통 응답 임포트
+import kr.remerge.stylehub.global.exception.BusinessException;
+import kr.remerge.stylehub.global.exception.ErrorCode;
+import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/company")
@@ -25,6 +31,7 @@ public class CompanyController {
 
     private final CompanyService companyService;
     private final BrandRepository brandRepository;
+    private final UserService userService;
 
     @GetMapping("/brands")
     public ResponseEntity<ApiResponse<List<BrandDto>>> getMyBrands() {
@@ -90,7 +97,37 @@ public class CompanyController {
     }
 
     /**
-     * ADMIN 화면의 회사 필터용 — 전체 회사 목록 조회
+     * 소속 회사 상세 정보 조회
+     */
+    @GetMapping("/{companyId}")
+    public ResponseEntity<ApiResponse<CompanyDetailResponse>> getCompanyDetail(
+            @PathVariable Integer companyId,
+            @LoginUser AuthUser authUser
+    ) {
+        log.info("[Company Detail Request] userId: {}, companyId: {}", authUser.userId(), companyId);
+
+        CompanyDetailResponse response = companyService.getCompanyDetail(companyId, authUser);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 회사 정보 변경
+     */
+    @PatchMapping("/{companyId}")
+    public ResponseEntity<ApiResponse<Void>> updateCompanyDetail(
+            @PathVariable Integer companyId,
+            @Valid @RequestBody UpdateCompanyRequest request,
+            @LoginUser AuthUser authUser
+    ) {
+        log.info("[Company Update Request] userId: {}, companyId: {}, newCompanyName: {}",
+                authUser.userId(), companyId, request.companyName());
+
+        companyService.updateCompanyDetail(companyId, request, authUser);
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    /**
+     * 문의용: ADMIN 화면의 회사 필터용 — 전체 회사 목록 조회
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<CompanyResponse>>> getCompanies(
@@ -101,14 +138,65 @@ public class CompanyController {
     }
 
     /**
-     * PRESIDENT 화면의 직원 필터용 — 본인 회사 소속 직원 목록 조회
+     * 문의용: PRESIDENT 화면의 직원 필터용 — 본인 회사 소속 직원 목록 조회
+     */
+    @GetMapping("/{companyId}/inquiry-employees")
+    public ResponseEntity<ApiResponse<List<EmployeeResponse>>> getInquiryEmployees(
+            @PathVariable Integer companyId,
+            @LoginUser AuthUser authUser
+    ) {
+        List<EmployeeResponse> response = companyService.getInquiryByCompanyId(companyId, authUser);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 직원관리용: PRESIDENT 화면의 직원 필터용 — 본인 회사 소속 직원 목록 조회
      */
     @GetMapping("/{companyId}/employees")
     public ResponseEntity<ApiResponse<List<EmployeeResponse>>> getCompanyEmployees(
             @PathVariable Integer companyId,
             @LoginUser AuthUser authUser
     ) {
+        if (!Objects.equals(authUser.role(), UserRole.PRESIDENT.name())
+                && !Objects.equals(authUser.role(), UserRole.ADMIN.name())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
         List<EmployeeResponse> response = companyService.getEmployeesByCompanyId(companyId, authUser);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 직원 권한/역할 변경 API
+     * PATCH /company/members/{userId}/role
+     */
+    @PatchMapping("/{userId}/role")
+    public ResponseEntity<ApiResponse<Void>> updateMemberRole(
+            @PathVariable Integer userId,
+            @RequestBody UpdateMemberRoleRequest request,
+            @LoginUser AuthUser authUser
+    ) {
+        userService.updateMemberRole(userId, request, authUser);
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    /**
+     * 직원 관리용: PRESIDENT 또는 ADMIN 화면에서 직원의 계정 상태(UserStatus)를 변경
+     * PATCH /api/company/{userId}/status
+     */
+    @PatchMapping("/{userId}/status")
+    public ResponseEntity<ApiResponse<Void>> updateMemberStatus(
+            @PathVariable Integer userId,
+            @RequestBody UpdateMemberStatusRequest request,
+            @LoginUser AuthUser authUser
+    ) {
+        // 권한 검증: 대표(PRESIDENT)이거나 관리자(ADMIN)만 타인의 상태를 변경 가능
+        if (!"PRESIDENT".equals(authUser.role()) && !"ADMIN".equals(authUser.role())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        // userService를 호출하여 상태를 변경합니다.
+        userService.updateUserStatus(userId, request.status(), authUser);
+        return ResponseEntity.ok(ApiResponse.success());
     }
 }

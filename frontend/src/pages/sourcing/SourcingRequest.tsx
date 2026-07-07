@@ -135,7 +135,7 @@ async function postSourcingRequest(item: SourcingItem): Promise<number> {
                         sampleQuantity: r.sampleQuantity ? Number(r.sampleQuantity) : null,
                     }))
                     : item.customOptions
-                        .filter((r) => buildOptionSummary(r.pairs) || r.quantity)
+                        .filter((r) => Number(r.quantity) > 0)
                         .map((r) => ({
                             optionSummary: buildOptionSummary(r.pairs),
                             quantity: Number(r.quantity) || 0,
@@ -169,7 +169,7 @@ async function uploadFiles(
 const isItemValid = (item: SourcingItem): boolean => {
     if (item.type === "READY") {
         const hasOptions = item.readyOptions.some(
-            (r) => r.pairs.some((p) => p.optionValue.trim()) && r.quantity
+            (r) => r.pairs.some((p) => p.optionValue.trim()) && Number(r.quantity) > 0
         );
         return !!(
             item.productName &&

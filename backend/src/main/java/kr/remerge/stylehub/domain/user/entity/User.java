@@ -162,4 +162,33 @@ public class User extends BaseEntity {
     public void updateDefaultReceivingAddress(Address address) {
         this.defaultReceivingAddress = address;
     }
+
+    /**
+     * 직원 권한 및 거래 유형 선택적 변경 (비즈니스 메서드)
+     */
+    public void updateRoles(UserRole newRole, BusinessRole newBusinessRole) {
+        if (newRole != null) {
+            this.role = newRole;
+        }
+        if (newBusinessRole != null) {
+            this.businessRole = newBusinessRole;
+        }
+    }
+
+    /**
+     * 직원 상태 선택적 변경 (비즈니스 메서드)
+     */
+    public void updateStatus(UserStatus newStatus) {
+        if (newStatus != null) {
+            this.status = newStatus;
+
+            // 💡 상태가 DELETED(탈퇴)로 변경될 때 자동으로 탈퇴 일시를 기록합니다.
+            if (newStatus == UserStatus.DELETED) {
+                this.deletedAt = LocalDateTime.now();
+            } else {
+                // 만약 탈퇴했다가 복구되는 케이스가 기획상 존재한다면, 기존 탈퇴 시간을 초기화해줍니다.
+                this.deletedAt = null;
+            }
+        }
+    }
 }

@@ -1,6 +1,10 @@
 // UserResponse.java
 package kr.remerge.stylehub.domain.user.dto.response;
 
+import kr.remerge.stylehub.domain.company.entity.Company;
+import kr.remerge.stylehub.domain.company.enumtype.CompanyStatus;
+import kr.remerge.stylehub.domain.company.enumtype.CompanyStoreType;
+import kr.remerge.stylehub.domain.company.enumtype.SellerStatus;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.enumtype.BusinessRole;
 import kr.remerge.stylehub.domain.user.enumtype.UserRole;
@@ -16,6 +20,10 @@ public record UserResponse(
         Integer userId,
         Integer companyId,
         String companyName,
+        CompanyStatus companyStatus,
+        SellerStatus sellerStatus,
+        CompanyStoreType storeType,
+        String logoUrl,
         String email,
         String name,
         String phone,
@@ -27,10 +35,16 @@ public record UserResponse(
 ) {
     // Entity → DTO 변환
     public static UserResponse from(User user) {
+        Company company = user.getCompany();
+
         return UserResponse.builder()
                 .userId(user.getUserId())
-                .companyId(user.getCompany() != null ? user.getCompany().getCompanyId() : null)
-                .companyName(user.getCompany() != null ? user.getCompany().getName() : null)
+                .companyId(company != null ? company.getCompanyId() : null)
+                .companyName(company != null ? company.getName() : null)
+                .companyStatus(company != null ? company.getStatus() : null)
+                .sellerStatus(company != null ? company.getSellerStatus() : SellerStatus.NONE)
+                .storeType(company != null ? company.getStoreType() : null)
+                .logoUrl(company != null ? company.getLogoUrl() : null)
                 .email(user.getEmail())
                 .name(user.getName())
                 .phone(user.getPhone())

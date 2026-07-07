@@ -2,14 +2,11 @@ import {useState} from "react";
 import {Link} from "react-router";
 import {ArrowLeft, CheckCircle} from "lucide-react";
 import {sendFindIdOtp, verifyFindIdOtp} from "@/api/auth/auth.service";
-import {OtpVerificationPanel} from "@/app/components/ui/otp-vertification-panel"; // 💡 방금 만든 패널 가져오기
+import {OtpVerificationPanel} from "@/app/components/ui/otp-vertification-panel";
+import {formatPhoneNumber} from "@/pages/auth/register/shared"; // 💡 방금 만든 패널 가져오기
 
 const inputCls =
     "w-full border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors";
-
-function digitsOnly(v: string) {
-    return v.replace(/\D/g, "");
-}
 
 export function FindId() {
     const [name, setName]             = useState("");
@@ -23,15 +20,31 @@ export function FindId() {
 
     const [result, setResult] = useState<{ maskedEmail: string; createdAt: string } | null>(null);
 
-    const phoneDigits = digitsOnly(phone);
+    const phoneDigits = phone.replace(/\D/g, "");
     const phoneValid  = phoneDigits.length >= 10;
-    const canSendOtp = name.trim().length > 0 && phoneValid && !sendingOtp && !otpSent;
+    const [phoneError, setPhoneError] = useState("");
+    const [nameError, setNameError] = useState("");
 
+    const canSendOtp = name.trim().length > 0 && phoneValid && !phoneError && !sendingOtp && !otpSent && !nameError;
     const handlePhoneChange = (v: string) => {
-        setPhone(v);
+        const formatted = formatPhoneNumber(v);   // ← 포맷 적용
+        setPhone(formatted);
+        setPhoneError("");                         // 입력 중엔 에러 숨김
         if (otpSent) {
             setOtpSent(false);
             setError("");
+        }
+    };
+
+    const handleNameBlur = () => {
+        if (name && name.trim().length < 2) {
+            setNameError("이름은 2자 이상 입력해 주세요.");
+        }
+    };
+
+    const handlePhoneBlur = () => {
+        if (phone && phoneDigits.length < 10) {
+            setPhoneError("올바른 휴대폰 번호를 입력해 주세요.");
         }
     };
 
@@ -98,11 +111,18 @@ export function FindId() {
                         <input
                             type="text"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={(e) => {
+                                setName(e.target.value);
+                                setNameError("");
+                            }}
+                            onBlur={handleNameBlur}
                             placeholder="가입 시 등록한 이름"
                             disabled={otpSent}
-                            className={`${inputCls} disabled:bg-secondary/40`}
+                            className={`${inputCls} ${nameError ? "border-red-400 focus:border-red-400" : ""}`}
                         />
+                        {nameError && (
+                            <p className="text-xs text-red-500 mt-1.5">{nameError}</p>
+                        )}
                     </div>
 
                     <div>
@@ -112,18 +132,27 @@ export function FindId() {
                                 type="tel"
                                 value={phone}
                                 onChange={(e) => handlePhoneChange(e.target.value)}
+                                onBlur={handlePhoneBlur}
                                 placeholder="010-0000-0000"
-                                className={`${inputCls} flex-1`}
+                                className={`${inputCls} flex-1 ${phoneError ? "border-red-400 focus:border-red-400" : ""}`}
                             />
                             <button
                                 type="button"
                                 onClick={handleSendOtp}
                                 disabled={!canSendOtp}
-                                className="bg-primary text-white px-4 rounded-xl text-sm font-semibold min-w-[88px]"
+                                className={`px-4 rounded-xl text-sm font-semibold min-w-[88px] transition-colors text-white ${
+                                    canSendOtp
+                                        ? "bg-primary hover:bg-primary/90"
+                                        : "bg-muted-foreground/30 cursor-not-allowed"
+                                }`}
                             >
                                 {sendingOtp ? "발송 중" : otpSent ? "발송완료" : "인증"}
                             </button>
+
                         </div>
+                        {phoneError && (
+                            <p className="text-xs text-red-500 mt-1.5">{phoneError}</p>
+                        )}
                         {!otpSent && error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
                     </div>
 

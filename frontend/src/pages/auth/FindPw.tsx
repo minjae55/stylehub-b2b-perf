@@ -3,9 +3,10 @@ import {Link} from "react-router";
 import {ArrowLeft, CheckCircle} from "lucide-react";
 import {resetPassword, sendFindPwOtp, verifyFindPwOtp} from "@/api/auth/auth.service";
 import {OtpVerificationPanel} from "@/app/components/ui/otp-vertification-panel"; // 💡 공통 패널 사용
+import {PasswordStrengthBar} from "@/pages/auth/register/shared";
 
 const inputCls =
-    "w-full border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors";
+    "w-full border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors disabled:bg-muted/40 disabled:text-muted-foreground/60 disabled:cursor-not-allowed";
 
 function isValidEmail(v: string) {
     return /\S+@\S+\.\S+/.test(v);
@@ -26,8 +27,13 @@ export function FindPw() {
 
     const [resetToken, setResetToken] = useState("");
 
+    const isPasswordValid =
+        newPassword.length >= 8 &&
+        /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/.test(newPassword);
+
+    const pwMismatch = !!confirmPassword && newPassword !== confirmPassword;
+
     const canSendOtp = name.trim().length > 0 && isValidEmail(email) && !sendingOtp && !otpSent;
-    const passwordMatch = newPassword.length >= 8 && newPassword === confirmPassword;
 
     const handleEmailChange = (v: string) => {
         setEmail(v);
@@ -66,7 +72,7 @@ export function FindPw() {
     };
 
     const handleResetPassword = async () => {
-        if (!passwordMatch || resetting) return;
+        if (!isPasswordValid || resetting) return;
         setError("");
         setResetting(true);
         try {
@@ -101,7 +107,7 @@ export function FindPw() {
                             onChange={(e) => setName(e.target.value)}
                             placeholder="가입 시 등록한 이름"
                             disabled={otpSent}
-                            className={`${inputCls} disabled:bg-secondary/40`}
+                            className={`${inputCls} ${otpSent ? "bg-muted/30 text-muted-foreground/60" : ""}`}
                         />
                     </div>
 
@@ -114,13 +120,17 @@ export function FindPw() {
                                 onChange={(e) => handleEmailChange(e.target.value)}
                                 placeholder="your@company.com"
                                 disabled={otpSent}
-                                className={`${inputCls} flex-1`}
+                                className={`${inputCls} ${otpSent ? "bg-muted/30 text-muted-foreground/60" : ""}`}
                             />
                             <button
                                 type="button"
                                 onClick={handleSendOtp}
                                 disabled={!canSendOtp}
-                                className="bg-primary text-white px-4 rounded-xl text-sm font-semibold min-w-[88px]"
+                                className={`px-4 rounded-xl text-sm font-semibold min-w-[88px] transition-colors text-white ${
+                                    canSendOtp
+                                        ? "bg-primary hover:bg-primary/90"
+                                        : "bg-muted-foreground/30 cursor-not-allowed"
+                                }`}
                             >
                                 {sendingOtp ? "발송 중" : otpSent ? "발송완료" : "인증"}
                             </button>
@@ -129,7 +139,7 @@ export function FindPw() {
                             <p className="text-xs text-red-500 mt-1.5 bg-red-50 border border-red-200 rounded-xl p-3">{error}</p>}
                     </div>
 
-                    {/* 🧩 공통 패널 호출 및 데이터 주입 */}
+                    {/* 공통 패널 호출 및 데이터 주입 */}
                     {otpSent && (
                         <OtpVerificationPanel
                             targetValue={email}
@@ -152,18 +162,27 @@ export function FindPw() {
                         <label className="block text-sm font-medium text-[#333] mb-1.5">새 비밀번호</label>
                         <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
                                placeholder="새 비밀번호 입력" className={inputCls}/>
+                        <PasswordStrengthBar password={newPassword}/>
+                        {newPassword && !isPasswordValid && (
+                            <p className="text-xs text-amber-600 mt-1">
+                                영문자, 숫자, 특수문자(@$!%*#?&)를 각각 최소 1자 이상 포함해야 합니다.
+                            </p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-[#333] mb-1.5">새 비밀번호 확인</label>
-                        <input type="password" value={confirmPassword}
-                               onChange={(e) => setConfirmPassword(e.target.value)} placeholder="새 비밀번호 재입력"
-                               className={inputCls}/>
-                        {confirmPassword && !passwordMatch &&
-                            <p className="text-xs text-red-500 mt-1.5">비밀번호가 일치하지 않거나 8자 미만입니다.</p>}
-                        {error &&
-                            <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl p-3 mt-1.5">{error}</p>}
+                        <input
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="새 비밀번호 재입력"
+                            disabled={!isPasswordValid}
+                            className={`${inputCls} ${pwMismatch ? "border-red-400" : ""} disabled:opacity-50`}
+                        />
+                        {pwMismatch && <p className="text-xs text-red-500 mt-1">비밀번호가 일치하지 않습니다.</p>}
                     </div>
-                    <button type="button" onClick={handleResetPassword} disabled={!passwordMatch || resetting}
+                    <button type="button" onClick={handleResetPassword}
+                            disabled={!isPasswordValid || !confirmPassword || pwMismatch || resetting}
                             className="w-full bg-primary text-white py-3 rounded-xl text-sm font-semibold mt-2">
                         {resetting ? "변경 처리 중..." : "비밀번호 변경 완료"}
                     </button>

@@ -2,6 +2,7 @@ package kr.remerge.stylehub.domain.sourcing;
 
 import kr.remerge.stylehub.domain.sourcing.dto.AdminSourcingRequestResponse;
 import kr.remerge.stylehub.domain.sourcing.dto.AdminSourcingStatsResponse;
+import kr.remerge.stylehub.domain.sourcing.dto.AssignableCompanyResponse;
 import kr.remerge.stylehub.domain.sourcing.dto.SourcingReviewQueueResponse;
 import kr.remerge.stylehub.domain.sourcing.dto.SourcingSupplierRejectRequest;
 import kr.remerge.stylehub.domain.sourcing.dto.SourcingSupplierResponse;
@@ -92,6 +93,23 @@ public class SourcingAdminController {
     ) {
         List<SourcingSupplierResponse> response =
                 sourcingAdminService.getUnassignedRequests();
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // ───────────────────────────────────────────
+    // 수동배정
+    // ───────────────────────────────────────────
+
+    // 배정 가능한 회사 검색 (카테고리 매칭 + 승인상태 + 이미 배정된 회사 제외)
+    @GetMapping("/{sourcingRequestId}/assignable-companies")
+    public ResponseEntity<ApiResponse<List<AssignableCompanyResponse>>> getAssignableCompanies(
+            @LoginUser AuthUser authUser,
+            @PathVariable Integer sourcingRequestId,
+            @RequestParam(required = false, defaultValue = "") String keyword,
+            @RequestParam(required = false, defaultValue = "false") boolean includeAllCategories
+    ) {
+        List<AssignableCompanyResponse> response =
+                sourcingAdminService.getAssignableCompanies(sourcingRequestId, keyword, includeAllCategories);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

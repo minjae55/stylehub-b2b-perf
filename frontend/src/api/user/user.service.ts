@@ -1,9 +1,16 @@
 import api from "@/api/axios";
 import {UserResponse} from "../auth/auth.types";
 import {
-    ChangeEmailOtpRequest, ChangePhoneOtpRequest, VerifyEmailOtpRequest,
-    VerifyPhoneOtpRequest, UpdateProfilePayload, AddressResponse, AddressPayload, CompanyDefaultsResponse,
-    UserDefaultsResponse, UpdateDefaultAddressRequest
+    AddressPayload,
+    AddressResponse,
+    ChangeEmailOtpRequest,
+    ChangePhoneOtpRequest,
+    CompanyDefaultsResponse,
+    UpdateDefaultAddressRequest,
+    UpdateProfilePayload,
+    UserDefaultsResponse,
+    VerifyEmailOtpRequest,
+    VerifyPhoneOtpRequest
 } from "./user.types";
 // ───────────────────────────────────────────
 // 내 정보 조회
@@ -48,6 +55,16 @@ export const updateProfileInfo = async (payload: UpdateProfilePayload) => {
     return await api.patch<UserResponse>("/users/profile", payload);
 };
 
+/**
+ * 비밀번호 변경
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    // axios 인터셉터가 ApiResponse를 언랩하므로 리턴 타입을 void로 처리합니다.
+    await api.post("/users/me/password", {
+        currentPassword,
+        newPassword
+    });
+}
 // ───────────────────────────────────────────
 // 기본 배송, 발송, 반품 주소지 관리
 // ───────────────────────────────────────────

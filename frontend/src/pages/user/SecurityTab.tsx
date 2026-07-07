@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { ShieldCheck, Eye, EyeOff, Link, Unlink, CheckCircle, AlertCircle } from "lucide-react";
+import {useState} from "react";
+import {AlertCircle, CheckCircle, Eye, EyeOff, Link, ShieldCheck, Unlink} from "lucide-react";
+import {useAuthStore} from "@/store/useAuthStore";
+import {changePassword} from "@/api/user/user.service";
+import {useNavigate} from "react-router";
+import {logout} from "@/api/auth/auth.service";
+import {PasswordStrengthBar} from "@/pages/auth/register/shared";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -58,6 +63,41 @@ function SectionHeader({ icon, title, desc }: {
 }
 
 // ── Password Section ──────────────────────────────────────────────────────────
+const PasswordField = ({
+                           label, value, onChange, placeholder, show, onToggle, mismatch,
+                       }: {
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+    field: string;
+    placeholder?: string;
+    show: boolean;
+    onToggle: () => void;
+    mismatch?: boolean;
+}) => (
+    <div>
+        <label className="block text-sm font-medium text-[#333] mb-1.5">{label}</label>
+        <div className="relative">
+            <input
+                type={show ? "text" : "password"}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                className={`${inputCls} pr-10 ${mismatch ? "border-red-400" : ""}`}
+            />
+            <button
+                type="button"
+                onClick={onToggle}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+                {show ? <EyeOff size={15}/> : <Eye size={15}/>}
+            </button>
+        </div>
+        {mismatch && (
+            <p className="text-xs text-red-500 mt-1">비밀번호가 일치하지 않습니다.</p>
+        )}
+    </div>
+);
 
 function PasswordSection() {
     const [current, setCurrent]   = useState("");
@@ -68,63 +108,71 @@ function PasswordSection() {
     const [error, setError]       = useState<string | null>(null);
     const [success, setSuccess]   = useState(false);
 
-    const mismatch = confirm && next !== confirm;
+    const clearUser = useAuthStore((state) => state.clearUser);
+    const navigate = useNavigate();
 
     const validate = (): string | null => {
         if (!current) return "현재 비밀번호를 입력해 주세요.";
         if (next.length < 8) return "새 비밀번호는 8자 이상이어야 합니다.";
+        if (next === current) return "새 비밀번호는 현재 비밀번호와 다르게 설정해야 합니다."; // 👈 보안 검증 추가
         if (next !== confirm) return "새 비밀번호가 일치하지 않습니다.";
+        if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/.test(next)) {
+            return "영문자, 숫자, 특수문자를 각각 최소 1자 이상 포함해야 합니다.";
+        }
         return null;
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const err = validate();
         if (err) { setError(err); return; }
+
         setError(null);
         setSaving(true);
-        // TODO: POST /users/me/password
-        setTimeout(() => {
-            setSaving(false);
+        setSuccess(false);
+
+        try {
+            // 1. 비밀번호 변경 API 호출
+            await changePassword(current, next);
+
+            // 2. 성공 메시지 표시 및 입력창 비우기
             setSuccess(true);
             setCurrent(""); setNext(""); setConfirm("");
-            setTimeout(() => setSuccess(false), 3000);
-        }, 900);
+
+            // 3. 1.5초~2초 후 세션 정리 및 로그인 페이지로 이동
+            // (사용자가 성공 메시지를 읽을 시간을 줍니다)
+            setTimeout(async () => {
+                try {
+                    // 백엔드 로그아웃 API 호출 (/auth/logout)
+                    await logout();
+                } catch (logoutErr) {
+                    // 로그아웃 API가 실패하더라도 프론트엔드 클리어는 진행되어야 안전합니다.
+                    console.error("인증 서버 로그아웃 실패:", logoutErr);
+                } finally {
+                    // Zustand 스토어 초기화 및 localStorage 비우기
+                    clearUser();
+                    // 로컬스토리지에 저장된 토큰이 별도로 있다면 여기서 같이 삭제
+                    localStorage.removeItem("accessToken");
+
+                    // 로그인 화면으로 리다이렉트
+                    navigate("/login");
+                }
+            }, 2000);
+
+        } catch (e: any) {
+            setError(e.message || "비밀번호 변경 중 오류가 발생했습니다.");
+        } finally {
+            setSaving(false);
+        }
     };
 
     const toggle = (field: keyof typeof show) =>
         setShow((s) => ({ ...s, [field]: !s[field] }));
 
-    const PasswordField = ({
-                               label, value, onChange, field, placeholder,
-                           }: {
-        label: string; value: string;
-        onChange: (v: string) => void;
-        field: keyof typeof show;
-        placeholder?: string;
-    }) => (
-        <div>
-            <label className="block text-sm font-medium text-[#333] mb-1.5">{label}</label>
-            <div className="relative">
-                <input
-                    type={show[field] ? "text" : "password"}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder}
-                    className={`${inputCls} pr-10 ${field === "confirm" && mismatch ? "border-red-400" : ""}`}
-                />
-                <button
-                    type="button"
-                    onClick={() => toggle(field)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                    {show[field] ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-            </div>
-            {field === "confirm" && mismatch && (
-                <p className="text-xs text-red-500 mt-1">비밀번호가 일치하지 않습니다.</p>
-            )}
-        </div>
-    );
+    const isPasswordValid =
+        next.length >= 8 &&
+        /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/.test(next);
+
+    const pwMismatch = !!confirm && next !== confirm;
 
     return (
         <section>
@@ -140,48 +188,32 @@ function PasswordSection() {
                     value={current}
                     onChange={setCurrent}
                     field="current"
-                    placeholder="현재 비밀번호"
+                    show={show.current}
+                    onToggle={() => toggle("current")}
                 />
                 <PasswordField
                     label="새 비밀번호"
                     value={next}
                     onChange={setNext}
                     field="next"
-                    placeholder="8자 이상"
+                    show={show.next}
+                    onToggle={() => toggle("next")}
                 />
+                <PasswordStrengthBar password={next}/>
+                {next && !isPasswordValid && (
+                    <p className="text-xs text-amber-600 mt-1">
+                        영문자, 숫자, 특수문자(@$!%*#?&)를 각각 최소 1자 이상 포함해야 합니다.
+                    </p>
+                )}
                 <PasswordField
                     label="새 비밀번호 확인"
                     value={confirm}
                     onChange={setConfirm}
                     field="confirm"
-                    placeholder="비밀번호 재입력"
+                    show={show.confirm}
+                    onToggle={() => toggle("confirm")}
+                    mismatch={pwMismatch}
                 />
-
-                {/* Strength bar */}
-                {next.length > 0 && (
-                    <div>
-                        <div className="flex gap-1 mb-1">
-                            {[8, 12, 16].map((threshold) => (
-                                <div
-                                    key={threshold}
-                                    className={`flex-1 h-1.5 rounded-full transition-colors ${
-                                        next.length >= threshold
-                                            ? next.length >= 16 ? "bg-emerald-500"
-                                                : next.length >= 12 ? "bg-amber-400"
-                                                    : "bg-red-400"
-                                            : "bg-muted"
-                                    }`}
-                                />
-                            ))}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            {next.length < 8  ? "너무 짧음"
-                                : next.length < 12 ? "보통"
-                                    : next.length < 16 ? "강함"
-                                        : "매우 강함"}
-                        </p>
-                    </div>
-                )}
 
                 {error && (
                     <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
@@ -196,7 +228,7 @@ function PasswordSection() {
 
                 <button
                     onClick={handleSubmit}
-                    disabled={saving || !current || !next || !confirm}
+                    disabled={saving || !current || !isPasswordValid || !confirm || pwMismatch}
                     className="flex items-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
                 >
                     {saving ? (

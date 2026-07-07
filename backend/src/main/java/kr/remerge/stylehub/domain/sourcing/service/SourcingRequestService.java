@@ -126,6 +126,10 @@ public class SourcingRequestService {
 
             if (itemDto.getOptions() != null) {
                 for (SourcingRequestDto.OptionRequest opt : itemDto.getOptions()) {
+                    if (opt.getQuantity() == null || opt.getQuantity() <= 0) {
+                        throw new BusinessException(ErrorCode.INVALID_OPTION_QUANTITY);
+                    }
+
                     SourcingRequestItem item = SourcingRequestItem.builder()
                             .sourcingRequest(saved)
                             .optionSummary(opt.getOptionSummary())

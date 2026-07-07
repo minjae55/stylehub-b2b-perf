@@ -203,13 +203,99 @@ function WithdrawConfirmModal({ onClose, onConfirm, isLoading }: {
   );
 }
 
+// ── 견적 액션(승인/거절/샘플결제) 확인 모달 ─────────────────────────────────
+interface PendingQuoteAction {
+  quoteId: number;
+  status: QuoteActionStatus;
+  companyName: string;
+}
+
+const QUOTE_ACTION_META: Record<
+    QuoteActionStatus,
+    { title: string; icon: React.ReactNode; tone: string; confirmLabel: string; description: (companyName: string) => string }
+> = {
+  APPROVED: {
+    title: "견적 승인",
+    icon: <CheckCircle size={16} className="text-green-600" />,
+    tone: "bg-green-500 hover:bg-green-600",
+    confirmLabel: "승인하기",
+    description: (companyName) =>
+        `${companyName}의 견적을 승인하면 같은 소싱 요청에 접수된 다른 견적은 모두 자동으로 거절 처리됩니다. 이 작업은 되돌릴 수 없습니다.`,
+  },
+  REJECTED: {
+    title: "견적 거절",
+    icon: <XCircle size={16} className="text-red-500" />,
+    tone: "bg-red-500 hover:bg-red-600",
+    confirmLabel: "거절하기",
+    description: (companyName) =>
+        `${companyName}의 견적을 거절합니다. 거절 후에는 되돌릴 수 없습니다.`,
+  },
+  SAMPLE_REQUESTED: {
+    title: "샘플 결제",
+    icon: <FlaskConical size={16} className="text-amber-600" />,
+    tone: "bg-amber-500 hover:bg-amber-600",
+    confirmLabel: "결제 페이지로 이동",
+    description: (companyName) =>
+        `${companyName}의 견적으로 샘플 결제를 진행합니다. 결제 페이지로 이동합니다.`,
+  },
+  NEGOTIATING: {
+    title: "협의 요청",
+    icon: <MessageSquare size={16} className="text-purple-600" />,
+    tone: "bg-purple-500 hover:bg-purple-600",
+    confirmLabel: "계속하기",
+    description: (companyName) => `${companyName}와 협의를 진행합니다.`,
+  },
+};
+
+function QuoteActionConfirmModal({ action, onClose, onConfirm, isLoading }: {
+  action: PendingQuoteAction;
+  onClose: () => void;
+  onConfirm: () => void;
+  isLoading: boolean;
+}) {
+  const meta = QUOTE_ACTION_META[action.status];
+
+  return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              {meta.icon}
+              <h3 className="font-bold text-foreground">{meta.title}</h3>
+            </div>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-sm text-foreground leading-relaxed">
+              {meta.description(action.companyName)}
+            </p>
+            <p className="text-xs text-muted-foreground">정말 진행하시겠습니까?</p>
+            <div className="flex gap-2 pt-1">
+              <button onClick={onClose}
+                      className="flex-1 py-2.5 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors font-medium">
+                취소
+              </button>
+              <button onClick={onConfirm} disabled={isLoading}
+                      className={`flex-1 py-2.5 disabled:opacity-50 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-1.5 ${meta.tone}`}>
+                {isLoading ? "처리 중..." : meta.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+  );
+}
+
 // ── 공급사 카드 ───────────────────────────────────────────────────────────────
 function SupplierCard({
                         bid,
                         anonymousLabel,
                         request,
                         onNavigateNegotiation,
-                        onAction,
+                        onRequestAction,
                         actionLoading,
                         onViewDetail,
                       }: {
@@ -217,7 +303,7 @@ function SupplierCard({
   anonymousLabel: string;
   request: SourcingRequestDetail;
   onNavigateNegotiation: () => void;
-  onAction: (quoteId: number, status: QuoteActionStatus) => void;
+  onRequestAction: (quoteId: number, status: QuoteActionStatus, companyName: string) => void;
   actionLoading: boolean;
   onViewDetail: () => void;
 }) {
@@ -279,7 +365,7 @@ function SupplierCard({
             {isActionable(bid) ? (
                 <>
                   <button
-                      onClick={() => bid.quoteId && onAction(bid.quoteId, "REJECTED")}
+                      onClick={() => bid.quoteId && onRequestAction(bid.quoteId, "REJECTED", displayName)}
                       disabled={actionLoading}
                       className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -287,7 +373,7 @@ function SupplierCard({
                   </button>
                   {request.needSample === "Y" ? (
                       <button
-                          onClick={() => bid.quoteId && onAction(bid.quoteId, "SAMPLE_REQUESTED")}
+                          onClick={() => bid.quoteId && onRequestAction(bid.quoteId, "SAMPLE_REQUESTED", displayName)}
                           disabled={actionLoading}
                           className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -295,7 +381,7 @@ function SupplierCard({
                       </button>
                   ) : (
                       <button
-                          onClick={() => bid.quoteId && onAction(bid.quoteId, "APPROVED")}
+                          onClick={() => bid.quoteId && onRequestAction(bid.quoteId, "APPROVED", displayName)}
                           disabled={actionLoading}
                           className="flex items-center gap-1.5 px-3 py-1.5 border border-green-200 text-green-600 hover:bg-green-50 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -337,6 +423,7 @@ export function BuyerSourcingDetail() {
   const [error, setError] = useState<string | null>(null);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingQuoteAction | null>(null);
   const [actionQuoteId, setActionQuoteId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showWithdrawnBids, setShowWithdrawnBids] = useState(false);
@@ -364,12 +451,14 @@ export function BuyerSourcingDetail() {
     }
   };
 
-  const handleQuoteAction = async (quoteId: number, status: QuoteActionStatus) => {
+  // 실제 승인/거절/샘플결제 API 실행 (확인 모달에서 최종 확정 시 호출)
+  const executeQuoteAction = async (quoteId: number, status: QuoteActionStatus) => {
     if (!requestId) return;
     setActionQuoteId(quoteId);
     setActionError(null);
     try {
       await updateQuoteStatus(quoteId, status);
+      setPendingAction(null);
       if (status === "SAMPLE_REQUESTED") {
         navigate(`/checkout?type=sample&quoteId=${quoteId}`);
         return;
@@ -386,6 +475,11 @@ export function BuyerSourcingDetail() {
     } finally {
       setActionQuoteId(null);
     }
+  };
+
+  // 버튼 클릭 시 바로 실행하지 않고 확인 모달을 먼저 띄움 (오클릭 방지)
+  const requestQuoteAction = (quoteId: number, status: QuoteActionStatus, companyName: string) => {
+    setPendingAction({ quoteId, status, companyName });
   };
 
   if (loading) {
@@ -427,7 +521,7 @@ export function BuyerSourcingDetail() {
           onNavigateNegotiation={() => navigate("/negotiations", {
             state: { supplierId: bid.sellerCompanyId, requestId: request.sourcingRequestId },
           })}
-          onAction={handleQuoteAction}
+          onRequestAction={requestQuoteAction}
           actionLoading={actionQuoteId === bid.quoteId}
           // 상세보기 클릭 → QuoteDetail 페이지로 이동 (perspective는 백엔드가 authUser.companyId 기준으로 판단)
           onViewDetail={() => bid.quoteId && navigate(`/buyer/quotes/${bid.quoteId}`)}
@@ -648,6 +742,15 @@ export function BuyerSourcingDetail() {
                 onClose={() => setShowWithdraw(false)}
                 onConfirm={handleWithdraw}
                 isLoading={withdrawing}
+            />
+        )}
+
+        {pendingAction && (
+            <QuoteActionConfirmModal
+                action={pendingAction}
+                onClose={() => setPendingAction(null)}
+                onConfirm={() => executeQuoteAction(pendingAction.quoteId, pendingAction.status)}
+                isLoading={actionQuoteId === pendingAction.quoteId}
             />
         )}
       </div>

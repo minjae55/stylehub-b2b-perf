@@ -57,7 +57,7 @@ public class JwtProvider {
                 .subject(String.valueOf(userId))  // 토큰 주인 (userId)
                 .claim("companyId", companyId)    // 회사 ID 클레임
                 .claim("role", role)              // 권한(ADMIN, PRESIDENT, EMPLOYEE 등)
-                .claim("BusinessRole", businessRole)
+                .claim("businessRole", businessRole)
                 .issuedAt(new Date())             // 발급 시각
                 .expiration(new Date(System.currentTimeMillis() + expiration)) // 만료 시각
                 .signWith(getSigningKey());    // 서명

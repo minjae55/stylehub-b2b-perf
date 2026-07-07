@@ -50,13 +50,20 @@ public interface SourcingSupplierRepository extends JpaRepository<SourcingSuppli
     );
 
     // 배정 안 된 소싱 요청
+    // 활성 상태(SUGGESTED/RECOMMENDED/QUOTED)인 공급사가 하나도 없는 요청만 미배정으로 취급.
+    // DECLINED뿐 아니라 REJECTED/EXPIRED/CANCELLED도 "더 이상 유효하지 않은 배정"이므로 함께 제외해야 함.
     @Query("""
             SELECT ss FROM SourcingSupplier ss
             JOIN FETCH ss.sourcingRequest sr
             WHERE sr.sourcingRequestId NOT IN (
                 SELECT ss2.sourcingRequest.sourcingRequestId
                 FROM SourcingSupplier ss2
-                WHERE ss2.status <> kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus.DECLINED
+                WHERE ss2.status NOT IN (
+                    kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus.DECLINED,
+                    kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus.REJECTED,
+                    kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus.EXPIRED,
+                    kr.remerge.stylehub.domain.sourcing.enumtype.SourcingSupplierStatus.CANCELLED
+                )
             )
             ORDER BY sr.createdAt DESC
             """)

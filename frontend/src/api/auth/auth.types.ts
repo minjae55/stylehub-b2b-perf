@@ -63,13 +63,17 @@ export interface EmployeeSignUpRequest {
 
 export interface UserResponse {
     userId: number;
-    companyId: number;
-    companyName: string;
+    companyId: number | null;
+    companyName: string | null;
+    companyStatus: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED" | "DELETED" | null;
+    sellerStatus: "NONE" | "PENDING" | "APPROVED" | "REJECTED";
+    storeType: "OFFLINE" | "ONLINE" | "BOTH" | null
+    logoUrl: string | null;
     email: string;
     name: string;
-    phone: string | null;
+    phone: string;
     role: "ADMIN" | "PRESIDENT" | "EMPLOYEE";
-    businessRole: "BUYER" | "SELLER" | "BOTH";
+    businessRole: "BUYER" | "SELLER" | "BOTH" | "";
     profileImageUrl: string | null;
     status: "PENDING" | "APPROVED" | "SUSPENDED" | "DELETED";
     createdAt: string;

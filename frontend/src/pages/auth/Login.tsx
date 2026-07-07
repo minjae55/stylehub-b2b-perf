@@ -1,9 +1,12 @@
 import React, {useRef, useState} from "react";
 import {Link, useNavigate} from "react-router";
-import {ArrowRight, Eye, EyeOff, ShoppingBag, TrendingUp, Users} from "lucide-react";
+import {Eye, EyeOff, ShoppingBag, TrendingUp, Users} from "lucide-react";
 import {useAuthStore} from "@/store/useAuthStore";
 import {getMe} from "@/api/user/user.service";
 import {login} from "@/api/auth/auth.service";
+import btn_apple from "@/assets/btn_apple.png";
+import btn_kakao from "@/assets/btn_kakao.png";
+import btn_naver from "@/assets/btn_naver.png";
 
 const STATS = [
     {icon: <ShoppingBag size={16}/>, value: "2,400+", label: "입점 브랜드"},
@@ -45,6 +48,12 @@ export function Login() {
     const handleLogin = async (e: React.SubmitEvent) => {
         e.preventDefault();
         setError(null);
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(form.email)) {
+            setError("올바른 이메일 형식을 입력해 주세요.");
+            emailInputRef.current?.focus();
+            return;
+        }
 
         // 아예 둘다 비어있을 때 버튼을 누른 경우
         if ((!form.email.trim() && !form.password.trim())) {
@@ -112,7 +121,7 @@ export function Login() {
                     <div className="flex-1 flex flex-col justify-center gap-5">
                         <div>
                             <p className="text-primary text-xs tracking-[0.2em] uppercase font-semibold mb-3">
-                                — Fashion B2B Platform
+                                — 패션 B2B Platform
                             </p>
                             <h1 className="text-[44px] font-black text-white leading-[1.05] tracking-tight">
                                 패션 B2B<br/>
@@ -226,7 +235,7 @@ export function Login() {
                                 : "bg-primary hover:bg-primary/90 cursor-pointer"
                             }`}
                         >
-                            {loading ? "로그인 중..." : "로그인"} <ArrowRight size={15}/>
+                            {loading ? "로그인 중..." : "로그인"}
                         </button>
 
                         <div className="mt-6 pt-5 border-t border-border">
@@ -240,18 +249,19 @@ export function Login() {
                         </div>
 
                         <div className="flex justify-center gap-4 mt-4">
-                            <Link to="/ssl/member/snsLogin/mem_snsBridge.php?provider=naver" title="네이버로그인">
-                                <img src="https://cdn1.domeggook.com/image/member/btn_naver.png" alt="네이버로그인" width="48"
-                                     height="48"/>
+                            <Link to="https://nid.naver.com/nidlogin.login?mode=form&url=https://www.naver.com/"
+                                  title="네이버로그인">
+                                <img src={btn_naver} alt="네이버로그인" width="48" height="48"/>
                             </Link>
-                            <Link to="/ssl/member/snsLogin/mem_snsBridge.php?provider=kakao" title="카카오로그인">
-                                <img src="https://cdn1.domeggook.com/image/member/btn_kakao.png" alt="카카오로그인" width="48"
-                                     height="48"/>
+                            <Link
+                                to="https://accounts.kakao.com/login/simple/?continue=https%3A%2F%2Fcs.kakao.com%2F&talk_login=#simpleLogin"
+                                title="카카오로그인">
+                                <img src={btn_kakao} alt="카카오로그인" width="48" height="48"/>
                             </Link>
-                            <Link to="/ssl/member/snsLogin/mem_snsBridge.php?provider=apple" title="애플로그인">
-                                <img src="https://cdn1.domeggook.com/image/member/btn_apple.png" alt="애플로그인" width="48"
-                                     height="48"/>
+                            <Link to="https://account.apple.com/sign-in" title="애플로그인">
+                                <img src={btn_apple} alt="애플로그인" width="48" height="48"/>
                             </Link>
+
                         </div>
                     </form>
                 </div>

@@ -30,4 +30,7 @@ public interface CompanyRepository extends JpaRepository<Company, Integer> {
             @Param("status") CompanyStatus status,
             @Param("sellerStatus") SellerStatus sellerStatus
     );
+    // 관리자 수동배정 화면의 회사 검색용. keyword가 빈 문자열이면 전체 매칭.
+    List<Company> findAllByNameContainingIgnoreCase(String keyword);
+
 }

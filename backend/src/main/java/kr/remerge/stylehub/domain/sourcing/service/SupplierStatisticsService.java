@@ -82,11 +82,15 @@ public class SupplierStatisticsService {
                 .filter(id -> !id.equals(buyerCompanyId)) // 요청한 바이어 본인 회사는 후보에서 제외
                 .collect(Collectors.toList());
 
-        List<Integer> categoryMatchIds = companyHandledCategoryRepository
-                .findCompanyIdsByCategoryId(categoryId);
-        companyIds = companyIds.stream()
-                .filter(categoryMatchIds::contains)
-                .collect(Collectors.toList());
+        List<Integer> categoryMatchIds = categoryId != null
+                ? companyHandledCategoryRepository.findCompanyIdsByCategoryId(categoryId)
+                : null;
+
+        if (categoryMatchIds != null) {
+            companyIds = companyIds.stream()
+                    .filter(categoryMatchIds::contains)
+                    .collect(Collectors.toList());
+        }
 
         if (companyIds.isEmpty()) {
             log.warn("[AutoAssign] 카테고리 매칭 공급사 없음 - CategoryId: {}", categoryId);

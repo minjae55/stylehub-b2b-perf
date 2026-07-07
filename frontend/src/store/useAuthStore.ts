@@ -66,6 +66,9 @@ export const useAuthStore = create<AuthState>()(
             // 스토리지 엔진 명시 (기본값도 localStorage지만 명시적으로 선언)
             // sessionStorage로 바꾸면 탭 닫을 때 자동 초기화됨
             storage: createJSONStorage(() => localStorage),
+            partialize: (state) => ({
+                isAuthenticated: state.isAuthenticated,
+            }),
         }
     )
 );

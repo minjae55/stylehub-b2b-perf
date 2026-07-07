@@ -108,7 +108,7 @@ public class BuyerSourcingService {
             case "TRADING" -> List.of(SourcingStatus.TRADING);
             case "COMPLETED" -> List.of(SourcingStatus.COMPLETED);
             case "CLOSED" -> CLOSED_STATUSES;
-            default -> throw new IllegalArgumentException("알 수 없는 상태 필터: " + statusGroup);
+            default -> throw new BusinessException(ErrorCode.INVALID_INPUT);
         };
         return requests.stream()
                 .filter(r -> targetStatuses.contains(r.getStatus()))
@@ -129,7 +129,7 @@ public class BuyerSourcingService {
     @Transactional
     public void withdraw(Integer sourcingRequestId, Integer userId, Integer buyerCompanyId, String role) {
         SourcingRequest request = sourcingRequestRepository.findById(sourcingRequestId)
-                .orElseThrow(() -> new IllegalArgumentException("소싱 요청 없음: " + sourcingRequestId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SOURCING_NOT_FOUND));
 
         // 회사 자체가 다르면 애초에 대상이 아님
         if (!request.getBuyerCompanyId().equals(buyerCompanyId)) {
@@ -146,18 +146,22 @@ public class BuyerSourcingService {
 
         if (request.getStatus() != SourcingStatus.PENDING
                 && request.getStatus() != SourcingStatus.QUOTED) {
-            throw new IllegalStateException("취소할 수 없는 상태입니다: " + request.getStatus());
+            throw new BusinessException(ErrorCode.SOURCING_WITHDRAW_NOT_ALLOWED);
         }
 
+        // PENDING 단계에서도 자동배정으로 인해 SUGGESTED/RECOMMENDED 공급사가 이미 존재할 수 있으므로
+        // QUOTED 여부와 무관하게 살아있는 공급사 배정은 모두 무효화한다.
+        List<SourcingSupplier> suppliers = sourcingSupplierRepository
+                .findAllBySourcingRequest_SourcingRequestId(sourcingRequestId);
+
+        suppliers.stream()
+                .filter(s -> s.getStatus() == SourcingSupplierStatus.SUGGESTED
+                        || s.getStatus() == SourcingSupplierStatus.RECOMMENDED
+                        || s.getStatus() == SourcingSupplierStatus.QUOTED)
+                .forEach(SourcingSupplier::cancelByBuyerWithdrawal);
+
+        // 견적 취소 처리는 실제로 견적이 제출된 경우(QUOTED)에만 필요
         if (request.getStatus() == SourcingStatus.QUOTED) {
-            List<SourcingSupplier> suppliers = sourcingSupplierRepository
-                    .findAllBySourcingRequest_SourcingRequestId(sourcingRequestId);
-
-            suppliers.stream()
-                    .filter(s -> s.getStatus() == SourcingSupplierStatus.RECOMMENDED
-                            || s.getStatus() == SourcingSupplierStatus.QUOTED)
-                    .forEach(SourcingSupplier::cancelByBuyerWithdrawal);
-
             List<Quote> quotes = quoteRepository
                     .findBySourcingRequest_SourcingRequestId(sourcingRequestId);
 

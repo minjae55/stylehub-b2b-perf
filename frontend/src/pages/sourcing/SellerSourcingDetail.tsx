@@ -12,7 +12,7 @@ import { SourcingStatusStepper } from "./SourcingStatusStepper";
 // 이 페이지는 "거절 또는 견적 제출"만 결정하는 곳이라 견적 상세(quote_id 등)는 다루지 않음.
 // 제출 이후 견적 확인/협의는 전부 견적 관리(SellerQuoteList) 쪽에서 처리.
 type RequestStatus = "PENDING" | "QUOTED" | "TRADING" | "NEGOTIATING" | "CANCELLED" | "COMPLETED" | "WITHDRAWN" | "EXPIRED";
-type BidStatus = "SUGGESTED" | "RECOMMENDED" | "QUOTED" | "DECLINED" | "EXPIRED";
+type BidStatus = "SUGGESTED" | "RECOMMENDED" | "QUOTED" | "DECLINED" | "EXPIRED" | "CANCELLED";
 
 interface ItemDto {
     sourcing_request_item_id: number;
@@ -84,6 +84,7 @@ const BID_STATUS_LABEL: Record<BidStatus, string> = {
     QUOTED:      "견적제출",
     DECLINED:    "거절",
     EXPIRED:     "만료",
+    CANCELLED:   "취소됨",
 };
 
 const BID_STATUS_STYLE: Record<BidStatus, string> = {
@@ -92,6 +93,7 @@ const BID_STATUS_STYLE: Record<BidStatus, string> = {
     QUOTED:      "bg-green-50 text-green-600 border-green-200",
     DECLINED:    "bg-red-50 text-red-500 border-red-200",
     EXPIRED:     "bg-secondary text-muted-foreground border-border",
+    CANCELLED:   "bg-secondary text-muted-foreground border-border",
 };
 
 // ── API (인증은 @LoginUser로 백엔드에서 세션/쿠키 기반 처리, companyId 별도 전달 불필요) ──
@@ -260,7 +262,7 @@ export function SellerSourcingDetail() {
                 {/* 진행 단계: 이미 거절/만료로 손을 뗀 셀러에게는 의미가 없으므로 숨김.
                     (다른 공급사는 계속 진행 중이라 request.status는 계속 움직이지만,
                     이 셀러 입장에서는 아래 '내 배정 상태' 배너가 최종 결과임) */}
-                {(!myBid || (myBid.status !== "DECLINED" && myBid.status !== "EXPIRED")) && (
+                {(!myBid || (myBid.status !== "DECLINED" && myBid.status !== "EXPIRED" && myBid.status !== "CANCELLED")) && (
                     <div className="px-6 py-5 border-b border-border">
                         <SourcingStatusStepper status={request.status} needSample={request.need_sample} />
                     </div>
@@ -386,6 +388,10 @@ export function SellerSourcingDetail() {
                     <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary border border-border rounded-lg px-4 py-3">
                         <Clock size={16} /> 응답 기한이 만료되었습니다.
                     </div>
+                ) : myBid.status === "CANCELLED" ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary border border-border rounded-lg px-4 py-3">
+                        <Ban size={16} /> 바이어가 요청을 철회하여 더 이상 진행되지 않는 요청입니다.
+                    </div>
                 ) : myBid.status === "QUOTED" ? (
                     <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
                         <CheckCircle size={16} />
@@ -400,8 +406,7 @@ export function SellerSourcingDetail() {
                             <XCircle size={14} /> 거절
                         </button>
                         <button
-                            // TODO: 실제 견적 작성 페이지 경로 확인 필요
-                            onClick={() => navigate(`/seller/quotes/new/${request.sourcing_request_id}`)}
+                            onClick={() => navigate(`/seller/sourcing/${request.sourcing_request_id}/quote`)}
                             className="flex-1 py-2.5 bg-primary hover:bg-primary/90 text-white rounded font-semibold text-sm transition-colors flex items-center justify-center gap-1.5"
                         >
                             <Send size={14} /> 견적 제출
