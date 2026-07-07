@@ -8,6 +8,8 @@ public record BuyerOrderOverviewResponse(
 
         List<BuyerOrderItemResponse> items,
         BuyerOrderSummaryResponse amountSummary,
-        OrderStatus orderStatus
+        OrderStatus orderStatus,
+        List<BuyerOrderLogResponse> logs,
+        Integer quoteId
 ){
 }

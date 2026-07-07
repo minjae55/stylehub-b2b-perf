@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router';
-import axios, { AxiosResponse } from 'axios';
+import api from '@/api/axios';
 
 
 interface VirtualAccountResponse {
@@ -54,14 +54,13 @@ export default function PaymentSuccessPage() {
         const storedIds = sessionStorage.getItem("pending_order_ids");
         const orderIds = storedIds ? JSON.parse(storedIds) : null;
 
-        axios.post<{ data: PaymentConfirmResponse }>('/api/v1/payments/confirm', {
+        api.post<PaymentConfirmResponse>('/v1/payments/confirm', {
             orderId,
             paymentKey,
             amount: Number(amount),
             orderIds
         })
-            .then((response) => {
-                const result = response.data.data;
+            .then((result) => {
                 if (result.status === 'WAITING_FOR_DEPOSIT' && result.virtualAccount) {
                     // 가상계좌 발급 완료 — 입금 안내 화면으로 전환 (페이지 이동 없음)
                     console.log('가상계좌 발급 완료:', result.virtualAccount);
@@ -71,14 +70,14 @@ export default function PaymentSuccessPage() {
                 }
 
                 // 카드결제 등 즉시 완료된 경우 기존 흐름 그대로
-                console.log('결제 성공, 이동 시도:', response);
+                console.log('결제 성공, 이동 시도:', result);
                 sessionStorage.removeItem("pending_order_ids");
                 navigate('/payment/ordersuccess', { replace: true });
             })
             .catch((error) => {
                 console.error('결제 승인 실패:', error);
                 sessionStorage.removeItem("pending_order_ids");
-                setConfirmError(error.response?.data?.message ?? '결제 승인에 실패했습니다.');
+                setConfirmError(error.message ?? '결제 승인에 실패했습니다.');
             });
     }, [orderId, paymentKey, amount, isProcessing, navigate]);
 

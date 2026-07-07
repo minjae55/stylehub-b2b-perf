@@ -8,6 +8,7 @@ import {
   Send,
   User,
   ShieldAlert,
+  X,
 } from "lucide-react";
 import { useLocation, useParams } from "react-router";
 import api from "@/api/axios";
@@ -53,31 +54,31 @@ const STATUS_CONFIG: Record<
 > = {
   RECEIVED: {
     label: "접수 완료",
-    className: "bg-blue-50 text-blue-700 ring-blue-600/20",
+    className: "border-blue-200 bg-blue-50 text-blue-700",
   },
   REVIEWING: {
     label: "관리자 검토 중",
-    className: "bg-amber-50 text-amber-700 ring-amber-600/20",
+    className: "border-amber-200 bg-amber-50 text-amber-700",
   },
   WAITING_SELLER: {
     label: "판매사 답변 대기",
-    className: "bg-purple-50 text-purple-700 ring-purple-600/20",
+    className: "border-purple-200 bg-purple-50 text-purple-700",
   },
   WAITING_BUYER: {
     label: "바이어 답변 대기",
-    className: "bg-pink-50 text-pink-700 ring-pink-600/20",
+    className: "border-pink-200 bg-pink-50 text-pink-700",
   },
   RESOLVED: {
     label: "처리 완료",
-    className: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
   },
   REJECTED: {
     label: "기각",
-    className: "bg-rose-50 text-rose-700 ring-rose-600/20",
+    className: "border-rose-200 bg-rose-50 text-rose-700",
   },
   CANCELED: {
     label: "취소",
-    className: "bg-gray-50 text-gray-600 ring-gray-500/10",
+    className: "border-slate-200 bg-slate-100 text-slate-600",
   },
 };
 
@@ -343,73 +344,77 @@ export function Disputes() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#f7f9fb]">
+      <main className="mx-auto w-full max-w-[1380px] px-4 py-8 sm:px-6">
         {/* 상단 헤더 */}
-        <div className="md:flex md:items-center md:justify-between mb-8">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+        <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase text-blue-700">
+              Dispute Resolution
+            </p>
+            <h1 className="mt-1 text-2xl font-black text-slate-950">
               이의제기 관리
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
+            </h1>
+            <p className="mt-2 text-sm text-slate-500">
               {isSeller
                 ? "판매 주문에 접수된 이의제기와 답변 상태를 확인합니다."
                 : "접수한 이의제기와 판매사의 답변을 확인합니다."}
             </p>
           </div>
-        </div>
+        </header>
 
         {/* 대시보드 카드 섹션 */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="전체 이의제기"
             value={counts.all}
-            icon={<AlertCircle className="h-6 w-6 text-gray-600" />}
-            bgClass="bg-white"
+            icon={<AlertCircle size={18} />}
+            iconClassName="bg-slate-100 text-slate-600"
           />
           <StatCard
             label="접수 완료"
             value={counts.received}
-            icon={<FileText className="h-6 w-6 text-blue-600" />}
-            bgClass="bg-white"
+            icon={<FileText size={18} />}
+            iconClassName="bg-blue-50 text-blue-700"
           />
           <StatCard
             label="답변 대기"
             value={counts.waiting}
-            icon={<MessageSquare className="h-6 w-6 text-purple-600" />}
-            bgClass="bg-white"
+            icon={<MessageSquare size={18} />}
+            iconClassName="bg-purple-50 text-purple-700"
           />
           <StatCard
             label="처리 완료"
             value={counts.resolved}
-            icon={<Clock className="h-6 w-6 text-emerald-600" />}
-            bgClass="bg-white"
+            icon={<Clock size={18} />}
+            iconClassName="bg-emerald-50 text-emerald-700"
           />
-        </div>
+        </section>
 
         {/* 메인 대시보드 레이아웃 */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 items-start">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
 
           {/* 왼쪽: 이의제기 목록 영역 */}
-          <div className="lg:col-span-1 bg-white shadow rounded-lg overflow-hidden border border-gray-200">
-            <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col gap-3">
-              <div className="relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
+          <div className="lg:col-span-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-4">
+              <div className="relative">
+                <Search
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-9 sm:text-sm border-gray-300 rounded-md h-9 outline-none border px-2"
+                  className="h-10 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="주문번호 또는 제목 검색"
                 />
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <select
                   value={filter}
                   onChange={(e) => setFilter(e.target.value as DisputeStatus | "ALL")}
-                  className="block w-full text-xs border-gray-300 rounded-md bg-white border h-8 px-2 font-medium text-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs font-bold text-slate-600 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="ALL">전체 상태</option>
                   {Object.entries(STATUS_CONFIG).map(([value, config]) => (
@@ -418,27 +423,27 @@ export function Disputes() {
                     </option>
                   ))}
                 </select>
-                <span className="text-xs font-semibold text-gray-500 ml-2 shrink-0">
+                <span className="shrink-0 text-xs font-bold text-slate-500">
                   총 {filtered.length}건
                 </span>
               </div>
             </div>
 
-            <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
+            <div className="max-h-[600px] divide-y divide-slate-100 overflow-y-auto">
               {isLoading ? (
-                <div className="p-8 text-center text-sm text-gray-500 font-medium">
+                <div className="p-8 text-center text-sm font-semibold text-slate-500">
                   이의제기 목록을 불러오는 중입니다.
                 </div>
               ) : error ? (
                 <div className="p-8 text-center">
-                  <AlertCircle className="mx-auto h-8 w-8 text-red-500" />
-                  <p className="mt-2 text-sm font-semibold text-gray-900">목록 로드 실패</p>
-                  <p className="mt-1 text-xs text-gray-500">{error}</p>
+                  <AlertCircle className="mx-auto h-8 w-8 text-rose-500" />
+                  <p className="mt-2 text-sm font-bold text-slate-900">목록 로드 실패</p>
+                  <p className="mt-1 text-xs text-slate-500">{error}</p>
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="p-8 text-center">
-                  <FileText className="mx-auto h-8 w-8 text-gray-300" />
-                  <p className="mt-2 text-sm font-semibold text-gray-900">표시할 내용 없음</p>
+                  <FileText className="mx-auto h-8 w-8 text-slate-300" />
+                  <p className="mt-2 text-sm font-bold text-slate-900">표시할 내용 없음</p>
                 </div>
               ) : (
                 filtered.map((item) => {
@@ -447,20 +452,20 @@ export function Disputes() {
                     <div
                       key={item.disputeId}
                       onClick={() => setSelectedId(item.disputeId)}
-                      className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                        isSelected ? "bg-indigo-50/70 hover:bg-indigo-50" : ""
+                      className={`cursor-pointer p-4 transition-colors hover:bg-slate-50 ${
+                        isSelected ? "bg-blue-50/70 hover:bg-blue-50" : ""
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-mono text-gray-400">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="font-mono text-xs text-slate-400">
                           {item.orderNo}
                         </span>
                         <StatusBadge status={item.status} />
                       </div>
-                      <h4 className="text-sm font-semibold text-gray-900 truncate">
+                      <h4 className="truncate text-sm font-bold text-slate-950">
                         {item.title}
                       </h4>
-                      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                      <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
                         <span>{TYPE_LABELS[item.disputeType] ?? item.disputeType}</span>
                         <span>{formatDate(item.receivedAt)}</span>
                       </div>
@@ -474,58 +479,58 @@ export function Disputes() {
           {/* 오른쪽: 상세 정보 및 히스토리 영역 */}
           <div className="lg:col-span-2">
             {selectedId && (
-              <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                 {isDetailLoading ? (
-                  <div className="p-12 text-center text-sm text-gray-500 font-medium">
+                  <div className="p-12 text-center text-sm font-semibold text-slate-500">
                     상세 내용을 불러오는 중입니다.
                   </div>
                 ) : detailError && !detail ? (
                   <div className="p-12 text-center">
-                    <AlertCircle className="mx-auto h-10 w-10 text-red-500" />
-                    <p className="mt-3 text-base font-semibold text-gray-900">상세 로드 실패</p>
-                    <p className="mt-1 text-sm text-gray-500">{detailError}</p>
+                    <AlertCircle className="mx-auto h-10 w-10 text-rose-500" />
+                    <p className="mt-3 text-base font-bold text-slate-900">상세 로드 실패</p>
+                    <p className="mt-1 text-sm text-slate-500">{detailError}</p>
                   </div>
                 ) : detail ? (
                   <>
-                    <div className="px-6 py-5 border-b border-gray-200 bg-gray-50 flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
                       <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-base font-bold leading-6 text-gray-900">
+                        <div className="mb-1 flex items-center gap-2">
+                          <h3 className="text-base font-black text-slate-950">
                             {detail.title}
                           </h3>
                           <StatusBadge status={detail.status} />
                         </div>
-                        <p className="text-xs font-mono text-gray-500">
+                        <p className="font-mono text-xs text-slate-500">
                           주문번호: {detail.orderNo} | 이의제기 번호: #{detail.disputeId}
                         </p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 border-b border-gray-200 divide-y sm:divide-y-0 sm:divide-x divide-gray-200 bg-white">
-                      <div className="px-6 py-4">
-                        <span className="text-xs text-gray-400 block mb-1">유형</span>
-                        <span className="text-sm font-medium text-gray-900">
+                    <div className="grid grid-cols-1 divide-y divide-slate-100 border-b border-slate-200 bg-white sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
+                      <div className="px-5 py-4">
+                        <span className="mb-1 block text-xs text-slate-400">유형</span>
+                        <span className="text-sm font-bold text-slate-900">
                           {TYPE_LABELS[detail.disputeType] ?? detail.disputeType}
                         </span>
                       </div>
-                      <div className="px-6 py-4">
-                        <span className="text-xs text-gray-400 block mb-1">요청 처리 사항</span>
-                        <span className="text-sm font-medium text-gray-900">
+                      <div className="px-5 py-4">
+                        <span className="mb-1 block text-xs text-slate-400">요청 처리 사항</span>
+                        <span className="text-sm font-bold text-slate-900">
                           {ACTION_LABELS[detail.requestedAction] ?? detail.requestedAction}
                         </span>
                       </div>
-                      <div className="px-6 py-4">
-                        <span className="text-xs text-gray-400 block mb-1">접수 일시</span>
-                        <span className="text-sm font-medium text-gray-900">
+                      <div className="px-5 py-4">
+                        <span className="mb-1 block text-xs text-slate-400">접수 일시</span>
+                        <span className="text-sm font-bold text-slate-900">
                           {formatDate(detail.receivedAt)}
                         </span>
                       </div>
                     </div>
 
                     {/* 대화 히스토리 (isSeller 변수를 같이 넘겨서 나를 구분하게 함) */}
-                    <div className="px-6 py-6 bg-gray-50/50">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-1.5">
-                        <MessageSquare className="h-3.5 w-3.5 text-gray-400" />
+                    <div className="bg-slate-50/50 px-6 py-6">
+                      <h4 className="mb-4 flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-400">
+                        <MessageSquare className="h-3.5 w-3.5 text-slate-400" />
                         진행 및 답변 이력
                       </h4>
 
@@ -550,14 +555,14 @@ export function Disputes() {
                       </div>
                     </div>
 
-                    <div className="px-6 py-5 bg-white border-t border-gray-200">
+                    <div className="border-t border-slate-200 bg-white px-6 py-5">
                       {canReply ? (
                         <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <label htmlFor="reply-input" className="text-sm font-semibold text-gray-800">
+                          <div className="mb-2 flex items-center justify-between">
+                            <label htmlFor="reply-input" className="text-sm font-bold text-slate-800">
                               {isSeller ? "바이어에게 답변 작성" : "판매사에게 추가 답변 작성"}
                             </label>
-                            <span className="text-xs text-gray-400">{reply.length}/3000자</span>
+                            <span className="text-xs text-slate-400">{reply.length}/3000자</span>
                           </div>
                           <textarea
                             id="reply-input"
@@ -565,11 +570,11 @@ export function Disputes() {
                             value={reply}
                             onChange={(e) => setReply(e.target.value.slice(0, 3000))}
                             placeholder="명확하고 친절한 해결 방안이나 답변 내용을 작성해 주세요."
-                            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md p-3 border outline-none resize-none"
+                            className="w-full resize-none rounded-md border border-slate-200 p-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                           />
 
                           {detailError && (
-                            <div className="mt-3 p-3 rounded-md bg-rose-50 border border-rose-100 text-xs font-medium text-rose-700">
+                            <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
                               {detailError}
                             </div>
                           )}
@@ -580,14 +585,14 @@ export function Disputes() {
                                 <button
                                   type="button"
                                   onClick={() => void resolveDispute()}
-                                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-semibold rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none transition-colors"
+                                  className="inline-flex items-center rounded-md border border-transparent bg-emerald-600 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-emerald-700 focus:outline-none"
                                 >
                                   판매사 조치 수락
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setIsAdminModalOpen(true)}
-                                  className="inline-flex items-center px-4 py-2 border border-amber-300 text-sm font-semibold rounded-md shadow-sm text-amber-700 bg-amber-50 hover:bg-amber-100 focus:outline-none transition-colors"
+                                  className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-black text-amber-700 transition-colors hover:bg-amber-100 focus:outline-none"
                                 >
                                   관리자 검토 요청
                                 </button>
@@ -597,16 +602,16 @@ export function Disputes() {
                               type="button"
                               onClick={() => void submitReply()}
                               disabled={isSubmitting || reply.trim().length === 0}
-                              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-semibold rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-blue-700 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                              <Send className="h-4 w-4 mr-1.5" />
+                              <Send className="mr-1.5 h-4 w-4" />
                               {isSubmitting ? "등록 중..." : "답변 등록"}
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-start gap-2.5 p-3.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-600">
-                          <Clock className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" />
+                        <div className="flex items-start gap-2.5 rounded-md border border-slate-200 bg-slate-50 p-3.5 text-sm text-slate-600">
+                          <Clock className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
                           <div className="font-medium">
                             {getWaitingMessage(detail.status, isSeller)}
                           </div>
@@ -620,71 +625,75 @@ export function Disputes() {
           </div>
 
         </div>
-      </div>
+      </main>
 
       {/* 관리자 검토 요청 모달 */}
       {isAdminModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div
-              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity backdrop-blur-sm"
-              onClick={() => {
-                setIsAdminModalOpen(false);
-                setAdminReason("");
-              }}
-            />
-
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">
-              &#8203;
-            </span>
-
-            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6 border border-gray-200">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-review-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
+        >
+          <div className="w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
               <div>
-                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-amber-100">
-                  <ShieldAlert className="h-6 w-6 text-amber-600" />
-                </div>
-                <div className="mt-3 text-center sm:mt-5">
-                  <h3 className="text-lg leading-6 font-bold text-gray-900">
-                    관리자 검토 요청 사유 작성
-                  </h3>
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-500">
-                      판매사의 답변이나 해결 조치로 문제가 해결되지 않은 구체적인 사유를 작성해주세요. 플랫폼 관리자가 중재 및 검토를 시작합니다.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <textarea
-                  rows={5}
-                  value={adminReason}
-                  onChange={(e) => setAdminReason(e.target.value)}
-                  placeholder="예: 재배송 프로세스로 진행되었으나 온 상품에 여전히 동일 결함이 확인되어 중재 조치를 요청합니다."
-                  className="shadow-sm focus:ring-amber-500 focus:border-amber-500 block w-full sm:text-sm border-gray-300 rounded-md p-3 border outline-none resize-none"
-                />
-              </div>
-
-              <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:flow-row-start">
-                <button
-                  type="button"
-                  onClick={() => void requestAdminReview()}
-                  disabled={adminReason.trim().length === 0}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-amber-600 text-sm font-semibold text-white hover:bg-amber-700 focus:outline-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                <p className="flex items-center gap-1 text-xs font-black text-amber-700">
+                  <ShieldAlert size={13} />
+                  관리자 중재 요청
+                </p>
+                <h2
+                  id="admin-review-modal-title"
+                  className="mt-1 text-lg font-black text-slate-950"
                 >
-                  검토 요청 제출
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAdminModalOpen(false);
-                    setAdminReason("");
-                  }}
-                  className="mt-3 sm:mt-0 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors"
-                >
-                  취소
-                </button>
+                  관리자 검토 요청 사유 작성
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  판매사의 답변이나 해결 조치로 문제가 해결되지 않은 구체적인 사유를 작성해주세요. 플랫폼 관리자가 중재 및 검토를 시작합니다.
+                </p>
               </div>
+              <button
+                type="button"
+                title="모달 닫기"
+                onClick={() => {
+                  setIsAdminModalOpen(false);
+                  setAdminReason("");
+                }}
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5">
+              <textarea
+                rows={5}
+                value={adminReason}
+                onChange={(e) => setAdminReason(e.target.value)}
+                placeholder="예: 재배송 프로세스로 진행되었으나 온 상품에 여전히 동일 결함이 확인되어 중재 조치를 요청합니다."
+                className="w-full resize-none rounded-md border border-slate-200 px-3 py-3 text-sm leading-6 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+              />
+            </div>
+
+            <div className="flex gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdminModalOpen(false);
+                  setAdminReason("");
+                }}
+                className="h-10 flex-1 rounded-md border border-slate-200 bg-white text-sm font-bold text-slate-600 transition hover:bg-slate-100"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void requestAdminReview()}
+                disabled={adminReason.trim().length === 0}
+                className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md bg-amber-600 text-sm font-black text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                검토 요청 제출
+              </button>
             </div>
           </div>
         </div>
@@ -697,28 +706,24 @@ function StatCard({
   label,
   value,
   icon,
-  bgClass,
+  iconClassName,
 }: {
   label: string;
   value: number;
   icon: React.ReactNode;
-  bgClass: string;
+  iconClassName: string;
 }) {
   return (
-    <div className={`${bgClass} overflow-hidden shadow rounded-lg border border-gray-200`}>
-      <div className="p-5">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">{icon}</div>
-          <div className="ml-5 w-0 flex-1">
-            <dl>
-              <dt className="text-sm font-medium text-gray-500 truncate">{label}</dt>
-              <dd className="flex items-baseline">
-                <div className="text-2xl font-bold text-gray-900">{value}</div>
-              </dd>
-            </dl>
-          </div>
-        </div>
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between">
+        <p className="text-sm font-bold text-slate-500">{label}</p>
+        <span
+          className={`inline-flex size-9 items-center justify-center rounded-md ${iconClassName}`}
+        >
+          {icon}
+        </span>
       </div>
+      <p className="mt-4 text-3xl font-black text-slate-950">{value}</p>
     </div>
   );
 }
@@ -727,7 +732,7 @@ function StatusBadge({ status }: { status: DisputeStatus }) {
   const config = STATUS_CONFIG[status];
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ring-inset ${config.className}`}
+      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-bold ${config.className}`}
     >
       {config.label}
     </span>
@@ -757,36 +762,36 @@ function ResponseBubble({
   const isMe = (!isSellerPage && role === "BUYER") || (isSellerPage && role === "SELLER");
 
   return (
-    <div className={`flex gap-3 items-start w-full ${
+    <div className={`flex w-full items-start gap-3 ${
       isAdmin ? "justify-start" : isMe ? "flex-row-reverse" : "flex-row"
     }`}>
       {/* 프로필 아바타 (관리자 글이거나 내가 아닐 때만 노출하여 더욱 메신저 느낌 구현) */}
       {!isMe && (
-        <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 shadow-sm border ${
-          isAdmin ? "bg-amber-100 border-amber-200 text-amber-700" :
-          role === "BUYER" ? "bg-blue-100 border-blue-200 text-blue-700" : "bg-purple-100 border-purple-200 text-purple-700"
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border shadow-sm ${
+          isAdmin ? "border-amber-200 bg-amber-100 text-amber-700" :
+          role === "BUYER" ? "border-blue-200 bg-blue-100 text-blue-700" : "border-purple-200 bg-purple-100 text-purple-700"
         }`}>
           <User className="h-4 w-4" />
         </div>
       )}
 
       {/* 말풍선 바디 */}
-      <div className={`max-w-[85%] rounded-lg p-4 shadow-sm border ${
-        isAdmin ? "bg-amber-50/70 border-amber-200" :
-        isMe ? "bg-indigo-600 border-indigo-600 text-white" : "bg-white border-gray-200 text-gray-700"
+      <div className={`max-w-[85%] rounded-lg border p-4 shadow-sm ${
+        isAdmin ? "border-amber-200 bg-amber-50/70" :
+        isMe ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-700"
       }`}>
-        <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
-          <span className={`text-xs font-bold ${isMe ? "text-indigo-100" : "text-gray-900"}`}>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <span className={`text-xs font-bold ${isMe ? "text-blue-100" : "text-slate-900"}`}>
             {ROLE_LABELS[role]} {isMe && "(나)"}
-            <span className={`text-[11px] font-normal ml-1 ${isMe ? "text-indigo-200" : "text-gray-400"}`}>
+            <span className={`ml-1 text-[11px] font-normal ${isMe ? "text-blue-200" : "text-slate-400"}`}>
               {initial ? "최초 접수 내용" : "답변 피드백"}
             </span>
           </span>
-          <span className={`text-[11px] font-medium ${isMe ? "text-indigo-200" : "text-gray-400"}`}>
+          <span className={`text-[11px] font-medium ${isMe ? "text-blue-200" : "text-slate-400"}`}>
             {formatDate(createdAt)}
           </span>
         </div>
-        <p className={`whitespace-pre-wrap text-sm leading-6 font-normal ${isMe ? "text-white" : "text-gray-700"}`}>
+        <p className={`whitespace-pre-wrap text-sm font-normal leading-6 ${isMe ? "text-white" : "text-slate-700"}`}>
           {content}
         </p>
       </div>

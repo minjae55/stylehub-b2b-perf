@@ -47,7 +47,7 @@ type OrderItem = {
   material: string;
   quantity: number;
   unitPrice: number;
-  image: string;
+  image: string | null;
 };
 
 type StatusLog = {
@@ -124,6 +124,7 @@ type BuyerOrderDetailResponse = {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    imageUrl: string | null;
   }>;
   logs: Array<{
     previousStatus: OrderStatus | null;
@@ -517,7 +518,7 @@ function mapOrderDetailResponse(response: BuyerOrderDetailResponse): Order {
       material: "",
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      image: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=240&h=240&fit=crop&auto=format",
+      image: item.imageUrl,
     })),
     logs: response.logs.map((log) => ({
       previousStatus: log.previousStatus ?? undefined,
@@ -574,6 +575,26 @@ const TRACKING_STATUS_LABELS: Record<string, string> = {
 
 function getTrackingStatusLabel(event: DeliveryTrackingEvent) {
   return TRACKING_STATUS_LABELS[event.status.code] ?? event.status.name;
+}
+
+// 리머지택배(테스트용 더미 캐리어)는 외부 API가 이벤트 설명을 항상 "DUMMY!"로 내려준다.
+// 그대로 보여주면 이상해 보이므로, 그 경우엔 상태 코드 기반의 안내 문구로 대체한다.
+const TRACKING_STATUS_DESCRIPTIONS: Record<string, string> = {
+  INFORMATION_RECEIVED: "택배사가 배송 정보를 접수했습니다.",
+  AT_PICKUP: "상품이 집화되어 배송을 준비하고 있습니다.",
+  IN_TRANSIT: "상품이 배송 중입니다.",
+  OUT_FOR_DELIVERY: "배송기사가 상품을 싣고 출발했습니다.",
+  DELIVERED: "상품이 수령지에 배송 완료되었습니다.",
+  AVAILABLE_FOR_PICKUP: "지정 장소에서 상품을 수령할 수 있습니다.",
+  ATTEMPT_FAIL: "배송을 시도했으나 완료되지 못했습니다.",
+  EXCEPTION: "배송 중 예외 상황이 발생했습니다.",
+};
+
+function getTrackingDescription(event: DeliveryTrackingEvent) {
+  if (event.description && event.description !== "DUMMY!") {
+    return event.description;
+  }
+  return TRACKING_STATUS_DESCRIPTIONS[event.status.code] ?? "";
 }
 
 function getTrackingLocation(location: DeliveryTrackingEvent["location"]) {
@@ -722,7 +743,13 @@ export function OrderDetail() {
               <div className="space-y-5">
                 {order.items.map((item) => (
                   <div key={item.id} className="grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-[88px_minmax(0,1fr)_160px] md:items-center">
-                    <img src={item.image} alt={item.name} className="h-22 w-22 h-[88px] w-[88px] rounded-lg border border-slate-100 object-cover" />
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} className="h-22 w-22 h-[88px] w-[88px] rounded-lg border border-slate-100 object-cover" />
+                    ) : (
+                      <div className="flex h-[88px] w-[88px] items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-300">
+                        <Package size={24} />
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="text-base font-black text-slate-950">{item.name}</p>
                       <p className="mt-1 text-sm leading-6 text-slate-500">{item.optionSummary}</p>
@@ -905,9 +932,9 @@ export function OrderDetail() {
                                 {formatOrderDate(tracking.lastEvent.time)}
                               </span>
                             </div>
-                            {tracking.lastEvent.description && (
+                            {getTrackingDescription(tracking.lastEvent) && (
                               <p className="mt-1 text-xs leading-5 text-sky-700">
-                                {tracking.lastEvent.description}
+                                {getTrackingDescription(tracking.lastEvent)}
                               </p>
                             )}
                           </div>
@@ -931,9 +958,9 @@ export function OrderDetail() {
                                       {formatOrderDate(event.time)}
                                     </p>
                                   </div>
-                                  {(event.description || getTrackingLocation(event.location)) && (
+                                  {(getTrackingDescription(event) || getTrackingLocation(event.location)) && (
                                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                                      {[event.description, getTrackingLocation(event.location)]
+                                      {[getTrackingDescription(event), getTrackingLocation(event.location)]
                                         .filter(Boolean)
                                         .join(" · ")}
                                     </p>

@@ -261,9 +261,13 @@ export default function BuyerQuoteList() {
   const [negotiationContent, setNegotiationContent] = useState("");
   const [negotiationType, setNegotiationType] = useState("");
   // 소싱 요청별 견적 그룹은 기본적으로 접혀 있고, 헤더를 눌러야 펼쳐진다.
-  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<number>>(
-    new Set(),
-  );
+  // 다만 견적서 상세 페이지에서 "견적 목록"으로 돌아온 경우엔, 방금 보고 온 견적서가 속한
+  // 소싱 요청 그룹은 접히지 않고 계속 펼쳐진 채로 보여야 하므로 URL의 expandedGroup 값으로
+  // 초기 상태를 잡는다 (QuoteDetail.tsx에서 뒤로가기 링크에 이 값을 실어서 넘겨줌).
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<number>>(() => {
+    const initialGroup = searchParams.get("expandedGroup");
+    return initialGroup ? new Set([Number(initialGroup)]) : new Set();
+  });
 
   const toggleGroup = (sourcingRequestId: number) => {
     setExpandedGroupIds((current) => {
@@ -304,6 +308,18 @@ export default function BuyerQuoteList() {
     void loadQuotes();
   }, []);
 
+  // expandedGroup 쿼리 파라미터는 초기 펼침 상태를 잡는 용도로만 한 번 쓰고,
+  // 이후엔 주소창에 남아있지 않도록 정리한다 (계속 남아있으면 새로고침할 때마다
+  // 그 그룹이 강제로 다시 펼쳐짐).
+  useEffect(() => {
+    if (!searchParams.has("expandedGroup")) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("expandedGroup");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const visibleQuotes = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
 
@@ -327,12 +343,19 @@ export default function BuyerQuoteList() {
       groups.set(quote.sourcingRequestId, current);
     });
 
-    // 채택된 견적이 있으면 그 그룹 안에서 맨 위로 올라오도록 정렬한다.
+    // 채택된 견적이 있으면 그 그룹 안에서 맨 위로 올라오고, 그 다음은
+    // 1순위 최저 견적 금액, 2순위 최단 납기일 순으로 정렬한다.
     groups.forEach((groupQuotes) => {
       groupQuotes.sort((a, b) => {
         const aRank = a.status === "APPROVED" ? 0 : 1;
         const bRank = b.status === "APPROVED" ? 0 : 1;
-        return aRank - bRank;
+        if (aRank !== bRank) return aRank - bRank;
+
+        if (a.totalAmount !== b.totalAmount) {
+          return a.totalAmount - b.totalAmount;
+        }
+
+        return a.leadTimeDays - b.leadTimeDays;
       });
     });
 

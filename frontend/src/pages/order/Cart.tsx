@@ -358,7 +358,7 @@ export function Cart() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-slate-50">
         <div className="flex items-center gap-3 text-sm font-semibold text-slate-500">
-          <Loader2 size={20} className="animate-spin text-primary" />
+          <Loader2 size={20} className="animate-spin text-blue-600" />
           장바구니를 불러오는 중입니다
         </div>
       </div>
@@ -387,7 +387,7 @@ export function Cart() {
             <p className="mb-6 text-sm text-slate-500">도매 상품을 둘러보고 필요한 품목을 담아보세요.</p>
             <Link
               to="/products"
-              className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary/90"
+              className="inline-flex items-center justify-center rounded-lg bg-blue-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-600"
             >
               상품 둘러보기
             </Link>
@@ -444,11 +444,11 @@ export function Cart() {
           <button
             type="button"
             onClick={() => setTab("SAMPLE")}
-            className="mb-5 flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-secondary px-4 py-3 text-left text-sm text-slate-800 transition hover:border-primary/40"
+            className="mb-5 flex w-full items-center gap-3 rounded-xl border border-blue-400/20 bg-blue-50 px-4 py-3 text-left text-sm text-slate-800 transition hover:border-blue-400/40"
           >
-            <FlaskConical size={16} className="shrink-0 text-primary" />
+            <FlaskConical size={16} className="shrink-0 text-blue-600" />
             <span className="font-semibold">샘플 주문 상품 {sampleItems.length}개가 담겨 있습니다.</span>
-            <span className="ml-auto text-xs font-semibold text-primary">확인하기</span>
+            <span className="ml-auto text-xs font-semibold text-blue-600">확인하기</span>
           </button>
         )}
 
@@ -487,7 +487,7 @@ export function Cart() {
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
                                 <Package size={17} />
                               </div>
                               <h2 className="truncate text-base font-black text-slate-950">
@@ -578,7 +578,7 @@ function PageTitle() {
   return (
     <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div>
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-primary">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
         </div>
         <h1 className="text-2xl font-bold text-slate-950">장바구니</h1>
         <p className="mt-1 text-sm text-slate-500">
@@ -607,7 +607,7 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={`flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-bold transition ${
-        active ? "bg-primary text-white shadow-sm" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+        active ? "bg-blue-500 text-white shadow-sm" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
       }`}
     >
       {icon}
@@ -637,8 +637,8 @@ function Checkbox({
         disabled
           ? "cursor-not-allowed border-slate-200 bg-slate-100"
           : checked
-            ? "border-primary bg-primary"
-            : "border-slate-300 bg-white hover:border-primary"
+            ? "border-blue-400 bg-blue-500"
+            : "border-slate-300 bg-white hover:border-blue-400"
       }`}
     >
       {checked && !disabled && <Check size={13} className="text-white" />}
@@ -704,16 +704,16 @@ function CartProductCard({
   return (
     <article
       className={grouped
-        ? `overflow-hidden bg-white ${selected ? "bg-primary/[0.015]" : ""}`
+        ? `overflow-hidden bg-white ${selected ? "bg-blue-500/[0.015]" : ""}`
         : `overflow-hidden rounded-xl border bg-white shadow-sm ${
-            blocked ? "border-amber-300" : selected ? "border-primary/30" : "border-slate-200"
+            blocked ? "border-amber-300" : selected ? "border-blue-400/30" : "border-slate-200"
           }`}
     >
       {isSample && (
-        <div className="flex items-center gap-2 border-b border-primary/10 bg-secondary px-5 py-2 text-xs font-bold text-primary">
+        <div className="flex items-center gap-2 border-b border-blue-400/10 bg-blue-50 px-5 py-2 text-xs font-bold text-blue-600">
           <FlaskConical size={13} />
           샘플 주문
-          <span className="ml-auto text-[11px] text-primary/70">
+          <span className="ml-auto text-[11px] text-blue-600/70">
             최대 {sampleMaxQuantity.toLocaleString()}개까지 선택 가능
           </span>
         </div>
@@ -780,7 +780,7 @@ function CartProductCard({
           <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-black text-primary">{formatPrice(unitPrice)}</span>
+                <span className="text-sm font-black text-blue-600">{formatPrice(unitPrice)}</span>
                 <span className="text-xs text-slate-400">/ 벌</span>
                 {!isSample && <span className="text-xs text-slate-500">최소 {item.moq.toLocaleString()}벌</span>}
               </div>
@@ -888,7 +888,7 @@ function QuantityControl({
         type="button"
         onClick={onMinus}
         disabled={minusDisabled}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-400 hover:text-blue-600 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
       >
         <Minus size={13} />
       </button>
@@ -904,13 +904,13 @@ function QuantityControl({
             event.currentTarget.blur();
           }
         }}
-        className="h-8 w-24 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold text-slate-950 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+        className="h-8 w-24 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
       />
       <button
         type="button"
         onClick={onPlus}
         disabled={plusDisabled}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-400 hover:text-blue-600 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
       >
         <Plus size={13} />
       </button>
@@ -957,7 +957,7 @@ function SampleCart({
         <button
           type="button"
           onClick={onGoBulk}
-          className="rounded-lg border border-primary/30 px-5 py-2.5 text-sm font-bold text-primary transition hover:bg-secondary"
+          className="rounded-lg border border-blue-400/30 px-5 py-2.5 text-sm font-bold text-blue-600 transition hover:bg-blue-50"
         >
           일반 주문으로 이동
         </button>
@@ -967,8 +967,8 @@ function SampleCart({
 
   return (
     <>
-      <div className="rounded-xl border border-primary/20 bg-secondary px-4 py-3 text-sm text-slate-800">
-        <div className="mb-1 flex items-center gap-2 font-bold text-primary">
+      <div className="rounded-xl border border-blue-400/20 bg-blue-50 px-4 py-3 text-sm text-slate-800">
+        <div className="mb-1 flex items-center gap-2 font-bold text-blue-600">
           <FlaskConical size={14} />
           샘플 주문 안내
         </div>
@@ -1025,7 +1025,7 @@ function OrderSummary({
           <h2 className="text-sm font-bold text-slate-950">
             {isSample ? "샘플 주문 요약" : "주문 요약"}
           </h2>
-          <span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-bold text-primary">
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">
             {count}개 선택
           </span>
         </div>
@@ -1054,12 +1054,12 @@ function OrderSummary({
                     결제 예정 금액
                 </h2>
           </div>
-          <p className="whitespace-nowrap text-right text-xl font-black leading-none text-primary md:text-2xl">
+          <p className="whitespace-nowrap text-right text-xl font-black leading-none text-blue-600 md:text-2xl">
             {formatPrice(total)}
           </p>
         </div>
 
-        <div className="my-4 rounded-lg border border-primary/15 bg-secondary/60 px-3 py-2.5 text-xs leading-5 text-slate-700">
+        <div className="my-4 rounded-lg border border-blue-400/15 bg-blue-50/60 px-3 py-2.5 text-xs leading-5 text-slate-700">
           플랫폼 이용 수수료는 결제 단계에서 별도 계산됩니다.
         </div>
 
@@ -1076,7 +1076,7 @@ function OrderSummary({
           <button
             type="button"
             onClick={onCheckout}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary/90"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-600"
           >
             {isSample ? "샘플 주문하기" : "주문하기"}
             <ArrowRight size={16} />
@@ -1085,7 +1085,7 @@ function OrderSummary({
 
         <Link
           to="/products"
-          className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
+          className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-blue-400 hover:text-blue-600"
         >
           쇼핑 계속하기
         </Link>

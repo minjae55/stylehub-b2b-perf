@@ -341,11 +341,19 @@ export function QuoteDetail({
     role === "buyer"
     && (quote.status === "SUBMITTED" || quote.status === "NEGOTIATING");
 
+  // 바이어 견적 목록에서 소싱 요청별로 접혀있던 견적 그룹을 펼친 채 이 견적서로 들어왔을 텐데,
+  // "견적 목록"으로 돌아갔을 때 그 그룹이 다시 접혀서 안 보이지 않도록 어느 소싱 요청 그룹이었는지
+  // 쿼리 파라미터로 같이 넘겨준다.
+  const backPathWithGroup =
+    role === "buyer"
+      ? `/buyer/quotes?expandedGroup=${quote.sourcingRequestId}`
+      : backPath;
+
   return (
     <div className="min-h-screen bg-[#f7f9fb] px-4 py-8 sm:px-6">
       <main className="mx-auto w-full max-w-[1280px]">
         <Link
-          to={backPath}
+          to={backPathWithGroup}
           className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-950"
         >
           <ChevronLeft size={16} />

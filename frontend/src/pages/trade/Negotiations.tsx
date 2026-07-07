@@ -45,6 +45,8 @@ type NegotiationResponse = {
   updatedAt: string;
   agreedAt: string | null;
   closedAt: string | null;
+  // 같은 딜의 다른 타입(QUOTE<->CONTRACT) 협의가 있으면 그 negotiationId.
+  linkedNegotiationId: number | null;
 };
 
 type NegotiationLocationState = {
@@ -188,6 +190,28 @@ function getRowAction(
     : { label: "셀러 응답 대기", emphasize: false };
 }
 
+// 견적 협의(QUOTE)와 그 뒤에 이어지는 계약 협의(CONTRACT)는 백엔드에서 서로 다른 행으로
+// 남지만, 같은 딜이면 화면에는 하나의 연속된 대화로만 보여준다. 계약 협의가 더 나중 단계라
+// 대표로 남기고, 짝이 되는 견적 협의 행은 목록에서 숨긴다. (이력 조회 시 백엔드가 두 협의의
+// 요청 내역을 알아서 합쳐서 내려주므로, 여기서는 중복 카드만 걸러내면 된다)
+function dedupeLinkedNegotiations(
+  list: NegotiationResponse[],
+): NegotiationResponse[] {
+  const idsInList = new Set(list.map((item) => item.negotiationId));
+
+  return list.filter((item) => {
+    if (
+      item.negotiationType === "QUOTE"
+      && item.linkedNegotiationId !== null
+      && idsInList.has(item.linkedNegotiationId)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 export function Negotiations() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -251,17 +275,18 @@ export function Negotiations() {
       setLoadError("");
       const response =
         await api.get<NegotiationResponse[]>("/negotiations");
+      const deduped = dedupeLinkedNegotiations(response);
 
-      setNegotiations(response);
+      setNegotiations(deduped);
       setSelectedId((current) => {
         if (
           current !== null
-          && response.some((item) => item.negotiationId === current)
+          && deduped.some((item) => item.negotiationId === current)
         ) {
           return current;
         }
 
-        return response[0]?.negotiationId ?? null;
+        return deduped[0]?.negotiationId ?? null;
       });
     } catch (error) {
       console.error("협의 목록 조회 실패", error);
@@ -898,6 +923,11 @@ export function Negotiations() {
                 <span className="font-mono text-xs text-slate-400">
                   {selected.quoteNo || `#${selected.negotiationId}`}
                 </span>
+                {selected.linkedNegotiationId !== null && (
+                  <span className="rounded-md bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700">
+                    견적 협의부터 이어짐
+                  </span>
+                )}
                 {viewerRole && (
                   <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">
                     내 역할 {viewerRole === "BUYER" ? "바이어" : "셀러"}
@@ -931,7 +961,13 @@ export function Negotiations() {
                         key={request.negotiationRequestId}
                         round={index + 1}
                         request={request}
-                        negotiationType={selected.negotiationType}
+                        negotiationType={
+                          // 견적 협의 + 계약 협의가 합쳐진 대화일 수 있으므로, 각 라운드
+                          // 자체의 요청 내용(requestedQuote/requestedContract)을 보고
+                          // 타입을 판단한다 (selected.negotiationType은 대표 협의 하나의
+                          // 타입이라 병합된 스레드에서는 라운드마다 다를 수 있다).
+                          request.requestedContract ? "CONTRACT" : "QUOTE"
+                        }
                       />
                     ))}
                   </div>
@@ -939,6 +975,9 @@ export function Negotiations() {
 
                 {selected.status === "OPEN" && latestRequestDetail && (
                   <div className="mt-5 border-t border-slate-200 pt-5">
+                    {/* 병합된 스레드에서는 마지막 라운드가 어떤 타입인지가
+                       selected.negotiationType(대표 협의)과 다를 수 있으므로
+                       latestRequestDetail 자체의 내용으로 타입을 판단한다. */}
                     {viewerRole === "SELLER"
                     && latestRequestDetail.status === "REQUESTED" ? (
                       <button
@@ -946,15 +985,17 @@ export function Negotiations() {
                         onClick={() =>
                           openRespondModal(
                             latestRequestDetail,
-                            selected.negotiationType,
+                            latestRequestDetail.requestedContract
+                              ? "CONTRACT"
+                              : "QUOTE",
                           )
                         }
                         className="inline-flex h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700"
                       >
                         <Send size={15} />
-                        {selected.negotiationType === "QUOTE"
-                          ? "새 견적으로 응답하기"
-                          : "새 계약 조건으로 응답하기"}
+                        {latestRequestDetail.requestedContract
+                          ? "새 계약 조건으로 응답하기"
+                          : "새 견적으로 응답하기"}
                       </button>
                     ) : viewerRole === "BUYER"
                     && latestRequestDetail.status === "RESPONDED" ? (
@@ -965,9 +1006,9 @@ export function Negotiations() {
                           className="inline-flex h-10 items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-4 text-sm font-black text-blue-700 transition hover:bg-blue-100"
                         >
                           <FileText size={15} />
-                          {selected.negotiationType === "QUOTE"
-                            ? "견적 비교"
-                            : "계약 비교"}
+                          {latestRequestDetail.requestedContract
+                            ? "계약 비교"
+                            : "견적 비교"}
                         </button>
                         <button
                           type="button"
@@ -1643,9 +1684,9 @@ export function Negotiations() {
                   id="review-modal-title"
                   className="text-lg font-black text-slate-950"
                 >
-                  {selected?.negotiationType === "QUOTE"
-                    ? "이전 견적 vs 새 견적 비교"
-                    : "이전 계약 조건 vs 새 계약 조건 비교"}
+                  {reviewRequest.requestedContract
+                    ? "이전 계약 조건 vs 새 계약 조건 비교"
+                    : "이전 견적 vs 새 견적 비교"}
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
                   셀러가 응답한 새 조건과 이전 조건을 비교해서 확인하세요.
@@ -1671,7 +1712,7 @@ export function Negotiations() {
                 </div>
               )}
 
-              {selected?.negotiationType === "QUOTE" ? (
+              {!reviewRequest.requestedContract ? (
                 <div className="grid gap-5 lg:grid-cols-2">
                   <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs font-black text-slate-500">

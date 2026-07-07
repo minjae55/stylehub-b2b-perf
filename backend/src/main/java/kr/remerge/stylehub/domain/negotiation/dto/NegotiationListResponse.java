@@ -26,12 +26,16 @@ public record NegotiationListResponse(
         LocalDateTime openedAt,
         LocalDateTime updatedAt,
         LocalDateTime agreedAt,
-        LocalDateTime closedAt
+        LocalDateTime closedAt,
+        // 같은 딜의 다른 타입(QUOTE<->CONTRACT) 협의가 있으면 그 negotiationId.
+        // 화면에서 두 협의를 하나의 연속된 대화로 묶어 보여줄 때 사용한다.
+        Integer linkedNegotiationId
 ) {
 
     public static NegotiationListResponse from(
             Negotiation negotiation,
-            NegotiationRequest latestRequest
+            NegotiationRequest latestRequest,
+            Integer linkedNegotiationId
     ) {
 
         return new NegotiationListResponse(
@@ -70,7 +74,8 @@ public record NegotiationListResponse(
                 negotiation.getOpenedAt(),
                 negotiation.getUpdatedAt(),
                 negotiation.getAgreedAt(),
-                negotiation.getClosedAt()
+                negotiation.getClosedAt(),
+                linkedNegotiationId
         );
     }
 }

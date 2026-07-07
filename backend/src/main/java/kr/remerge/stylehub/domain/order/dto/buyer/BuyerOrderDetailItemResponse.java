@@ -11,7 +11,8 @@ public record BuyerOrderDetailItemResponse(
         Integer quantity,
 
         Long unitPrice,
-        Long totalPrice
+        Long totalPrice,
+        String imageUrl
 ) {
 
     public static BuyerOrderDetailItemResponse from(OrderItem orderItem) {
@@ -29,7 +30,8 @@ public record BuyerOrderDetailItemResponse(
                 orderItem.getQuantity(),
 
                 orderItem.getUnitPrice(),
-                orderItem.getTotalPrice()
+                orderItem.getTotalPrice(),
+                orderItem.getProductImageUrl()
 
         );
 

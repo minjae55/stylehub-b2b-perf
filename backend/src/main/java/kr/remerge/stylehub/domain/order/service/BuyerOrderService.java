@@ -331,10 +331,20 @@ public class BuyerOrderService {
                 .map(BuyerOrderItemResponse::from)
                 .toList();
 
+        // 진행 타임라인에 실제 상태 변경 시각을 반영하기 위해 로그도 함께 내려준다.
+        List<BuyerOrderLogResponse> orderLogResponseList =
+                orderLogRepository.findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId())
+                        .stream()
+                        .filter(orderLog -> orderLog.getNewStatus() != null)
+                        .map(BuyerOrderLogResponse::from)
+                        .toList();
+
         return new BuyerOrderOverviewResponse(
                 orderItemResponseList,
                 orderAmountSummaryResponse,
-                order.getStatus()
+                order.getStatus(),
+                orderLogResponseList,
+                order.getQuote() != null ? order.getQuote().getQuoteId() : null
         );
     }
 

@@ -97,6 +97,7 @@ public enum ErrorCode {
     QUOTE_SAMPLE_NOT_AVAILABLE(HttpStatus.BAD_REQUEST,"QUOTE_004","샘플 제공이 불가능한 견적서입니다."),
     QUOTE_SAMPLE_ITEM_NOT_FOUND(HttpStatus.BAD_REQUEST,"QUOTE_005","결제할 샘플 품목이 없습니다."),
     QUOTE_ALREADY_SUBMITTED(HttpStatus.CONFLICT,"QUOTE_006","이미 해당 소싱 요청에 견적서를 제출했습니다."),
+    QUOTE_NOT_NEGOTIABLE(HttpStatus.CONFLICT,"QUOTE_007","이미 채택되었거나 종료된 견적서는 재협의를 요청할 수 없습니다."),
 
     // ───────────────────────────────────────────
     // 계약 (CONTRACT)

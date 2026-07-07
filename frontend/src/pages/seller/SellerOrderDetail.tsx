@@ -37,6 +37,7 @@ type SellerOrderItemResponse = {
   itemStatus: "WAITING" | "READY";
   preparedAt: string | null;
   assignedToMe: boolean;
+  assignedUserName: string;
   canPrepare: boolean;
 };
 
@@ -186,6 +187,47 @@ const trackingStatusLabel: Record<string, string> = {
 
 function getTrackingStatusLabel(code: string, fallback: string) {
   return trackingStatusLabel[code] ?? fallback;
+}
+
+// 리머지택배(테스트용 더미 캐리어)는 외부 API가 이벤트 설명을 항상 "DUMMY!"로 내려준다.
+// 그대로 보여주면 이상해 보이므로, 그 경우엔 상태 코드 기반의 안내 문구로 대체한다.
+const trackingStatusDescription: Record<string, string> = {
+  DELIVERED: "상품이 수령지에 배송 완료되었습니다.",
+  OUT_FOR_DELIVERY: "배송기사가 상품을 싣고 출발했습니다.",
+  IN_TRANSIT: "상품이 배송 중입니다.",
+  AT_PICKUP: "상품이 집화되어 배송을 준비하고 있습니다.",
+  UNKNOWN: "배송 상태를 확인하고 있습니다.",
+};
+
+function getTrackingDescription(description: string | null, statusCode: string) {
+  if (description && description !== "DUMMY!") {
+    return description;
+  }
+  return trackingStatusDescription[statusCode] ?? "배송 상태가 갱신되었습니다.";
+}
+
+// 리머지택배(dev.track.dummy)는 실제 운송장 번호 대신, 3시간 단위(0/3/6/9/12/15/18/21시, UTC)로
+// "yyyy-MM-ddTHH:00:00Z" 형식의 운송장 번호를 매일 자동 생성해두고 그걸로만 조회가 된다.
+// 아무 숫자나 넣으면 조회가 실패하므로, 현재 시각 기준으로 이미 생성되어 있는(과거) 슬롯을
+// 계산해서 바로 쓸 수 있는 예시 값을 만들어준다.
+// 리머지택배(더미 캐리어)는 운송장 번호 자체가 "배송 완료 시각"이다.
+// 현재 시각과 같은 3시간 슬롯을 넣으면 등록 즉시 배송완료로 조회되므로,
+// 시연에서 "배송 중" 흐름을 보여주려면 미래 슬롯을 등록해야 한다.
+// 3칸(9시간) 뒤 슬롯을 기본값으로 사용한다.
+function getDummyTrackingNumber(slotsAhead = 3) {
+  const now = new Date();
+  const flooredHour = Math.floor(now.getUTCHours() / 3) * 3;
+
+  const slot = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      flooredHour + slotsAhead * 3,
+    ),
+  );
+
+  return slot.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 const normalOrderStatuses: OrderStatus[] = [
@@ -554,7 +596,9 @@ export function SellerOrderDetail() {
                                         : "bg-slate-100 text-slate-500"
                                     }`}
                                   >
-                                    {item.assignedToMe ? "내 담당 상품" : "다른 담당자 상품"}
+                                    {item.assignedToMe
+                                      ? "내 담당 상품"
+                                      : `${item.assignedUserName} 담당자의 상품`}
                                   </span>
                                   <span
                                     className={`rounded px-2 py-1 text-[11px] font-bold ${
@@ -776,7 +820,10 @@ export function SellerOrderDetail() {
                       </span>
                       <div className="min-w-0">
                         <p className="text-sm text-slate-700">
-                          {event.description || "배송 상태가 갱신되었습니다."}
+                          {getTrackingDescription(
+                            event.description,
+                            event.status.code
+                          )}
                         </p>
                         {event.location?.name && (
                           <p className="mt-1 text-xs text-slate-400">
@@ -827,6 +874,8 @@ export function SellerOrderDetail() {
                     <option value="롯데택배">롯데택배</option>
                     <option value="로젠택배">로젠택배</option>
                     <option value="우체국택배">우체국택배</option>
+                    {/* 실제 배송 없이 배송추적 데모/테스트용 더미 캐리어 */}
+                    <option value="리머지택배">리머지택배</option>
                   </select>
                 </label>
 
@@ -834,18 +883,39 @@ export function SellerOrderDetail() {
                   <span className="mb-1.5 block text-xs font-semibold text-slate-700">
                     운송장 번호
                   </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={trackingNumber}
-                    onChange={(event) =>
-                      setTrackingNumber(
-                        event.target.value.replace(/[^0-9-]/g, "")
-                      )
-                    }
-                    placeholder="운송장 번호 입력"
-                    className="h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={trackingNumber}
+                      onChange={(event) =>
+                        setTrackingNumber(
+                          event.target.value.replace(/[^0-9A-Za-z:-]/g, "")
+                        )
+                      }
+                      placeholder={
+                        carrier === "리머지택배"
+                          ? "예: 2026-07-07T09:00:00Z"
+                          : "운송장 번호 입력"
+                      }
+                      className="h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                    {carrier === "리머지택배" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTrackingNumber(getDummyTrackingNumber())
+                        }
+                        className="h-11 shrink-0 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                      >
+                        자동 채우기
+                      </button>
+                    )}
+                  </div>
+                  <span className="mt-1.5 block text-[11px] text-slate-400">
+                    {carrier === "리머지택배"
+                      ? "리머지택배는 실제 운송장 번호 대신 \"yyyy-MM-ddTHH:00:00Z\"(3시간 단위, UTC) 형식의 테스트 번호만 조회됩니다. 아무 숫자나 넣으면 조회에 실패해요 — 오른쪽 \"자동 채우기\"를 눌러주세요."
+                      : "숫자와 하이픈(-)만 입력, 8~30자"}
+                  </span>
                 </label>
 
                 <button

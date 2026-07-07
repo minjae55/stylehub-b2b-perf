@@ -28,4 +28,15 @@ public interface NegotiationRepository extends JpaRepository<Negotiation, Intege
             Integer contractId,
             Integer buyerId
     );
+
+    // 같은 딜(같은 견적, 같은 바이어·셀러)의 다른 타입 협의를 찾기 위한 조회.
+    // 견적 협의(QUOTE)와 계약 협의(CONTRACT)는 서로 다른 행이지만, 같은 딜이면
+    // 화면에서 하나의 연속된 대화로 이어 보여주기 위해 짝을 찾을 때 쓴다.
+    Optional<Negotiation>
+    findFirstByQuote_QuoteIdAndBuyer_UserIdAndSeller_UserIdAndNegotiationTypeOrderByOpenedAtDesc(
+            Integer quoteId,
+            Integer buyerId,
+            Integer sellerId,
+            String negotiationType
+    );
 }

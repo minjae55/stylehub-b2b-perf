@@ -24,8 +24,10 @@ public record BuyerOrderListResponse(
         LocalDateTime createdAt,
         LocalDateTime canceledAt,
 
-        String canceledReason
+        String canceledReason,
 
+        // 소싱(견적 기반) 주문의 재협의 요청 등에 사용. 일반 주문은 null.
+        Integer quoteId
 
 ) {
     public static BuyerOrderListResponse from(Order order, List<OrderItem> orderItems) {
@@ -51,7 +53,9 @@ public record BuyerOrderListResponse(
                 order.getCreatedAt(),
                 order.getCanceledAt(),
 
-                order.getCanceledReason()
+                order.getCanceledReason(),
+
+                order.getQuote() != null ? order.getQuote().getQuoteId() : null
         );
     }
 }

@@ -36,15 +36,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class NegotiationService {
+
+    // 재협의를 요청할 수 있는 견적 상태. 이 외의 상태(APPROVED/REJECTED/EXPIRED/NOT_SELECTED/SUPERSEDED)는
+    // 이미 결론이 난 견적이라 재협의를 받으면 안 된다.
+    private static final Set<String> NEGOTIABLE_QUOTE_STATUSES = Set.of(
+            QuoteStatusCode.SUBMITTED,
+            QuoteStatusCode.NEGOTIATING,
+            QuoteStatusCode.SAMPLE_REQUESTED
+    );
 
     private final NegotiationRepository negotiationRepository;
     private final NegotiationRequestRepository negotiationRequestRepository;
@@ -91,17 +103,61 @@ public class NegotiationService {
                         )
                 );
 
+        Map<Integer, Integer> linkedNegotiationIdByNegotiationId =
+                buildLinkedNegotiationIdMap(negotiations);
+
         return negotiations.stream()
                 .map(negotiation ->
                         NegotiationListResponse.from(
                                 negotiation,
                                 latestRequestByNegotiationId.get(
                                         negotiation.getNegotiationId()
+                                ),
+                                linkedNegotiationIdByNegotiationId.get(
+                                        negotiation.getNegotiationId()
                                 )
                         )
                 )
                 .toList();
 
+    }
+
+    // 같은 딜(같은 견적, 같은 바이어·셀러)의 견적 협의(QUOTE)와 계약 협의(CONTRACT)를
+    // 서로의 negotiationId로 연결해준다. DB 행 자체는 그대로 2개로 유지하되, 화면에서
+    // 하나의 연속된 대화로 묶어 보여주기 위한 용도다.
+    private Map<Integer, Integer> buildLinkedNegotiationIdMap(
+            List<Negotiation> negotiations
+    ) {
+
+        Map<String, List<Negotiation>> groupsByDeal = negotiations.stream()
+                .filter(negotiation -> negotiation.getQuote() != null)
+                .collect(Collectors.groupingBy(negotiation ->
+                        negotiation.getQuote().getQuoteId()
+                                + ":" + negotiation.getBuyer().getUserId()
+                                + ":" + negotiation.getSeller().getUserId()
+                ));
+
+        Map<Integer, Integer> linkedIdByNegotiationId = new HashMap<>();
+
+        for (List<Negotiation> group : groupsByDeal.values()) {
+            if (group.size() < 2) {
+                continue;
+            }
+
+            for (Negotiation a : group) {
+                for (Negotiation b : group) {
+                    if (!Objects.equals(a.getNegotiationId(), b.getNegotiationId())
+                            && !Objects.equals(a.getNegotiationType(), b.getNegotiationType())) {
+                        linkedIdByNegotiationId.put(
+                                a.getNegotiationId(),
+                                b.getNegotiationId()
+                        );
+                    }
+                }
+            }
+        }
+
+        return linkedIdByNegotiationId;
     }
 
     @Transactional
@@ -172,6 +228,14 @@ public class NegotiationService {
                         : quote)
                 .orElse(quote);
 
+        // 이미 채택(APPROVED)된 견적은 재협의를 받을 수 없다. 재협의가 진행되어 셀러가
+        // 새 버전으로 응답하면 QuoteService가 원본을 SUPERSEDED로 바꿔버리는데, 그러면
+        // 계약서 작성 조건(quote.status == APPROVED)이 깨져서 계약서를 영영 못 만들게 된다.
+        // REJECTED/EXPIRED/NOT_SELECTED/SUPERSEDED 등 이미 종료된 상태도 마찬가지로 막는다.
+        if (!NEGOTIABLE_QUOTE_STATUSES.contains(currentQuote.getStatus())) {
+            throw new BusinessException(ErrorCode.QUOTE_NOT_NEGOTIABLE);
+        }
+
         negotiationRequestRepository.save(
                 new NegotiationRequest(
                         negotiation,
@@ -240,7 +304,12 @@ public class NegotiationService {
         // Quote와 동일한 이유로, 넘어온 계약이 이미 재계약된 버전일 수 있으므로 항상 체인의
         // 최상위(root, v1) 계약을 기준으로 기존 협의를 찾아야 같은 대화로 묶인다.
         Contract rootContract = resolveRootContract(contract);
-        Quote quote = rootContract.getQuote();
+
+        // 계약이 실제로 만들어진 견적 버전(v2 등)이 아니라 항상 견적 체인의 최상위(v1)를
+        // 참조해야 한다. QUOTE 타입 협의도 항상 root 견적을 기준으로 저장되므로, 이렇게
+        // 맞춰둬야 같은 딜의 견적 협의/계약 협의가 같은 quote_id로 묶여서 셀러 협의관리
+        // 화면에서 하나의 연속된 대화로 이어 보여줄 수 있다.
+        Quote quote = resolveRootQuote(rootContract.getQuote());
         User buyer = userReader.getUser(userId);
         User seller = userReader.getUser(quote.getSeller().getUserId());
 
@@ -442,8 +511,17 @@ public class NegotiationService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
+        List<Integer> negotiationIds = new ArrayList<>();
+        negotiationIds.add(negotiationId);
+
+        // 견적 협의 -> 계약 협의처럼 같은 딜이 다른 단계의 별개 Negotiation 행으로 이어지는
+        // 경우, 이력 조회 시 짝이 되는 협의의 요청 이력도 함께 가져와 시간순으로 합쳐
+        // 하나의 연속된 대화처럼 보여준다.
+        findLinkedNegotiation(negotiation)
+                .ifPresent(linked -> negotiationIds.add(linked.getNegotiationId()));
+
         List<NegotiationRequest> requests = negotiationRequestRepository
-                .findByNegotiation_NegotiationIdOrderByCreatedAtAsc(negotiationId);
+                .findByNegotiation_NegotiationIdInOrderByCreatedAtAsc(negotiationIds);
 
         return requests.stream()
                 .map(request -> NegotiationRequestDetailResponse.from(
@@ -452,6 +530,25 @@ public class NegotiationService {
                         findQuoteItems(request.getRevisedQuote())
                 ))
                 .toList();
+    }
+
+    // 같은 딜(같은 견적, 같은 바이어·셀러)의 다른 타입 협의(QUOTE<->CONTRACT)를 찾는다.
+    private Optional<Negotiation> findLinkedNegotiation(Negotiation negotiation) {
+
+        if (negotiation.getQuote() == null) {
+            return Optional.empty();
+        }
+
+        String otherType =
+                "QUOTE".equals(negotiation.getNegotiationType()) ? "CONTRACT" : "QUOTE";
+
+        return negotiationRepository
+                .findFirstByQuote_QuoteIdAndBuyer_UserIdAndSeller_UserIdAndNegotiationTypeOrderByOpenedAtDesc(
+                        negotiation.getQuote().getQuoteId(),
+                        negotiation.getBuyer().getUserId(),
+                        negotiation.getSeller().getUserId(),
+                        otherType
+                );
     }
 
     private List<QuoteItem> findQuoteItems(Quote quote) {

@@ -16,7 +16,7 @@ public enum DeliveryCarrier {
     LOTTE("롯데택배", "kr.lotte"),
     LOGEN("로젠택배", "kr.logen"),
     EPOST("우체국택배", "kr.epost"),
-    DUMMY("테스트택배", "dev.track.dummy");
+    DUMMY("리머지택배", "dev.track.dummy");
 
     private final String name;
     private final String carrierId;
