@@ -68,4 +68,5 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             "sellerCompany"
     })
     Optional<Order> findOneByOrderId(Integer orderId);
+    List<Order> findByOrderNoIn(List<String> orderNos);
 }

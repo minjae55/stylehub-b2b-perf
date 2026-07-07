@@ -9,6 +9,8 @@ import {
   CheckCircle,
   Clock
 } from 'lucide-react';
+import {Inquiry} from "@/pages/support/Inquiry";
+
 
 export default function SupportManagement() {
   const [activeMenu, setActiveMenu] = useState('inquiry'); // inquiry: 1:1문의, notice: 공지사항, faq: FAQ
@@ -77,31 +79,7 @@ export default function SupportManagement() {
 
           {/* 리스트 본문 (flex-1과 overflow-y-auto를 주어 리스트가 많아져도 이 안에서만 스크롤됩니다) */}
           <div className="flex-1 overflow-y-auto divide-y divide-border">
-            {activeMenu === 'inquiry' && (
-              <>
-                {inquiries
-                  .filter(iq => iq.title.includes(searchTerm) || iq.user.includes(searchTerm))
-                  .map((row) => (
-                    <div key={row.id} className="p-4 flex justify-between items-center hover:bg-slate-50/50 transition-colors cursor-pointer group">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-mono text-muted-foreground">{row.id}</span>
-                          <span className="text-xs font-semibold bg-slate-100 px-2 py-0.5 rounded text-slate-700">{row.user}</span>
-                          <span className="text-xs text-muted-foreground">{row.date}</span>
-                        </div>
-                        <h3 className="font-medium text-sm text-foreground group-hover:text-blue-600 transition-colors">{row.title}</h3>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${row.status === '완료' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                          {row.status === '완료' ? <CheckCircle size={12} /> : <Clock size={12} />}
-                          {row.status === '완료' ? '답변완료' : '답변대기'}
-                        </span>
-                        <ChevronRight size={16} className="text-muted-foreground" />
-                      </div>
-                    </div>
-                ))}
-              </>
-            )}
+            {activeMenu === 'inquiry' && <Inquiry embedded />}
 
             {activeMenu === 'notice' && (
               <div className="p-8 text-center text-sm text-muted-foreground">
