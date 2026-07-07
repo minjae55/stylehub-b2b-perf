@@ -188,6 +188,14 @@ function StatCards({
     shipments: SellerShipment[];
     disputes: SellerDispute[];
 }) {
+
+    // 소싱 요청에 들어있는 상품명들을 중복 제거하여 등록된 총 상품 수 계산 (실제 데이터에 맞게 활용 가능)
+    // 소싱 요청에 들어있는 상품명들을 중복 제거하여 등록된 총 상품 수 계산
+    const totalProductsCount = useMemo(() => {
+        const productNames = Array.from(new Set(sourcingRequests.map(req => req.productName))).filter(Boolean);
+        return productNames.length;
+    }, [sourcingRequests]);
+
     const cards = [
         {
             label: "신규 요청", count: sourcingRequests.length,
@@ -224,10 +232,18 @@ function StatCards({
             urgent: disputes.filter((d) => d.status === "RECEIVED").length,
             urgentLabel: "처리 필요",
         },
+        {
+            label: "상품 관리",
+            count: totalProductsCount,
+            icon: <ShoppingBag size={16}/>, // 다른 아이콘들과 동일한 컴포넌트 형태 사용
+            href: "/seller/products",
+            urgent: 0,
+            urgentLabel: "",
+        },
     ];
 
     return (
-        <div className="grid grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-6 gap-3 mb-6">
             {cards.map((c) => (
                 <Link
                     key={c.label}
@@ -782,16 +798,16 @@ export function SellerDashboard() {
 
                     {/* ── 신규요청 + 견적작성 + 협의진행 ── */}
                     <div className="grid grid-cols-3 gap-4 mb-4">
+                        <SettlementPanel settlements={settlements}/>
                         <RequestPanel sourcingRequests={sourcingRequests}/>
                         <QuoteDraftPanel quoteDrafts={quoteDrafts}/>
-                        <NegotiationPanel negotiations={negotiations}/>
                     </div>
 
                     {/* ── 출고대기 + 이의제기 + 정산 현황 ── */}
                     <div className="grid grid-cols-3 gap-4 mb-4">
+                        <NegotiationPanel negotiations={negotiations}/>
                         <ShipmentPanel shipments={shipments}/>
                         <DisputePanel disputes={disputes}/>
-                        <SettlementPanel settlements={settlements}/>
                     </div>
                 </>
             )}

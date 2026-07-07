@@ -46,8 +46,8 @@ public class DashboardService {
         List<SourcingStatus> statuses = parseSourcingStatuses(statusStr);
 
         List<SourcingRequest> requests = sourcingRequestRepository
-                .findByBuyerCompanyIdAndTypeAndStatusInOrderByCreatedAtDesc(
-                        buyerCompanyId, "SOURCING", statuses
+                .findByBuyerCompanyIdAndStatusInOrderByCreatedAtDesc(
+                        buyerCompanyId, statuses
                 );
 
         if (requests.isEmpty()) return Collections.emptyList();

@@ -7,6 +7,7 @@ import kr.remerge.stylehub.domain.sourcing.enumtype.SourcingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface SourcingRequestRepository extends JpaRepository<SourcingRequest, Integer> {
@@ -38,4 +39,9 @@ public interface SourcingRequestRepository extends JpaRepository<SourcingRequest
         GROUP BY r.status
         """)
     List<Tuple> countAllGroupedByStatus();
+
+    List<SourcingRequest> findByBuyerCompanyIdAndStatusInOrderByCreatedAtDesc(
+            Integer buyerCompanyId,
+            Collection<SourcingStatus> statuses
+    );
 }

@@ -7,13 +7,7 @@ public record SellerNegotiationDashboardResponse(Integer negotiationId, String t
                                                  String lastMessageAt, Boolean hasNewMessage) {
     public SellerNegotiationDashboardResponse(Integer negotiationId, String title, String productName, String buyerName,
                                               Integer qty, String lastMessage, LocalDateTime lastMessageAt, Boolean hasNewMessage) {
-        this.negotiationId = negotiationId;
-        this.title = title;
-        this.productName = productName;
-        this.buyerName = buyerName;
-        this.qty = qty;
-        this.lastMessage = lastMessage;
-        this.lastMessageAt = lastMessageAt != null ? lastMessageAt.toString() : null;
-        this.hasNewMessage = hasNewMessage != null ? hasNewMessage : false;
+        //  이미 정상적으로 표준 생성자를 위임 호출하고 있습니다. 수정할 필요가 없습니다.
+        this(negotiationId, title, productName, buyerName, qty, lastMessage, lastMessageAt != null ? lastMessageAt.toString() : null, hasNewMessage != null ? hasNewMessage : false);
     }
 }
