@@ -7,6 +7,16 @@ public record PaymentResult (
     String orderId,
     String method, // 결제 수단
     Long totalAmount,
-    String approvedAt
-) {}
+    String approvedAt,
+    String status,
+    VirtualAccountInfo virtualAccount
+) {
+    public record VirtualAccountInfo(
+            String accountNumber,
+            String bankCode,
+            String customerName,
+            String dueDate
+    ){}
+    }
+
 

@@ -49,6 +49,7 @@ public class TossPaymentsClient {
                 )
                 .bodyToMono(PaymentResult.class)
                 .block();
+
     }
 
     private record TossConfirmRequest(
@@ -56,6 +57,20 @@ public class TossPaymentsClient {
             String orderId,
             Long amount
     ) {
+    }
+
+    public PaymentResult retrievePayment(String paymentKey) {
+        return tossWebClient.get()
+                .uri("/v1/payments/{paymentKey}", paymentKey)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(errorBody -> Mono.error(
+                                        new RuntimeException("결제 조회 실패: " + errorBody)
+                                ))
+                )
+                .bodyToMono(PaymentResult.class)
+                .block();
     }
 
     public PaymentResult cancel(String paymentKey, PaymentCancelRequest request) {

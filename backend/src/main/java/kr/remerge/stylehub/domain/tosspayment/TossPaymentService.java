@@ -7,6 +7,7 @@ import kr.remerge.stylehub.domain.order.repository.OrderRepository;
 import kr.remerge.stylehub.domain.order.service.OrderStatusService;
 import kr.remerge.stylehub.domain.tosspayment.entity.TossPayments;
 import kr.remerge.stylehub.domain.user.entity.User;
+import kr.remerge.stylehub.domain.user.repository.UserRepository;
 import kr.remerge.stylehub.domain.user.support.UserReader;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
@@ -26,14 +27,15 @@ public class TossPaymentService {
 
     private final TossPaymentRepository tosspaymentRepository;
     private final TossPaymentsClient tossPaymentsClient;
+    private final UserRepository userRepository;
     private final OrderRepository orderRepository;
-    private final UserReader userReader;
     private final OrderStatusService orderStatusService;
 
     @Transactional
     public PaymentResponse confirmPayment(Integer userId, PaymentConfirmRequest request) {
 
-        User buyer = userReader.getUser(userId);
+        User buyer = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         List<String> orderNos = request.orderIds().stream()
                 .distinct()
@@ -89,28 +91,50 @@ public class TossPaymentService {
                 .tossOrderId(result.orderId())
                 .amount(result.totalAmount())
                 .method(result.method())
-                .status("DONE")
+                .status(result.status())
                 .requestedAt(LocalDateTime.now())
                 .approvedAt(
-                        OffsetDateTime.parse(result.approvedAt())
-                                .toLocalDateTime()
+                        result.approvedAt() != null
+                                ? OffsetDateTime.parse(result.approvedAt()).toLocalDateTime()
+                                : null
                 )
                 .orderIds(new ArrayList<>(orderNos))
+                .vaBankCode(result.virtualAccount() != null ? result.virtualAccount().bankCode() : null)
+                .vaAccountNumber(result.virtualAccount() != null ? result.virtualAccount().accountNumber() : null)
+                .vaCustomerName(result.virtualAccount() != null ? result.virtualAccount().customerName() : null)
+                .vaDueDate(result.virtualAccount() != null ? result.virtualAccount().dueDate() : null)
                 .build();
 
         tosspaymentRepository.save(payment);
-        orderStatusService.confirmPayments(orders, buyer);
+
+        // 카드결제처럼 즉시 완료된 경우에만 Order 상태 전이.
+        // 가상계좌 발급 직후(WAITING_FOR_DEPOSIT)는 아직 입금 전이므로 여기서 절대 confirm하지 않음 — 웹훅에서 처리.
+        if ("DONE".equals(result.status())) {
+            orderStatusService.confirmPayments(orders, buyer);
+        }
 
         log.info(
-                "결제 승인 완료: orderId={}, orderCount={}",
+                "결제 승인 처리: orderId={}, status={}, orderCount={}",
                 request.orderId(),
+                result.status(),
                 orders.size()
         );
+
+        PaymentResponse.VirtualAccountResponse virtualAccountResponse =
+                result.virtualAccount() != null
+                        ? new PaymentResponse.VirtualAccountResponse(
+                        result.virtualAccount().bankCode(),
+                        result.virtualAccount().accountNumber(),
+                        result.virtualAccount().customerName(),
+                        result.virtualAccount().dueDate()
+                )
+                        : null;
 
         return new PaymentResponse(
                 payment.getTossPaymentId(),
                 payment.getTossOrderId(),
-                payment.getStatus()
+                payment.getStatus(),
+                virtualAccountResponse
         );
     }
 
@@ -141,16 +165,33 @@ public class TossPaymentService {
         boolean allConfirmed = orders.stream()
                 .allMatch(order -> order.getStatus() == OrderStatus.CONFIRMED);
 
-        if (allPending) {
+        // 저장된 Toss 상태가 아직 DONE이 아니면(가상계좌 입금대기 중) confirm 처리하지 않음
+        boolean tossPaymentDone = "DONE".equals(payment.getStatus());
+
+        if (allPending && tossPaymentDone) {
             orderStatusService.confirmPayments(orders, buyer);
+        } else if (allPending) {
+            // 가상계좌 입금대기 중 재요청 — 아직 결제 미완료, 정상 상황이므로 그대로 안내만
+            log.info("가상계좌 입금 대기 중 재요청: paymentKey={}", payment.getTossPaymentId());
         } else if (!allConfirmed) {
             throw new BusinessException(ErrorCode.PAYMENT_ORDER_STATE_MISMATCH);
         }
 
+        PaymentResponse.VirtualAccountResponse virtualAccountResponse =
+                payment.getVaAccountNumber() != null
+                        ? new PaymentResponse.VirtualAccountResponse(
+                        payment.getVaBankCode(),
+                        payment.getVaAccountNumber(),
+                        payment.getVaCustomerName(),
+                        payment.getVaDueDate()
+                )
+                        : null;
+
         return new PaymentResponse(
                 payment.getTossPaymentId(),
                 payment.getTossOrderId(),
-                payment.getStatus()
+                payment.getStatus(),
+                virtualAccountResponse
         );
     }
 }

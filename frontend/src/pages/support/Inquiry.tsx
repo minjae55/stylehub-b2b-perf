@@ -68,6 +68,10 @@ import {Client} from "@stomp/stompjs";
 // ── 카테고리/상태 메타데이터 ──────────────────────────────────────────────────
 // inquiry.types.ts의 CategoryKey ("ACCOUNT" | "ORDER" | "PAYMENT" | "DELIVERY" | "PRODUCT" | "ETC") 기준
 
+interface InquiryProps {
+    embedded?: boolean;
+}
+
 const CATEGORY_META: Record<CategoryKey, {
     label: string; icon: JSX.Element; color: string; bg: string; border: string;
 }> = {
@@ -859,7 +863,7 @@ function ChatPanel({inquiry, messages, viewerRole, currentUserId, isLoading, err
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 
-export function Inquiry() {
+export function Inquiry({ embedded = false }: InquiryProps) {
     // 로그인한 유저 정보 — zustand auth store에서 구독
     const user = useAuthStore((state) => state.user);
     const isAuthLoading = useAuthStore((state) => state.isLoading);
@@ -1060,8 +1064,11 @@ export function Inquiry() {
     return (
         <div className="max-w-5xl mx-auto px-4 py-8">
             {/* 2패널 레이아웃 */}
-            <div className="flex border border-border rounded-xl overflow-hidden bg-white shadow-sm"
-                 style={{height: 680}}>
+            <div className={ embedded
+            ? "flex h-full w-full overflow-hidden"
+            : "flex border border-border rounded-xl overflow-hidden bg-white shadow-sm"
+            }
+                 style={embedded ? undefined : { height: 680 }}>
                 <div className="w-[300px] flex flex-col shrink-0">
                     <InquiryListPanel
                         inquiries={inquiries}
