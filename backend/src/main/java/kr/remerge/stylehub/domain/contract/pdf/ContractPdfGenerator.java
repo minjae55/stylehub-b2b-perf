@@ -651,4 +651,49 @@ public class ContractPdfGenerator {
             Table table,
             String label,
             Long amount,
+            boolean emphasized
+    ) {
+        DeviceRgb background = emphasized ? NAVY : LIGHT_GRAY;
+        DeviceRgb textColor = emphasized
+                ? new DeviceRgb(255, 255, 255)
+                : NAVY;
+
+        table.addCell(
+                new Cell()
+                        .setBorder(new SolidBorder(BORDER_COLOR, 0.7f))
+                        .setBackgroundColor(background)
+                        .setPadding(8)
+                        .add(
+                                new Paragraph(label)
+                                        .setFontSize(9)
+                                        .simulateBold()
+                                        .setFontColor(textColor)
+                        )
+        );
+
+        table.addCell(
+                new Cell()
+                        .setBorder(new SolidBorder(BORDER_COLOR, 0.7f))
+                        .setBackgroundColor(background)
+                        .setPadding(8)
+                        .setTextAlignment(TextAlignment.RIGHT)
+                        .add(
+                                new Paragraph(formatPrice(amount))
+                                        .setFontSize(9)
+                                        .simulateBold()
+                                        .setFontColor(textColor)
+                        )
+        );
+    }
+
+    private String formatPrice(Long value) {
+        return String.format("%,d원", value);
+    }
+
+    private String valueOrDash(String value) {
+        return value == null || value.isBlank()
+                ? "-"
+                : value;
+    }
+}
    

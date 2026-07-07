@@ -196,4 +196,34 @@ public class ContractOrderService {
     private List<OrderItem> buildOrderItems(
             Order order,
             Contract contract,
-            Lis
+            List<ContractItem> contractItems
+    ) {
+        return contractItems.stream()
+                .map(item -> OrderItem.builder()
+                        .order(order)
+                        .product(item.getProduct())
+                        .productOption(item.getProductOption())
+                        .assignedUser(contract.getQuote().getSeller())
+                        .productName(item.getProductName())
+                        .optionSummary(item.getOptionSummary())
+                        .quantity(item.getQuantity())
+                        .unitPrice(item.getUnitPrice())
+                        .additionalPrice(0L)
+                        .totalPrice(item.getTotalPrice())
+                        .build()
+                )
+                .toList();
+    }
+
+    private String createOrderNo() {
+        String date = LocalDate.now()
+                .format(DateTimeFormatter.BASIC_ISO_DATE);
+        String random = UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 8)
+                .toUpperCase();
+
+        return "ORD-" + date + "-" + random;
+    }
+}

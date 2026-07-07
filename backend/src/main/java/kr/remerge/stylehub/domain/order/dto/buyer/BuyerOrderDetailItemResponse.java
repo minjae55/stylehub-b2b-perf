@@ -27,4 +27,21 @@ public record BuyerOrderDetailItemResponse(
 
         Integer productOptionId = orderItem.getProductOption() != null
                 ? orderItem.getProductOption().getProductOptionId()
-        
+                : null;
+
+        return new BuyerOrderDetailItemResponse(
+                orderItem.getOrderItemId(),
+
+                orderItem.getProductName(),
+                brandName,
+                orderItem.getOptionSummary(),
+                orderItem.getQuantity(),
+
+                orderItem.getUnitPrice(),
+                orderItem.getTotalPrice(),
+                orderItem.getProductImageUrl(),
+
+                productOptionId
+        );
+    }
+}

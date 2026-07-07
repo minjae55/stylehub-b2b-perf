@@ -613,4 +613,106 @@ public class NegotiationService {
         findLinkedNegotiation(negotiation)
                 .ifPresent(linked -> negotiationIds.add(linked.getNegotiationId()));
 
-        List<Negotia
+        List<NegotiationRequest> requests = negotiationRequestRepository
+                .findByNegotiation_NegotiationIdInOrderByCreatedAtAsc(negotiationIds);
+
+        return requests.stream()
+                .map(request -> NegotiationRequestDetailResponse.from(
+                        request,
+                        findQuoteItems(request.getRequestedQuote()),
+                        findQuoteItems(request.getRevisedQuote())
+                ))
+                .toList();
+    }
+
+    // 같은 딜(같은 견적, 같은 바이어·셀러)의 다른 타입 협의(QUOTE<->CONTRACT)를 찾는다.
+    private Optional<Negotiation> findLinkedNegotiation(Negotiation negotiation) {
+
+        if (negotiation.getQuote() == null) {
+            return Optional.empty();
+        }
+
+        String otherType =
+                "QUOTE".equals(negotiation.getNegotiationType()) ? "CONTRACT" : "QUOTE";
+
+        return negotiationRepository
+                .findFirstByQuote_QuoteIdAndBuyer_UserIdAndSeller_UserIdAndNegotiationTypeOrderByOpenedAtDesc(
+                        negotiation.getQuote().getQuoteId(),
+                        negotiation.getBuyer().getUserId(),
+                        negotiation.getSeller().getUserId(),
+                        otherType
+                );
+    }
+
+    private List<QuoteItem> findQuoteItems(Quote quote) {
+        if (quote == null) {
+            return List.of();
+        }
+
+        return quoteItemRepository.findByQuote_QuoteId(quote.getQuoteId());
+    }
+
+    // 협의 요청에 파일을 첨부한다. 해당 협의의 바이어/셀러만 업로드할 수 있다.
+    @Transactional
+    public NegotiationFileResponse uploadFile(
+            Integer userId,
+            Integer negotiationRequestId,
+            MultipartFile file
+    ) {
+
+        NegotiationRequest negotiationRequest = negotiationRequestRepository
+                .findById(negotiationRequestId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NEGOTIATION_REQUEST_NOT_FOUND));
+
+        Negotiation negotiation = negotiationRequest.getNegotiation();
+
+        boolean isParty = Objects.equals(negotiation.getBuyer().getUserId(), userId)
+                || Objects.equals(negotiation.getSeller().getUserId(), userId);
+
+        if (!isParty) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        User uploader = userReader.getUser(userId);
+
+        String fileUrl = imageUploadService.upload(
+                file,
+                "negotiations/" + negotiationRequestId
+        );
+
+        NegotiationFile negotiationFile = negotiationFileRepository.save(
+                new NegotiationFile(
+                        negotiationRequest,
+                        uploader,
+                        file.getOriginalFilename(),
+                        fileUrl,
+                        file.getContentType(),
+                        file.getSize()
+                )
+        );
+
+        return NegotiationFileResponse.from(negotiationFile);
+    }
+
+    public List<NegotiationFileResponse> getFiles(Integer userId, Integer negotiationRequestId) {
+
+        NegotiationRequest negotiationRequest = negotiationRequestRepository
+                .findById(negotiationRequestId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NEGOTIATION_REQUEST_NOT_FOUND));
+
+        Negotiation negotiation = negotiationRequest.getNegotiation();
+
+        boolean isParty = Objects.equals(negotiation.getBuyer().getUserId(), userId)
+                || Objects.equals(negotiation.getSeller().getUserId(), userId);
+
+        if (!isParty) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        return negotiationFileRepository
+                .findByNegotiationRequest_NegotiationRequestIdOrderByCreatedAtAsc(negotiationRequestId)
+                .stream()
+                .map(NegotiationFileResponse::from)
+                .toList();
+    }
+}

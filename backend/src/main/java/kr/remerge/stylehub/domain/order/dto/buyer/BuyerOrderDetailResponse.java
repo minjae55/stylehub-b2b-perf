@@ -31,6 +31,7 @@ public record BuyerOrderDetailResponse(
 
         String carrier,
         String trackingNumber,
+        LocalDateTime deliveredAt,
 
         Long subtotalAmount,
         Long platformFee,
@@ -70,6 +71,7 @@ public record BuyerOrderDetailResponse(
 
                 order.getCarrier(),
                 order.getTrackingNumber(),
+                order.getDeliveredAt(),
 
                 order.getSubtotalAmount(),
                 order.getPlatformFee(),

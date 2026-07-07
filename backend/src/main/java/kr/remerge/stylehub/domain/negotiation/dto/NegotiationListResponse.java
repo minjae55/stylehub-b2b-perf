@@ -74,4 +74,18 @@ public record NegotiationListResponse(
                         : latestRequest.getBuyerRequest(),
                 latestRequest == null
                         ? null
-          
+                        : latestRequest.getNegotiationRequestId(),
+                latestRequest == null
+                        ? null
+                        : latestRequest.getStatus(),
+                negotiation.getOpenedAt(),
+                negotiation.getUpdatedAt(),
+                negotiation.getAgreedAt(),
+                negotiation.getClosedAt(),
+                linkedNegotiationId,
+                sampleOrder == null ? null : sampleOrder.getOrderId(),
+                sampleOrder == null ? null : sampleOrder.getOrderNo(),
+                sampleOrder == null ? null : sampleOrder.getStatus().name()
+        );
+    }
+}

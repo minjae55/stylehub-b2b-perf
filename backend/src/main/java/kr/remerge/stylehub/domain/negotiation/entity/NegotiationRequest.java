@@ -110,4 +110,27 @@ public class NegotiationRequest {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void respondWithQuote(
+    public void respondWithQuote(Quote revisedQuote, String sellerMemo) {
+        this.revisedQuote = revisedQuote;
+        this.sellerMemo = sellerMemo;
+        this.status = "RESPONDED";
+        this.respondedAt = LocalDateTime.now();
+    }
+
+    public void respondWithContract(Contract revisedContract, String sellerMemo) {
+        this.revisedContract = revisedContract;
+        this.sellerMemo = sellerMemo;
+        this.status = "RESPONDED";
+        this.respondedAt = LocalDateTime.now();
+    }
+
+    public void accept() {
+        this.status = "ACCEPTED";
+        this.acceptedAt = LocalDateTime.now();
+    }
+
+    public void cancel() {
+        this.status = "CANCELED";
+        this.canceledAt = LocalDateTime.now();
+    }
+}

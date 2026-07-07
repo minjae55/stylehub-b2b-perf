@@ -168,6 +168,13 @@ public class Order extends BaseEntity {
         this.trackingNumber = trackingNumber;
         this.shippedAt = LocalDateTime.now();
     }
+
+    // shippedAt 등 다른 배송 필드는 건드리지 않고 운송장 번호만 갱신한다.
+    // (테스트용 더미 캐리어의 배송완료 강제 처리 등에서 사용)
+    public void updateTrackingNumber(String trackingNumber) {
+        this.trackingNumber = trackingNumber;
+    }
+
     public void markDelivered() {
         this.status = OrderStatus.DELIVERED;
         this.deliveredAt = LocalDateTime.now();

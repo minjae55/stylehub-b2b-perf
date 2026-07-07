@@ -224,4 +224,13 @@ public class SampleOrderService {
         }
     }
 
-    private Quote findBuyerQuote
+    private Quote findBuyerQuote(Integer quoteId, Integer buyerId) {
+
+        return quoteRepository
+                .findByQuoteIdAndBuyer_UserId(quoteId, buyerId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.QUOTE_NOT_FOUND)
+                );
+
+    }
+
+}

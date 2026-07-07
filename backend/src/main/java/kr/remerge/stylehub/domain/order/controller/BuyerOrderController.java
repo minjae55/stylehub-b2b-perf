@@ -126,4 +126,39 @@ public class BuyerOrderController {
     ) {
 
         SampleOrderCreateResponse response =
-                sampleOrderService.createSampleOrder(authUs
+                sampleOrderService.createSampleOrder(authUser.userId(), request);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/{orderId}/cancel")
+    public ResponseEntity<ApiResponse<Void>> cancelOrder(
+            @LoginUser AuthUser authUser,
+            @PathVariable Integer orderId,
+            @Valid @RequestBody OrderCancelRequest request
+    ) {
+
+        orderCancellationService.cancelOrder(
+                authUser.userId(),
+                orderId,
+                request
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/{orderId}/complete")
+    public ResponseEntity<ApiResponse<Void>> completeOrder(
+            @LoginUser AuthUser authUser,
+            @PathVariable Integer orderId
+    ) {
+
+        buyerOrderService.confirmOrder(
+                authUser.userId(),
+                orderId
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+}

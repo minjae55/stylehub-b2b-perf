@@ -19,4 +19,15 @@ public record NegotiationCreateRequest(
         @Size(max = 2000, message = "요청 내용은 2000자 이하여야 합니다.")
         String content,
 
-        @NotBlank(message = "선택된 협의 유형이 없습
+        @PositiveOrZero(message = "희망 단가는 0원 이상이어야 합니다.")
+        Long desiredUnitPrice,
+
+        @PositiveOrZero(message = "희망 납기는 0일 이상이어야 합니다.")
+        Integer desiredLeadTimeDays,
+
+        @NotBlank(message = "선택된 협의 유형이 없습니다.")
+        String negotiationType
+
+
+) {
+}
