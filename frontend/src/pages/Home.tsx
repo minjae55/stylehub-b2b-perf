@@ -390,12 +390,7 @@ export function Home() {
               </Link>
           ))}
 
-          <Link to="/suppliers" className="flex flex-col items-center gap-2 group transition-transform hover:scale-105">
-            <div className="w-20 h-20 rounded-full border-2 border-border bg-white flex items-center justify-center text-2xl group-hover:border-primary group-hover:bg-primary/5 transition-all overflow-hidden">
-              <img src="/images/brand.png" alt="브랜드" className="w-18 h-18 object-contain" />
-            </div>
-            <span className="text-sm text-foreground group-hover:text-primary transition-colors font-medium">브랜드</span>
-          </Link>
+
 
         </div>
 

@@ -66,28 +66,6 @@ const categories = [
   { id: "shoes", name: "신발", subCategories: ["스니커즈", "부츠/앵클부츠", "플랫/로퍼", "힐/롬프스"] },
 ];
 
-const allBrands = [
-  { name: "내추럴보이", logo: "/images/brands/natural.png" },
-  { name: "동대문패션", logo: "/images/brands/ddm.png" },
-  { name: "베이직이너", logo: "/images/brands/basic.png" },
-  { name: "세트스타일", logo: "/images/brands/set.png" },
-  { name: "스타일컴퍼니", logo: "/images/brands/style.png" },
-  { name: "스포츠라이프", logo: "/images/brands/sportslife.png" },
-  { name: "슈즈마켓", logo: "/images/brands/shoes.png" },
-  { name: "액티브웨어코리아", logo: "/images/brands/active.png" },
-  { name: "엘레강스모드", logo: "/images/brands/elegance.png" },
-  { name: "진워크스", logo: "/images/brands/jean.png" },
-  { name: "캐주얼하우스", logo: "/images/brands/casual.png" },
-  { name: "코지니트", logo: "/images/brands/cozy.png" },
-  { name: "코지홈", logo: "/images/brands/cozyhome.png" },
-  { name: "트렌드하우스", logo: "/images/brands/trend.png" },
-  { name: "패션액세서리몰", logo: "/images/brands/acc.png" },
-  { name: "페미닌스타일", logo: "/images/brands/feminine.png" },
-  { name: "프리미엄어패럴", logo: "/images/brands/premium.png" },
-];
-
-const CHOSUNG = ["전체", "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
-
 const searchCategories = [
   { id: "tops", name: "상의", iconImg: "/images/top.png", alias: [] as string[], subCategories: ["티셔츠/탑", "블라우스/셔츠", "니트/스웨터", "후드/맨투맨", "재킷/블레이저"] },
   { id: "bottoms", name: "하의", iconImg: "/images/bottom.png", alias: ["치마", "바지"], subCategories: ["팬츠/슬랙스", "스커트", "진/데님", "레깅스", "반바지"] },
@@ -99,12 +77,6 @@ const searchCategories = [
   { id: "shoes", name: "신발", iconImg: "/images/shoes.png", alias: ["구두", "운동화"], subCategories: ["스니커즈", "부츠/앵클부츠", "플랫/로퍼", "힐/롬프스"] },
 ];
 
-function getChosung(str: string): string {
-  const code = str.charCodeAt(0) - 0xAC00;
-  if (code < 0) return str[0];
-  return ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"][Math.floor(code / (21 * 28))];
-}
-
 const PAGE_SIZE = 20;
 
 export function AllProducts() {
@@ -113,14 +85,8 @@ export function AllProducts() {
   const [selectedSubCategory, setSelectedSubCategory] = useState(searchParams.get("sub") || "");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(searchParams.get("category") || null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [selectedBrand, setSelectedBrand] = useState("");
-  const [brandPanelOpen, setBrandPanelOpen] = useState(false);
-  const [brandChosung, setBrandChosung] = useState("전체");
-  const [brandVisibleCount, setBrandVisibleCount] = useState(10);
-  const brandPanelRef = useRef<HTMLDivElement>(null);
-  const brandScrollRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchTab, setSearchTab] = useState<"product" | "category" | "brand">("product");
+  const [searchTab, setSearchTab] = useState<"product" | "category">("product");
   const [tabDropOpen, setTabDropOpen] = useState(false);
   const [resultDropOpen, setResultDropOpen] = useState(false);
   const tabDropRef = useRef<HTMLDivElement>(null);
@@ -171,14 +137,9 @@ export function AllProducts() {
       if (tabDropRef.current && !tabDropRef.current.contains(e.target as Node)) setTabDropOpen(false);
       if (resultDropRef.current && !resultDropRef.current.contains(e.target as Node)) setResultDropOpen(false);
     };
-    const clickHandler = (e: MouseEvent) => {
-      if (brandPanelRef.current && !brandPanelRef.current.contains(e.target as Node)) setBrandPanelOpen(false);
-    };
     document.addEventListener("mousedown", mousedownHandler);
-    document.addEventListener("click", clickHandler);
     return () => {
       document.removeEventListener("mousedown", mousedownHandler);
-      document.removeEventListener("click", clickHandler);
     };
   }, []);
 
@@ -272,12 +233,11 @@ export function AllProducts() {
         // 중분류 필터: categoryName이 선택된 중분류와 일치
         const matchSubCategory = !selectedSubCategory || p.categoryName === selectedSubCategory;
 
-        const matchBrand = !selectedBrand || p.brandName === selectedBrand;
         const matchSearch = !searchQuery ||
             p.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
             p.brandName.toLowerCase().includes(searchQuery.toLowerCase());
 
-        return matchMainCategory && matchSubCategory && matchBrand && matchSearch;
+        return matchMainCategory && matchSubCategory && matchSearch;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -288,12 +248,8 @@ export function AllProducts() {
     const q = searchQuery.trim().toLowerCase();
     if (searchTab === "product") return apiProducts.filter(p => p.productName.toLowerCase().includes(q) || p.brandName.toLowerCase().includes(q)).slice(0, 6);
     if (searchTab === "category") return searchCategories.filter(c => c.name.toLowerCase().includes(q) || c.subCategories.some(s => s.toLowerCase().includes(q)) || c.alias.some(a => a.toLowerCase().includes(q))).slice(0, 6);
-    if (searchTab === "brand") return allBrands.filter(b => b.name.toLowerCase().includes(q)).slice(0, 6);
     return [];
   })();
-
-  const brandFiltered = brandChosung === "전체" ? allBrands : allBrands.filter(b => getChosung(b.name) === brandChosung);
-  const brandVisible = brandFiltered.slice(0, brandVisibleCount);
 
   // 상품의 카테고리 표시명 (대분류 or 중분류)
   const getCategoryDisplayName = (p: ProductSummary) => {
@@ -478,15 +434,15 @@ export function AllProducts() {
                     onClick={() => setTabDropOpen(v => !v)}
                     className="flex items-center border-r border-border bg-muted px-3 gap-1 cursor-pointer hover:bg-muted/80 transition-colors text-sm text-foreground whitespace-nowrap h-full w-24 justify-between rounded-l-lg"
                 >
-                  {searchTab === "product" ? "상품명" : searchTab === "category" ? "카테고리" : "브랜드"}
+                  {searchTab === "product" ? "상품명" : "카테고리"}
                   <ChevronDown size={14} />
                 </button>
                 {tabDropOpen && (
                     <div className="absolute left-0 top-full mt-1 bg-white border border-border rounded shadow-lg z-[100] w-28">
-                      {(["product", "category", "brand"] as const).map((tab) => (
+                      {(["product", "category"] as const).map((tab) => (
                           <button key={tab} onClick={() => { setSearchTab(tab); setTabDropOpen(false); setSearchQuery(""); setResultDropOpen(false); }}
                                   className={`w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors ${searchTab === tab ? "text-primary font-semibold" : "text-foreground"}`}>
-                            {tab === "product" ? "상품명" : tab === "category" ? "카테고리" : "브랜드"}
+                            {tab === "product" ? "상품명" : "카테고리"}
                           </button>
                       ))}
                     </div>
@@ -496,7 +452,7 @@ export function AllProducts() {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                     type="text"
-                    placeholder={searchTab === "product" ? "상품명으로 검색" : searchTab === "category" ? "카테고리명으로 검색" : "브랜드명으로 검색"}
+                    placeholder={searchTab === "product" ? "상품명으로 검색" : "카테고리명으로 검색"}
                     value={searchQuery}
                     onChange={(e) => { setSearchQuery(e.target.value); setResultDropOpen(true); setTabDropOpen(false); setCurrentPage(1); }}
                     onFocus={() => { if (searchQuery.trim().length > 0) setResultDropOpen(true); }}
@@ -522,7 +478,7 @@ export function AllProducts() {
                             <div className="text-primary text-sm font-bold flex-shrink-0">₩{p.unitPrice.toLocaleString()}</div>
                           </Link>
                       ))
-                  ) : searchTab === "category" ? (
+                  ) : (
                       (searchResults as typeof searchCategories).map((c) => (
                           <button key={c.id} onClick={() => { handleCategoryChange(c.id); setResultDropOpen(false); setSearchQuery(""); }}
                                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary transition-colors border-b border-border last:border-0 text-left">
@@ -531,16 +487,6 @@ export function AllProducts() {
                               <div className="text-sm font-medium text-foreground">{c.name}</div>
                               <div className="text-xs text-muted-foreground truncate">{c.subCategories.join(" · ")}</div>
                             </div>
-                          </button>
-                      ))
-                  ) : (
-                      (searchResults as typeof allBrands).map((b) => (
-                          <button key={b.name} onClick={() => { setSelectedBrand(b.name); setResultDropOpen(false); setSearchQuery(""); setCurrentPage(1); }}
-                                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary transition-colors border-b border-border last:border-0 text-left">
-                            <div className="w-7 h-7 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              <img src={b.logo} alt={b.name} className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                            </div>
-                            <span className="text-sm text-foreground">{b.name}</span>
                           </button>
                       ))
                   )}
@@ -591,44 +537,6 @@ export function AllProducts() {
                 ))}
               </div>
             </div>
-
-            {/* 브랜드 */}
-            <div className="relative" ref={brandPanelRef}>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">브랜드</p>
-              <button
-                  onClick={() => { if (selectedBrand) { setSelectedBrand(""); setCurrentPage(1); } else setBrandPanelOpen(v => !v); }}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-sm font-semibold transition-all border ${selectedBrand ? "bg-primary text-white border-primary" : "bg-white text-foreground border-border hover:border-primary hover:text-primary"}`}
-              >
-                <span>{selectedBrand || "브랜드 선택"}</span>
-                {selectedBrand ? <X size={14} /> : <ChevronDown size={14} className={`transition-transform ${brandPanelOpen ? "rotate-180" : ""}`} />}
-              </button>
-              {brandPanelOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border rounded-lg shadow-xl z-30">
-                    <div className="flex flex-wrap gap-1 p-2.5 border-b border-border">
-                      {CHOSUNG.map((c) => (
-                          <button key={c} onClick={() => { setBrandChosung(c); setBrandVisibleCount(10); }}
-                                  className={`text-xs px-1.5 py-0.5 rounded transition-colors ${brandChosung === c ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-primary"}`}>
-                            {c}
-                          </button>
-                      ))}
-                    </div>
-                    <div ref={brandScrollRef} onScroll={() => { const el = brandScrollRef.current; if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 10) setBrandVisibleCount(v => v + 10); }} className="max-h-56 overflow-y-auto">
-                      {brandVisible.length === 0 ? (
-                          <div className="text-center py-6 text-xs text-muted-foreground">해당 브랜드가 없습니다</div>
-                      ) : brandVisible.map((brand) => (
-                          <button key={brand.name} onClick={() => { setSelectedBrand(brand.name); setBrandPanelOpen(false); setCurrentPage(1); }}
-                                  className={`w-full flex items-center gap-2.5 px-3 py-2 border-b border-border last:border-0 transition-colors text-left ${selectedBrand === brand.name ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground"}`}>
-                            <div className="w-7 h-7 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              <img src={brand.logo} alt={brand.name} className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                            </div>
-                            <span className="text-xs flex-1 truncate">{brand.name}</span>
-                            {selectedBrand === brand.name && <span className="text-primary font-bold text-xs">✓</span>}
-                          </button>
-                      ))}
-                    </div>
-                  </div>
-              )}
-            </div>
           </div>
 
           {/* 상품 목록 */}
@@ -637,7 +545,6 @@ export function AllProducts() {
               <p className="text-sm text-muted-foreground">
                 총 <span className="font-bold text-foreground">{filteredProducts.length}</span>개 상품
                 {selectedSubCategory && <span className="ml-2 text-primary font-medium">· {selectedSubCategory}</span>}
-                {selectedBrand && <span className="ml-2 text-primary font-medium">· {selectedBrand}</span>}
               </p>
               {totalPages > 1 && (
                   <p className="text-xs text-muted-foreground">{currentPage} / {totalPages} 페이지</p>
