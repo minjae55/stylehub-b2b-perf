@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
-    ArrowLeft, Package, FileText, FlaskConical, Clock,
+    ArrowLeft, ArrowRight, Package, FileText, FlaskConical, Clock,
     CheckCircle, XCircle, CreditCard,
     Send, Loader2, AlertTriangle, X, Ban,
 } from "lucide-react";
@@ -393,9 +393,19 @@ export function SellerSourcingDetail() {
                         <Ban size={16} /> 바이어가 요청을 철회하여 더 이상 진행되지 않는 요청입니다.
                     </div>
                 ) : myBid.status === "QUOTED" ? (
-                    <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-                        <CheckCircle size={16} />
-                        견적을 제출했습니다{myBid.responded_at && ` (${myBid.responded_at.slice(0, 10)})`}. 이후 진행 상황은 견적 관리에서 확인할 수 있습니다.
+                    <div className="flex items-center justify-between gap-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle size={16} className="flex-shrink-0" />
+                            <span>
+                                견적을 제출했습니다{myBid.responded_at && ` (${myBid.responded_at.slice(0, 10)})`}. 이후 진행 상황은 견적 관리에서 확인할 수 있습니다.
+                            </span>
+                        </div>
+                        <button
+                            onClick={() => navigate("/seller/quotes")}
+                            className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 bg-white border border-green-300 text-green-700 hover:bg-green-100 rounded font-semibold text-xs transition-colors"
+                        >
+                            견적 관리로 이동 <ArrowRight size={12} />
+                        </button>
                     </div>
                 ) : (
                     <div className="flex gap-2">

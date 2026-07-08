@@ -90,7 +90,9 @@ public class SourcingRequestDto {
         private final List<ItemResponse> items;
         private final List<FileResponse> files;
         private final List<BidResponse> bids;
-        // 취소(withdraw) 액션 가능 여부 — 작성자 본인 또는 회사 대표 + 취소 가능 상태(PENDING/QUOTED)일 때만 true
+        // 취소(withdraw) 액션 가능 여부 — 작성자 본인 또는 회사 대표 + 취소 가능 상태(PENDING)일 때만 true.
+        // 견적(QUOTED)이 하나라도 접수된 이후에는 셀러가 이미 제출한 견적을 보호하기 위해 취소 불가.
+        // (BuyerSourcingService.withdraw()의 상태 체크와 동일한 기준으로 유지할 것)
         private final Boolean canWithdraw;
 
         public static DetailResponse of(
@@ -103,8 +105,7 @@ public class SourcingRequestDto {
         ) {
             boolean isWriter = Objects.equals(req.getBuyer().getUserId(), actorUserId);
             boolean isPresident = "PRESIDENT".equals(actorRole);
-            boolean statusWithdrawable =
-                    req.getStatus() == SourcingStatus.PENDING || req.getStatus() == SourcingStatus.QUOTED;
+            boolean statusWithdrawable = req.getStatus() == SourcingStatus.PENDING;
             boolean canWithdraw = statusWithdrawable && (isWriter || isPresident);
             // bids는 호출부(Service)에서 이미 BidResponse.from(supplier, actorUserId, actorRole)로 매핑되어 넘어옴
 

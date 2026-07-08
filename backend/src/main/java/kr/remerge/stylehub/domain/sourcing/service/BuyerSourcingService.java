@@ -4,9 +4,6 @@ package kr.remerge.stylehub.domain.sourcing.service;
 import jakarta.persistence.Tuple;
 import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.category.repository.CategoryRepository;
-import kr.remerge.stylehub.domain.quote.constant.QuoteStatusCode;
-import kr.remerge.stylehub.domain.quote.entity.Quote;
-import kr.remerge.stylehub.domain.quote.repository.QuoteRepository;
 import kr.remerge.stylehub.domain.sourcing.dto.BuyerSourcingBoardResponse;
 import kr.remerge.stylehub.domain.sourcing.dto.BuyerSourcingCountResponse;
 import kr.remerge.stylehub.domain.sourcing.dto.BuyerSourcingResponse;
@@ -34,7 +31,6 @@ public class BuyerSourcingService {
     private final SourcingRequestRepository sourcingRequestRepository;
     private final SourcingSupplierRepository sourcingSupplierRepository;
     private final CategoryRepository categoryRepository;
-    private final QuoteRepository quoteRepository;
 
     // 진행중 그룹: 아직 채택 전 단계
     private static final List<SourcingStatus> ACTIVE_STATUSES =
@@ -150,33 +146,23 @@ public class BuyerSourcingService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
-        if (request.getStatus() != SourcingStatus.PENDING
-                && request.getStatus() != SourcingStatus.QUOTED) {
+        // 견적(QUOTED)이 하나라도 접수된 이후에는 철회 불가.
+        // 셀러가 이미 시간을 들여 제출한 견적을 바이어가 임의로 무효화하지 못하도록,
+        // 아직 어떤 공급사도 견적을 제출하지 않은 PENDING 단계에서만 철회를 허용한다.
+        if (request.getStatus() != SourcingStatus.PENDING) {
             throw new BusinessException(ErrorCode.SOURCING_WITHDRAW_NOT_ALLOWED);
         }
 
         // PENDING 단계에서도 자동배정으로 인해 SUGGESTED/RECOMMENDED 공급사가 이미 존재할 수 있으므로
-        // QUOTED 여부와 무관하게 살아있는 공급사 배정은 모두 무효화한다.
+        // 살아있는 공급사 배정은 모두 무효화한다.
+        // (위에서 PENDING 단계로 제한했으므로 이 시점에 QUOTED 상태 공급사는 존재할 수 없다)
         List<SourcingSupplier> suppliers = sourcingSupplierRepository
                 .findAllBySourcingRequest_SourcingRequestId(sourcingRequestId);
 
         suppliers.stream()
                 .filter(s -> s.getStatus() == SourcingSupplierStatus.SUGGESTED
-                        || s.getStatus() == SourcingSupplierStatus.RECOMMENDED
-                        || s.getStatus() == SourcingSupplierStatus.QUOTED)
+                        || s.getStatus() == SourcingSupplierStatus.RECOMMENDED)
                 .forEach(SourcingSupplier::cancelByBuyerWithdrawal);
-
-        // 견적 취소 처리는 실제로 견적이 제출된 경우(QUOTED)에만 필요
-        if (request.getStatus() == SourcingStatus.QUOTED) {
-            List<Quote> quotes = quoteRepository
-                    .findBySourcingRequest_SourcingRequestId(sourcingRequestId);
-
-            quotes.stream()
-                    .filter(q -> QuoteStatusCode.SUBMITTED.equals(q.getStatus())
-                            || QuoteStatusCode.NEGOTIATING.equals(q.getStatus())
-                            || QuoteStatusCode.SAMPLE_REQUESTED.equals(q.getStatus()))
-                    .forEach(q -> q.changeStatus(QuoteStatusCode.NOT_SELECTED));
-        }
 
         request.withdraw();
     }

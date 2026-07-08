@@ -74,10 +74,13 @@ const REQUEST_STATUS_STYLE: Record<RequestStatus, string> = {
   EXPIRED:     "bg-secondary text-muted-foreground border-border",
 };
 
-// 취소는 PENDING/QUOTED 단계에서만 가능 - 협의(NEGOTIATING) 시작 이후엔
-// 셀러 쪽도 이미 대응을 진행 중일 수 있어 일방적인 취소를 막음.
+// 취소는 PENDING 단계에서만 가능 - 견적(QUOTED)이 하나라도 접수된 이후에는
+// 셀러가 이미 시간을 들여 제출한 견적을 보호하기 위해 취소를 막음.
 // canWithdraw가 false인데 아직 종료 상태가 아닌 경우에만 사유를 안내.
 function getWithdrawUnavailableReason(status: RequestStatus): string | null {
+  if (status === "QUOTED") {
+    return "이미 견적을 제출한 공급사가 있어 취소할 수 없습니다.";
+  }
   if (status === "NEGOTIATING") {
     return "협의가 시작된 이후에는 요청을 취소할 수 없습니다.";
   }
@@ -117,7 +120,7 @@ function WithdrawConfirmModal({ onClose, onConfirm, isLoading }: {
           </div>
           <div className="px-6 py-5 space-y-4">
             <p className="text-sm text-foreground">
-              소싱 요청을 취소하면 배정된 공급사들의 견적이 모두 거절 처리됩니다.
+              소싱 요청을 취소하면 배정된 공급사에게 더 이상 요청이 노출되지 않습니다.
             </p>
             <p className="text-xs text-muted-foreground">취소 후에는 되돌릴 수 없습니다.</p>
             <div className="flex gap-2 pt-1">

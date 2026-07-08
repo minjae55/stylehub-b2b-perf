@@ -660,7 +660,7 @@ export function SellerRequestList() {
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center border border-border rounded px-3 py-2 gap-2 flex-1 min-w-[240px]">
                     <Search size={15} className="text-muted-foreground" />
-                    <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명, 요구사항 검색..." className="text-sm outline-none flex-1" />
+                    <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명/상세내용 검색" className="text-sm outline-none flex-1" />
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground">
                     <div onClick={() => setUrgentOnly(!urgentOnly)} className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${urgentOnly ? "bg-red-500" : "bg-[#ddd]"}`}>
