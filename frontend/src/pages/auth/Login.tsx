@@ -82,9 +82,13 @@ export function Login() {
             const user = await getMe();
             setUser(user);
 
-            if (user.role === "ADMIN") navigate("/admin");
-            else if (user.businessRole === "SELLER") navigate("/seller");
-            else navigate("/");
+            if (user.role === "ADMIN") {
+                window.location.href = "/admin";
+            } else if (user.businessRole === "SELLER") {
+                window.location.href = "/seller";
+            } else {
+                window.location.href = "/";
+            }
         } catch (err: any) {
             const responseData = err.response?.data;
             if (responseData?.code === "COMMON_001" && responseData?.data) {

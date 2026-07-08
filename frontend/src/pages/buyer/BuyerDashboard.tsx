@@ -17,15 +17,16 @@ import {
   Truck,
 } from "lucide-react";
 import {useEffect, useMemo, useState} from "react";
-import {buyerService} from "@/api/buyer/buyer.service"; // 실제 경로에 맞게 조정하세요
+import {buyerService} from "@/api/buyer/buyer.service";
 import type {
   BuyerDispute,
-  BuyerNegotiation,
-  BuyerOrder,
-  BuyerQuote,
-  BuyerSourcing,
+  BuyerNegotiationResponse,
+  BuyerOrderResponse,
+  BuyerQuoteResponse,
+  BuyerSourcingResponse,
   UrgentReceipt,
-} from "@/api/buyer/buyer.type"; // 실제 경로에 맞게 조정하세요
+} from "@/api/buyer/buyer.type";
+import {useAuthStore} from "@/store/useAuthStore";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -86,22 +87,23 @@ function EmptyRow({ message }: { message: string }) {
 
 // ── Data hook ─────────────────────────────────────────────────────────────────
 
+// 💡 백엔드 포맷 변경에 대응하도록 대시보드 상태 데이터 타입 구조 재정의
 interface BuyerDashboardData {
-  sourcingRequests: BuyerSourcing[];
-  quotes: BuyerQuote[];
-  negotiations: BuyerNegotiation[];
-  payments: BuyerOrder[];
-  shippings: BuyerOrder[];
-  receipts: UrgentReceipt[];
-  disputes: BuyerDispute[];
+  sourcingRequests: BuyerSourcingResponse;
+  quotes: BuyerQuoteResponse;
+  negotiations: BuyerNegotiationResponse;
+  payments: BuyerOrderResponse;
+  shippings: BuyerOrderResponse;
+  receipts: UrgentReceipt[]; // 아직 배열 규격 유지
+  disputes: BuyerDispute[];   // 아직 배열 규격 유지
 }
 
 const EMPTY_DATA: BuyerDashboardData = {
-  sourcingRequests: [],
-  quotes: [],
-  negotiations: [],
-  payments: [],
-  shippings: [],
+  sourcingRequests: {totalCount: 0, list: []},
+  quotes: {totalCount: 0, list: []},
+  negotiations: {totalCount: 0, list: []},
+  payments: {totalCount: 0, list: []},
+  shippings: {totalCount: 0, list: []},
   receipts: [],
   disputes: [],
 };
@@ -184,37 +186,38 @@ function AlertBanner({
 function StatCards({
                      sourcingRequests, quotes, negotiations, payments, disputes, receipts,
                    }: {
-  sourcingRequests: BuyerSourcing[];
-  quotes: BuyerQuote[];
-  negotiations: BuyerNegotiation[];
-  payments: BuyerOrder[];
+  sourcingRequests: BuyerSourcingResponse;
+  quotes: BuyerQuoteResponse;
+  negotiations: BuyerNegotiationResponse;
+  payments: BuyerOrderResponse;
   disputes: BuyerDispute[];
   receipts: UrgentReceipt[];
 }) {
   const cards = [
     {
-      label: "소싱 요청", count: sourcingRequests.length,
+      // 💡 count 출력 및 filter를 돌릴 때 모두 .totalCount 및 .list로 차분하게 접근하도록 변경
+      label: "소싱 요청", count: sourcingRequests.totalCount,
       icon: <Plus size={16}/>,
       href: "/buyer/my-sourcing",
-      urgent: sourcingRequests.filter((r) => r.daysUntilExpiry <= 2).length,
+      urgent: sourcingRequests.list?.filter((r) => r.daysUntilExpiry <= 2).length,
       urgentLabel: "만료 임박",
     },
     {
-      label: "견적 수신", count: quotes.length,
+      label: "견적 수신", count: quotes.totalCount,
       icon: <FileText size={16}/>,
       href: "/buyer/quotes?status=RECEIVED",
-      urgent: quotes.filter((q) => q.isUrgent).length,
+      urgent: quotes.list?.filter((q) => q.isUrgent).length,
       urgentLabel: "만료 임박",
     },
     {
-      label: "협의 진행", count: negotiations.length,
+      label: "협의 진행", count: negotiations.totalCount,
       icon: <MessageSquare size={16}/>,
       href: "/negotiations",
-      urgent: negotiations.filter((n) => n.hasUnread).length,
+      urgent: negotiations.list?.filter((n) => n.hasUnread).length,
       urgentLabel: "미확인 메시지",
     },
     {
-      label: "결제 대기", count: payments.length,
+      label: "결제 대기", count: payments.totalCount,
       icon: <CreditCard size={16}/>,
       href: "/buyer/orders?status=PAYMENT_PENDING",
       urgent: 0, urgentLabel: "",
@@ -222,7 +225,7 @@ function StatCards({
     {
       label: "이의 제기", count: disputes.length,
       icon: <Scale size={16}/>,
-      href: "/disputes",
+      href: "orders/disputes",
       urgent: disputes.filter((d) => d.status === "RECEIVED").length,
       urgentLabel: "답변 필요",
     },
@@ -317,21 +320,22 @@ function ReceiptPanel({receipts}: { receipts: UrgentReceipt[] }) {
 
 // ── Panel: 소싱 요청 ──────────────────────────────────────────────────────────
 
-function SourcingPanel({sourcingRequests}: { sourcingRequests: BuyerSourcing[] }) {
+function SourcingPanel({sourcingRequests}: { sourcingRequests: BuyerSourcingResponse }) {
   return (
       <div className="bg-white border border-border rounded-xl overflow-hidden">
         <SectionHeader
             icon={<Plus size={15}/>}
             title="소싱 요청 중"
-            count={sourcingRequests.length}
+            count={sourcingRequests.totalCount} // 💡 totalCount 매핑
             href="/buyer/my-sourcing"
             accent={ACCENT}
         />
-        {sourcingRequests.length === 0 ? (
+        {sourcingRequests.totalCount === 0 ? (
             <EmptyRow message="진행 중인 소싱 요청이 없습니다."/>
         ) : (
             <div className="divide-y divide-border">
-              {sourcingRequests.slice(0, 5).map((r) => {
+              {/* 💡 .list에서 슬라이싱해서 렌더링하도록 변경 */}
+              {sourcingRequests.list?.slice(0, 5).map((r) => {
                 const isExpiringSoon = r.daysUntilExpiry <= 2;
                 return (
                     <Link
@@ -376,21 +380,22 @@ function SourcingPanel({sourcingRequests}: { sourcingRequests: BuyerSourcing[] }
 
 // ── Panel: 견적 수신 ──────────────────────────────────────────────────────────
 
-function QuotePanel({quotes}: { quotes: BuyerQuote[] }) {
+function QuotePanel({quotes}: { quotes: BuyerQuoteResponse }) {
   return (
       <div className="bg-white border border-border rounded-xl overflow-hidden">
         <SectionHeader
             icon={<FileText size={15}/>}
             title="견적 수신"
-            count={quotes.length}
+            count={quotes.totalCount} // 💡 totalCount 매핑
             href="/buyer/quotes?status=RECEIVED"
             accent={ACCENT}
         />
-        {quotes.length === 0 ? (
+        {quotes.totalCount === 0 ? (
             <EmptyRow message="수신된 견적이 없습니다."/>
         ) : (
             <div className="divide-y divide-border">
-              {quotes.slice(0, 5).map((q) => (
+              {/* 💡 .list에서 데이터 맵핑 */}
+              {quotes.list.slice(0, 5).map((q) => (
                   <Link
                       key={q.quoteId}
                       to={`/buyer/quotes/${q.quoteId}`}
@@ -422,21 +427,22 @@ function QuotePanel({quotes}: { quotes: BuyerQuote[] }) {
 
 // ── Panel: 협의 진행 ──────────────────────────────────────────────────────────
 
-function NegotiationPanel({negotiations}: { negotiations: BuyerNegotiation[] }) {
+function NegotiationPanel({negotiations}: { negotiations: BuyerNegotiationResponse }) {
   return (
       <div className="bg-white border border-border rounded-xl overflow-hidden">
         <SectionHeader
             icon={<MessageSquare size={15}/>}
             title="협의 진행"
-            count={negotiations.length}
+            count={negotiations.totalCount} // 💡 totalCount 매핑
             href="/negotiations"
             accent={ACCENT}
         />
-        {negotiations.length === 0 ? (
+        {negotiations.totalCount === 0 ? (
             <EmptyRow message="진행 중인 협의가 없습니다."/>
         ) : (
             <div className="divide-y divide-border">
-              {negotiations.slice(0, 5).map((n) => (
+              {/* 💡 .list에서 데이터 맵핑 */}
+              {negotiations.list.slice(0, 5).map((n) => (
                   <Link
                       key={n.negotiationId}
                       to={`/buyer/negotiations/${n.negotiationId}`}
@@ -467,21 +473,22 @@ function NegotiationPanel({negotiations}: { negotiations: BuyerNegotiation[] }) 
 
 // ── Panel: 결제 대기 ──────────────────────────────────────────────────────────
 
-function PaymentPanel({payments}: { payments: BuyerOrder[] }) {
+function PaymentPanel({payments}: { payments: BuyerOrderResponse }) {
   return (
       <div className="bg-white border border-border rounded-xl overflow-hidden">
         <SectionHeader
             icon={<CreditCard size={15}/>}
             title="결제 대기"
-            count={payments.length}
+            count={payments.totalCount} // 💡 totalCount 매핑
             href="/buyer/orders?status=PAYMENT_PENDING"
             accent={ACCENT}
         />
-        {payments.length === 0 ? (
+        {payments.totalCount === 0 ? (
             <EmptyRow message="결제 대기 중인 주문이 없습니다."/>
         ) : (
             <div className="divide-y divide-border">
-              {payments.slice(0, 5).map((p) => (
+              {/* 💡 .list에서 데이터 맵핑 */}
+              {payments.list.slice(0, 5).map((p) => (
                   <Link
                       key={p.orderId}
                       to={`/buyer/orders/${p.orderId}`}
@@ -507,21 +514,22 @@ function PaymentPanel({payments}: { payments: BuyerOrder[] }) {
 
 // ── Panel: 배송 중 ────────────────────────────────────────────────────────────
 
-function ShippingPanel({shippings}: { shippings: BuyerOrder[] }) {
+function ShippingPanel({shippings}: { shippings: BuyerOrderResponse }) {
   return (
       <div className="bg-white border border-border rounded-xl overflow-hidden">
         <SectionHeader
             icon={<Truck size={15}/>}
             title="배송 중"
-            count={shippings.length}
+            count={shippings.totalCount} // 💡 totalCount 매핑
             href="/buyer/orders?status=SHIPPING"
             accent={ACCENT}
         />
-        {shippings.length === 0 ? (
+        {shippings.totalCount === 0 ? (
             <EmptyRow message="배송 중인 주문이 없습니다."/>
         ) : (
             <div className="divide-y divide-border">
-              {shippings.slice(0, 5).map((s) => (
+              {/* 💡 .list에서 데이터 맵핑 */}
+              {shippings.list.slice(0, 5).map((s) => (
                   <Link
                       key={s.orderId}
                       to={`/buyer/orders/${s.orderId}`}
@@ -576,7 +584,7 @@ function DisputePanel({disputes}: { disputes: BuyerDispute[] }) {
           </span>
           </div>
           <Link
-              to="/buyer/disputes"
+              to="/buyer/orders/disputes"
               className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 transition-colors"
           >
             전체 보기 <ChevronRight size={12}/>
@@ -590,7 +598,7 @@ function DisputePanel({disputes}: { disputes: BuyerDispute[] }) {
                 {disputes.map((d) => (
                     <Link
                         key={d.disputeId}
-                        to={`/buyer/disputes/${d.disputeId}`}
+                        to={`/buyer/orders/disputes/${d.disputeId}`}
                         className="flex items-center gap-3 px-4 py-3.5 hover:bg-red-50/30 transition-colors group"
                     >
                       <AlertCircle size={14} className="text-red-400 shrink-0"/>
@@ -624,25 +632,43 @@ function DisputePanel({disputes}: { disputes: BuyerDispute[] }) {
 
 // ── Main Export ───────────────────────────────────────────────────────────────
 
-type UserRole = "buyer" | "seller";
-// business_role: "BUYER" | "SELLER" | "BOTH" — BOTH인 경우에만 전환 버튼 노출
+type JobRole = "PRESIDENT" | "EMPLOYEE";
 type BusinessRole = "BUYER" | "SELLER" | "BOTH";
+
+const JOB_ROLE_BADGE: Record<JobRole, { label: string; className: string }> = {
+  PRESIDENT: {label: "대표", className: "bg-purple-50 text-purple-700 border-purple-200"},
+  EMPLOYEE: {label: "직원", className: "bg-slate-50 text-slate-600 border-slate-200"},
+};
+
+const BUSINESS_ROLE_BADGE: Record<BusinessRole, { label: string; className: string }> = {
+  BUYER: {label: "구매 권한", className: "bg-blue-50 text-blue-700 border-blue-200"},
+  SELLER: {label: "판매 권한", className: "bg-emerald-50 text-emerald-700 border-emerald-200"},
+  BOTH: {label: "통합 권한", className: "bg-indigo-50 text-indigo-700 border-indigo-200"},
+};
 
 export function BuyerDashboard() {
   const navigate = useNavigate();
-  const businessRole: BusinessRole = "BOTH"; // DB에서 가져올 값
-  const [role] = useState<UserRole>("buyer");
+
+  const user = useAuthStore((state) => state.user);
+  const businessRole = user?.businessRole as BusinessRole;
+  const jobRole = user?.role as JobRole | undefined;
+  const companyName = user?.companyName ?? "회사 미등록";
+  const logoUrl = user?.logoUrl;
+  const userName = user?.name;
 
   const {
     sourcingRequests, quotes, negotiations, payments, shippings, receipts, disputes,
     isLoading, error,
   } = useBuyerDashboardData();
 
+  // 💡 알림 종 모양 뱃지에 쓸 전체 건수 계산식도 totalCount 구조에 맞추어 보정
   const totalCount = useMemo(
-      () => sourcingRequests.length + quotes.length + negotiations.length + payments.length + receipts.length + disputes.length,
+      () => sourcingRequests.totalCount + quotes.totalCount + negotiations.totalCount + payments.totalCount + receipts.length + disputes.length,
       [sourcingRequests, quotes, negotiations, payments, receipts, disputes],
   );
-  const urgentSourcingCount = useMemo(() => sourcingRequests.filter((r) => r.daysUntilExpiry <= 2).length, [sourcingRequests]);
+
+  // 💡 상단 만료 임박 추출 필터링도 .list 내부 배열을 타깃으로 잡도록 수정
+  const urgentSourcingCount = useMemo(() => sourcingRequests.list?.filter((r) => r.daysUntilExpiry <= 2).length, [sourcingRequests]);
   const urgentReceiptsCount = useMemo(() => receipts.filter((r) => r.daysElapsed >= 5).length, [receipts]);
 
   return (
@@ -653,35 +679,53 @@ export function BuyerDashboard() {
 
             {/* 좌: 회사명 + 타이틀 */}
             <div className="min-w-0 flex-1">
-              <div
-                  className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+              <div className="mb-2 flex items-center gap-1.5">
+              <span
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
                 <ShoppingBag size={12}/>
                 구매관리
+              </span>
+                {jobRole && (
+                    <span
+                        className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${JOB_ROLE_BADGE[jobRole].className}`}>
+                  {JOB_ROLE_BADGE[jobRole].label}
+                </span>
+                )}
+                {businessRole && (
+                    <span
+                        className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${BUSINESS_ROLE_BADGE[businessRole].className}`}>
+                  {BUSINESS_ROLE_BADGE[businessRole].label}
+                </span>
+                )}
               </div>
-              <h1 className="text-xl font-black text-slate-950">
-                스타일위크㈜
-              </h1>
+
+              <div className="flex items-center gap-2">
+                {logoUrl && (
+                    <img src={logoUrl} alt={companyName} className="w-6 h-6 rounded object-cover"/>
+                )}
+                <h1 className="text-xl font-black text-slate-950">
+                  {companyName}
+                </h1>
+              </div>
+
               <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
-                구매 현황을 한눈에 소싱 요청, 견적 검토, 발주 결제, 배송 및 수령 확인을 통합 관리할 수 있습니다.
+                {userName}님, 구매 현황을 한눈에 소싱 요청, 견적 검토, 발주 결제, 배송 및 수령 확인을 통합 관리할 수 있습니다.
               </p>
             </div>
-
             {/* 우: 2행 레이아웃 */}
             <div className="flex shrink-0 flex-col items-end gap-2.5">
 
-              {/* 윗줄: 역할 전환 · 알림(뱃지) · 설정 */}
               <div className="flex items-center gap-2">
                 {businessRole === "BOTH" && (
                     <button
-                        onClick={() => navigate(role === "buyer" ? "/seller" : "/buyer")}
-                        className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
+                        onClick={() => navigate("/seller")}
+                        className="flex h-[34px] items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
                     >
-                      {role === "buyer" ? <Layers size={13}/> : <ShoppingBag size={13}/>}
-                      {role === "buyer" ? "공급관리로 전환" : "구매관리로 전환"}
+                      <Layers size={13}/>
+                      판매관리로 전환
                     </button>
                 )}
 
-                {/* 알림 — 업무 수 뱃지 */}
                 <div className="relative">
                   <button
                       className="flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100"
@@ -706,7 +750,6 @@ export function BuyerDashboard() {
                 </Link>
               </div>
 
-              {/* 아랫줄: 새 소싱 요청 */}
               <div className="flex items-center gap-2">
                 <Link
                     to="../buyer/sourcing-request"
@@ -733,14 +776,12 @@ export function BuyerDashboard() {
             </div>
         ) : (
             <>
-              {/* ── 긴급 알림 배너 ── */}
               <AlertBanner
                   urgentReceipts={urgentReceiptsCount}
                   urgentSourcing={urgentSourcingCount}
                   disputes={disputes.length}
               />
 
-              {/* ── KPI 카드 (6칸) ── */}
               <StatCards
                   sourcingRequests={sourcingRequests}
                   quotes={quotes}
@@ -750,17 +791,14 @@ export function BuyerDashboard() {
                   receipts={receipts}
               />
 
-              {/* ── 수령 확인 (긴급, full-width, 있을 때만) ── */}
               {receipts.length > 0 && <ReceiptPanel receipts={receipts}/>}
 
-              {/* ── 소싱요청 + 견적수신 + 협의진행 ── */}
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <SourcingPanel sourcingRequests={sourcingRequests}/>
                 <QuotePanel quotes={quotes}/>
                 <NegotiationPanel negotiations={negotiations}/>
               </div>
 
-              {/* ── 결제대기 + 배송중 + 이의제기 ── */}
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <PaymentPanel payments={payments}/>
                 <ShippingPanel shippings={shippings}/>

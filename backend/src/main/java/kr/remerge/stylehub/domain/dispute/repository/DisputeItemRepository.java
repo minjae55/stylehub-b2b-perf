@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface DisputeItemRepository extends JpaRepository<DisputeItem, Integer> {
@@ -21,6 +22,15 @@ public interface DisputeItemRepository extends JpaRepository<DisputeItem, Intege
     List<Dispute> findAssignedDisputes(
             @Param("companyId") Integer companyId,
             @Param("userId") Integer userId
+    );
+
+    @Query("""
+            SELECT di FROM DisputeItem di
+            JOIN FETCH di.orderItem oi
+            WHERE di.dispute.disputeId IN :disputeIds
+            """)
+    List<DisputeItem> findByDisputeIds(
+            @Param("disputeIds") Collection<Integer> disputeIds
     );
 
 }

@@ -3,10 +3,13 @@ package kr.remerge.stylehub.domain.order.repository;
 import io.lettuce.core.dynamic.annotation.Param;
 import kr.remerge.stylehub.domain.order.entity.Order;
 import kr.remerge.stylehub.domain.order.enumtype.OrderStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -81,4 +84,70 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     Optional<Order> findOneByOrderId(Integer orderId);
 
     List<Order> findByOrderNoIn(List<String> orderNos);
+
+    // 여러 OrderStatus 조건(IN)에 맞는 주문 최신 5개 조회 (Limit 5)
+    @Query("""
+            
+                    SELECT o FROM Order o
+                    JOIN FETCH o.buyer b
+                    JOIN FETCH o.sellerCompany c
+                    WHERE b.company.companyId = :buyerCompanyId
+              AND o.status IN :statuses
+              AND (:role = 'PRESIDENT' OR b.userId = :userId)
+                    ORDER BY o.createdAt DESC
+            """)
+    List<Order> findTop5BuyerOrders(
+            @Param("buyerCompanyId") Integer buyerCompanyId,
+            @Param("statuses") Collection<OrderStatus> statuses,
+            @Param("userId") Integer userId,
+            @Param("role") String role,
+            Pageable pageable
+    );
+
+    // 여러 OrderStatus 조건(IN)에 맞는 주문의 전체 총 건수 조회
+    @Query("""
+            
+                    SELECT COUNT(o) FROM Order o
+            JOIN o.buyer b
+            WHERE b.company.companyId = :buyerCompanyId
+              AND (:role = 'PRESIDENT' OR b.userId = :userId)
+              AND o.status IN :statuses
+            """)
+    long countAllBuyerOrders(
+            @Param("buyerCompanyId") Integer buyerCompanyId,
+            @Param("statuses") Collection<OrderStatus> statuses,
+            @Param("userId") Integer userId,
+            @Param("role") String role
+    );
+
+    // 임박 주문
+    @Query("""
+            SELECT o FROM Order o
+            JOIN FETCH o.buyer b
+            LEFT JOIN FETCH o.sellerCompany c
+            WHERE b.userId = :buyerId
+              AND o.status IN :statuses
+              AND o.deliveredAt <= :urgentThresholdDate
+            ORDER BY o.deliveredAt ASC
+            """)
+    List<Order> findTop5UrgentReceipts(
+            @Param("buyerId") Integer buyerId,
+            @Param("statuses") Collection<OrderStatus> statuses,
+            @Param("urgentThresholdDate") LocalDateTime urgentThresholdDate,
+            Pageable pageable
+    );
+
+    // [셀러 4, 5, 7] 주문 및 정산 내역 조회 (회사 ID 기준)
+    @Query("""
+            SELECT o FROM Order o
+            JOIN FETCH o.buyer b
+            WHERE o.sellerCompany.companyId = :sellerCompanyId
+              AND o.status IN :statuses
+            ORDER BY o.createdAt DESC
+            """)
+    List<Order> findTop5SellerOrders(
+            @Param("sellerCompanyId") Integer sellerCompanyId,
+            @Param("statuses") Collection<OrderStatus> statuses,
+            Pageable pageable
+    );
 }

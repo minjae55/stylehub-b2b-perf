@@ -30,24 +30,27 @@ public class DashboardController {
      * GET /api/dashboard/sourcing-requests/buyer?status=PENDING,QUOTED,NEGOTIATING
      */
     @GetMapping("/sourcing-requests/buyer")
-    public ResponseEntity<ApiResponse<List<BuyerSourcingDashboardResponse>>> getBuyerSourcingRequests(
+    public ResponseEntity<ApiResponse<BuyerSourcingDashboardListResponse>> getBuyerSourcingRequests(
             @LoginUser AuthUser authUser,
             @RequestParam(value = "status", required = false, defaultValue = "PENDING,QUOTED,NEGOTIATING") String status
     ) {
-        List<BuyerSourcingDashboardResponse> data = dashboardService.getBuyerSourcingDashboardList(authUser.userId(), status);
+        // 💡 서비스 레이어에서 묶음 객체(Record)를 반환하므로 타입을 일치시켜 줍니다.
+        BuyerSourcingDashboardListResponse data = dashboardService.getBuyerSourcingDashboardList(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
+
         return ResponseEntity.ok(ApiResponse.success(data));
     }
-
     /**
      * [바이어 2] 받은 견적 내역 조회
      * GET /api/dashboard/quotes/buyer?status=SUBMITTED
      */
     @GetMapping("/quotes/buyer")
-    public ResponseEntity<ApiResponse<List<BuyerQuoteDashboardResponse>>> getBuyerReceivedQuotes(
+    public ResponseEntity<ApiResponse<BuyerQuoteDashboardListResponse>> getBuyerReceivedQuotes(
             @LoginUser AuthUser authUser,
-            @RequestParam(value = "status", required = false, defaultValue = "SUBMITTED") String status
+            @RequestParam(value = "status", required = false, defaultValue = "PENDING,QUOTED,NEGOTIATING") String status
     ) {
-        List<BuyerQuoteDashboardResponse> data = dashboardService.getBuyerReceivedQuotes(authUser.userId(), status);
+        BuyerQuoteDashboardListResponse data = dashboardService.getBuyerReceivedQuotes(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
@@ -56,25 +59,26 @@ public class DashboardController {
      * GET /api/dashboard/negotiations/buyer?status=OPEN
      */
     @GetMapping("/negotiations/buyer")
-    public ResponseEntity<ApiResponse<List<BuyerNegotiationDashboardResponse>>> getBuyerNegotiations(
+    public ResponseEntity<ApiResponse<BuyerNegotiationDashboardListResponse>> getBuyerNegotiations(
             @LoginUser AuthUser authUser,
             @RequestParam(value = "status", required = false, defaultValue = "OPEN") String status
     ) {
-        List<BuyerNegotiationDashboardResponse> data = dashboardService.getBuyerNegotiations(authUser.userId(), status);
+        BuyerNegotiationDashboardListResponse data = dashboardService.getBuyerNegotiations(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
-
     /**
      * [바이어 4 & 5] 결제 대기 및 배송 중 주문 목록 조회 (상태값 분기)
      * GET /api/dashboard/orders/buyer?status=PENDING
      * GET /api/dashboard/orders/buyer?status=SHIPPED
      */
     @GetMapping("/orders/buyer")
-    public ResponseEntity<ApiResponse<List<BuyerOrderDashboardResponse>>> getBuyerOrders(
+    public ResponseEntity<ApiResponse<BuyerOrderDashboardListResponse>> getBuyerOrders(
             @LoginUser AuthUser authUser,
-            @RequestParam(value = "status") String status
+            @RequestParam(value = "status", required = false, defaultValue = "PENDING") String status
     ) {
-        List<BuyerOrderDashboardResponse> data = dashboardService.getBuyerOrders(authUser.userId(), status);
+        BuyerOrderDashboardListResponse data = dashboardService.getBuyerOrders(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
@@ -110,80 +114,83 @@ public class DashboardController {
 
     /**
      * [셀러 1] 신규 소싱 요청 피드 조회
-     * GET /api/dashboard/sourcing-requests/seller?status=PENDING
      */
     @GetMapping("/sourcing-requests/seller")
     public ResponseEntity<ApiResponse<List<SellerSourcingFeedResponse>>> getSellerNewSourcingRequests(
             @LoginUser AuthUser authUser,
             @RequestParam(value = "status", required = false, defaultValue = "PENDING") String status
     ) {
-        List<SellerSourcingFeedResponse> data = dashboardService.getSellerSourcingFeedList(authUser.companyId(), status);
+        List<SellerSourcingFeedResponse> data = dashboardService.getSellerSourcingFeedList(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
     /**
      * [셀러 2] 작성 중이거나 마감 임박인 견적서 조회
-     * GET /api/dashboard/quotes/seller?status=DRAFT
      */
     @GetMapping("/quotes/seller")
     public ResponseEntity<ApiResponse<List<QuoteDraftDashboardResponse>>> getSellerQuoteDrafts(
             @LoginUser AuthUser authUser,
             @RequestParam(value = "status", required = false, defaultValue = "DRAFT") String status
     ) {
-        List<QuoteDraftDashboardResponse> data = dashboardService.getSellerQuoteDrafts(authUser.companyId(), status);
+        List<QuoteDraftDashboardResponse> data = dashboardService.getSellerQuoteDrafts(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
     /**
      * [셀러 3] 대화 및 협의 목록 조회
-     * GET /api/dashboard/negotiations/seller?status=OPEN
      */
     @GetMapping("/negotiations/seller")
     public ResponseEntity<ApiResponse<List<SellerNegotiationDashboardResponse>>> getSellerNegotiations(
             @LoginUser AuthUser authUser,
             @RequestParam(value = "status", required = false, defaultValue = "OPEN") String status
     ) {
-        List<SellerNegotiationDashboardResponse> data = dashboardService.getSellerNegotiations(authUser.companyId(), status);
+        // 💡 파라미터 매치 컴파일 오류 교정
+        List<SellerNegotiationDashboardResponse> data = dashboardService.getSellerNegotiations(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
     /**
-     * [셀러 4 & 5] 출고 대기 및 배송 흐름/확정 대기 목록 조회 (상태값 분기)
-     * GET /api/dashboard/orders/seller?status=PREPARING
-     * GET /api/dashboard/orders/seller?status=SHIPPED,DELIVERED
+     * [셀러 4 & 5] 출고 대기 및 배송 흐름 목록 조회
      */
     @GetMapping("/orders/seller")
     public ResponseEntity<ApiResponse<List<SellerShipmentDashboardResponse>>> getSellerOrders(
             @LoginUser AuthUser authUser,
-            @RequestParam(value = "status") String status
+            @RequestParam(value = "status", required = false, defaultValue = "PREPARING") String status
     ) {
-        List<SellerShipmentDashboardResponse> data = dashboardService.getSellerOrders(authUser.companyId(), status);
+        // 💡 파라미터 매치 컴파일 오류 교정
+        List<SellerShipmentDashboardResponse> data = dashboardService.getSellerOrders(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
     /**
      * [셀러 6] 구매자가 제기한 클레임 분쟁 건 조회
-     * GET /api/dashboard/disputes/seller?status=RECEIVED
      */
     @GetMapping("/disputes/seller")
     public ResponseEntity<ApiResponse<List<SellerDisputeDashboardResponse>>> getSellerActiveDisputes(
             @LoginUser AuthUser authUser,
             @RequestParam(value = "status", required = false, defaultValue = "RECEIVED") String status
     ) {
-        List<SellerDisputeDashboardResponse> data = dashboardService.getSellerActiveDisputes(authUser.companyId(), status);
+        // 💡 파라미터 매치 컴파일 오류 교정
+        List<SellerDisputeDashboardResponse> data = dashboardService.getSellerActiveDisputes(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
     /**
      * [셀러 7] 정산 예정 내역 조회
-     * GET /api/dashboard/settlements/seller?status=PENDING
      */
     @GetMapping("/settlements/seller")
     public ResponseEntity<ApiResponse<List<SellerSettlementDashboardResponse>>> getSellerPendingSettlements(
             @LoginUser AuthUser authUser,
             @RequestParam(value = "status", required = false, defaultValue = "PENDING") String status
     ) {
-        List<SellerSettlementDashboardResponse> data = dashboardService.getSellerPendingSettlements(authUser.companyId(), status);
+        // 💡 파라미터 매치 컴파일 오류 교정
+        List<SellerSettlementDashboardResponse> data = dashboardService.getSellerPendingSettlements(
+                authUser.companyId(), authUser.userId(), authUser.role(), status);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 }

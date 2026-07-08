@@ -75,3 +75,18 @@ export interface SellerSettlement {
     finalAmount: number;
     confirmedAt: string;
 }
+
+// ── 백엔드 포맷 변경 대응 공통 래퍼 타입 ───────────────────
+
+export interface DashboardListResponse<T> {
+    totalCount: number;
+    list: T[];
+}
+
+export type SellerSourcingRequestResponse = DashboardListResponse<SellerSourcingRequest>;
+export type QuoteDraftResponse = DashboardListResponse<QuoteDraft>;
+export type SellerNegotiationResponse = DashboardListResponse<SellerNegotiation>;
+export type SellerShipmentResponse = DashboardListResponse<SellerShipment>;
+export type SellerTransitResponse = DashboardListResponse<SellerTransit>;
+export type SellerDisputeResponse = DashboardListResponse<SellerDispute>;
+export type SellerSettlementResponse = DashboardListResponse<SellerSettlement>;

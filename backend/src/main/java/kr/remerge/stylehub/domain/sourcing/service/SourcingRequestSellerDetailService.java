@@ -28,7 +28,7 @@ public class SourcingRequestSellerDetailService {
 
     @Transactional(readOnly = true)
     public SourcingRequestSellerDetailResponse getSellerSourcingDetail(
-            Integer sourcingRequestId, Integer sellerCompanyId) {
+            Integer sourcingRequestId, Integer sellerCompanyId, Integer userId, String role) {
 
         SourcingRequest request = sourcingRequestRepository.findById(sourcingRequestId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SOURCING_NOT_FOUND));
@@ -40,6 +40,16 @@ public class SourcingRequestSellerDetailService {
                 .filter(s -> s.getStatus() != SourcingSupplierStatus.SUGGESTED
                         && s.getStatus() != SourcingSupplierStatus.REJECTED)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SOURCING_SUPPLIER_NOT_FOUND));
+
+        // 견적(quote)이 아직 없으면(=담당자 미지정) 회사 전체 열람 가능,
+        // 있으면 그 견적을 작성한 직원 본인 또는 대표만 열람 가능
+        boolean isPresident = "PRESIDENT".equals(role);
+        boolean hasQuote = mySupplier.getQuote() != null;
+        boolean isQuoteWriter = hasQuote && mySupplier.getQuote().getSeller().getUserId().equals(userId);
+
+        if (hasQuote && !isPresident && !isQuoteWriter) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
 
         // categoryId가 없을 수도 있으므로 null-safe 하게 조회
         String categoryName = request.getCategoryId() != null

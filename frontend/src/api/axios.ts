@@ -55,15 +55,32 @@ api.interceptors.response.use(
         // 요청 정보가 없으면 그대로 에러 반환
         if (!config) return Promise.reject(error);
 
-        // refresh / auth 관련 요청은 재인증 대상에서 제외
-        const isAuthEndpoint = config.url?.includes("/auth");
+        const PUBLIC_ENDPOINTS = [
+            "/auth",
+            "/ws",
+            "/login",
+            "/oauth2",
+            "/error",
+            "/upload/image",
+            "/company/ocr",
+            "/company/verify",
+            "/company/lookup",
+            "/users/signup",
+            "/categories/main"
+        ];
+
+        // 요청 API URL에 인증 예외 주소가 포함되어 있는지 확인
+        const isAuthEndpoint = PUBLIC_ENDPOINTS.some(path => config.url?.includes(path));
+
+        // 현재 브라우저의 실제 주소창 위치가 /auth로 시작하는지 확인
+        const isCurrentlyOnAuthPage = window.location.pathname.startsWith("/auth");
 
         /* ─────────────────────────────
            401 Unauthorized 처리
            - Access Token 만료 상황
-           - refresh token으로 재발급 시도
+           - 현재 /auth 페이지에 있거나 인증 예외 API 주소라면 refresh를 시도하지 않음
         ───────────────────────────── */
-        if (status === 401 && !(config as any)._retry && !isAuthEndpoint) {
+        if (status === 401 && !(config as any)._retry && !isAuthEndpoint && !isCurrentlyOnAuthPage) {
             (config as any)._retry = true; // 무한 retry 방지
 
             /**

@@ -45,11 +45,17 @@ public class BuyerSourcingService {
             List.of(SourcingStatus.CANCELLED, SourcingStatus.WITHDRAWN, SourcingStatus.EXPIRED);
 
     @Transactional(readOnly = true)
-    public BuyerSourcingBoardResponse getBuyerSourcingBoard(Integer buyerCompanyId, String type, String statusGroup) {
+    public BuyerSourcingBoardResponse getBuyerSourcingBoard(
+            Integer buyerCompanyId, Integer userId, String role, String type, String statusGroup) {
 
+        boolean isPresident = "PRESIDENT".equals(role);
+
+        // 대표는 회사 전체 요청 조회, 직원은 본인이 작성한 요청만 조회
         // 타입 기준 전체를 한 번만 조회 → 카운트와 필터링 모두 여기서 재사용 (쿼리 중복 방지)
-        List<SourcingRequest> allRequests = sourcingRequestRepository
-                .findByBuyerCompanyIdAndTypeOrderByCreatedAtDesc(buyerCompanyId, type);
+        List<SourcingRequest> allRequests = isPresident
+                ? sourcingRequestRepository.findByBuyerCompanyIdAndTypeOrderByCreatedAtDesc(buyerCompanyId, type)
+                : sourcingRequestRepository.findByBuyerCompanyIdAndTypeAndBuyer_UserIdOrderByCreatedAtDesc(
+                buyerCompanyId, type, userId);
 
         BuyerSourcingCountResponse counts = buildCounts(allRequests);
 

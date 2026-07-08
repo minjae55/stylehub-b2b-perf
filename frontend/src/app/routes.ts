@@ -47,7 +47,6 @@ import {SellerProductRegister} from "@/pages/product/SellerProductRegister";
 import {SellerQuoteWrite} from "@/pages/quote/SellerQuoteWrite";
 import {SellerQuoteList} from "@/pages/quote/SellerQuoteList";
 import BuyerQuoteList from "@/pages/quote/BuyerQuoteList";
-import { QuoteDetail } from "@/pages/quote/QuoteDetail";
 import {QuoteDetailBuyer, QuoteDetailSeller} from "@/pages/quote/QuoteDetailWrappers";
 
 import {SellerDashboard} from "@/pages/seller/SellerDashboard";
@@ -104,7 +103,7 @@ export const router = createBrowserRouter([
                     {path: "restricted-businesses", Component: RestrictedBusinessTypes},
                     {path: "supplier-register", Component: SupplierRegister},
                     {path: "mypage", Component: MyPage},
-                    {path: "settings", Component: CompanySettings},
+                    {path: "settings", Component: CompanySettings, handle: {role: "PRESIDENT"}},
                     {path: "partner", Component: PartnerPlan},
 
                     // Order Flow

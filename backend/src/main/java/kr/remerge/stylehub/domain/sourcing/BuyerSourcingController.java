@@ -22,9 +22,9 @@ public class BuyerSourcingController {
             @RequestParam(required = false) String status,
             @LoginUser AuthUser user
     ) {
-        Integer buyerCompanyId = user.companyId();
         BuyerSourcingBoardResponse response =
-                buyerSourcingService.getBuyerSourcingBoard(buyerCompanyId, type, status);
+                buyerSourcingService.getBuyerSourcingBoard(
+                        user.companyId(), user.userId(), user.role(), type, status);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

@@ -1,8 +1,11 @@
 package kr.remerge.stylehub.domain.negotiation.repository;
 
+import io.lettuce.core.dynamic.annotation.Param;
 import kr.remerge.stylehub.domain.negotiation.entity.NegotiationRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,4 +35,17 @@ public interface NegotiationRequestRepository
     findFirstByNegotiation_NegotiationIdOrderByCreatedAtDesc(
             Integer negotiationId
     );
+
+    // 💡 최신 5개 협의방의 가장 마지막 메시지(buyerRequest)들을 단 1번의 쿼리로 모아오는 최적화 쿼리
+    @Query("""
+            SELECT nr FROM NegotiationRequest nr
+            JOIN FETCH nr.negotiation n
+            WHERE nr.negotiation.negotiationId IN :negotiationIds
+              AND nr.createdAt = (
+                  SELECT MAX(sub.createdAt) 
+                  FROM NegotiationRequest sub 
+                  WHERE sub.negotiation.negotiationId = n.negotiationId
+              )
+            """)
+    List<NegotiationRequest> findLatestRequestsByNegotiationIds(@Param("negotiationIds") Collection<Integer> negotiationIds);
 }

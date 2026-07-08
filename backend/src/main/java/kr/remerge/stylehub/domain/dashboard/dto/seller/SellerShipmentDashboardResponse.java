@@ -15,9 +15,9 @@ public class SellerShipmentDashboardResponse {
     private final Integer qty;
     private final Long subtotalAmount;
     private final String paidAt;
-    private final String shipByDate;
-    private final Boolean isDue;     // 마감 임박 (예: 1일 이내)
-    private final Boolean isOverdue; // 마감 초과
+    private final String shipByDate; // 또는 화면 연동 기준일 (배송 예정일 등)
+    private final Boolean isDue;
+    private final Boolean isOverdue; 
 
     private SellerShipmentDashboardResponse(Integer orderId, String orderNo, String productName, String buyerName, Integer qty,
                                             Long subtotalAmount, String paidAt, String shipByDate, Boolean isDue, Boolean isOverdue) {

@@ -31,7 +31,8 @@ public class SellerSourcingController {
             @RequestParam(defaultValue = "RECOMMENDED") SourcingSupplierStatus status
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                sellerSourcingService.getSellerRequests(authUser.companyId(), type, status)));
+                sellerSourcingService.getSellerRequests(
+                        authUser.companyId(), type, status, authUser.userId(), authUser.role())));
     }
 
     // past: DECLINED + EXPIRED
@@ -41,7 +42,8 @@ public class SellerSourcingController {
             @RequestParam String type
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                sellerSourcingService.getSellerPastRequests(authUser.companyId(), type)));
+                sellerSourcingService.getSellerPastRequests(
+                        authUser.companyId(), type, authUser.userId(), authUser.role())));
     }
 
     // 셀러용 소싱 요청 상세 조회 (다른 회사 견적은 포함하지 않음)
@@ -51,7 +53,8 @@ public class SellerSourcingController {
             @PathVariable Integer sourcingRequestId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                sourcingRequestSellerDetailService.getSellerSourcingDetail(sourcingRequestId, authUser.companyId())));
+                sourcingRequestSellerDetailService.getSellerSourcingDetail(
+                        sourcingRequestId, authUser.companyId(), authUser.userId(), authUser.role())));
     }
 
     // 거절
@@ -72,6 +75,7 @@ public class SellerSourcingController {
             @RequestParam String type
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                sellerSourcingService.getSellerCompletedRequests(authUser.companyId(), type)));
+                sellerSourcingService.getSellerCompletedRequests(
+                        authUser.companyId(), type, authUser.userId(), authUser.role())));
     }
 }

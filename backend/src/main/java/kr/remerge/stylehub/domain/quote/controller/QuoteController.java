@@ -34,7 +34,7 @@ public class QuoteController {
             @PathVariable Integer sourcingRequestId
     ) {
         SourcingRequestSellerDetailResponse response = sourcingRequestSellerDetailService
-                .getSellerSourcingDetail(sourcingRequestId, authUser.companyId());
+                .getSellerSourcingDetail(sourcingRequestId, authUser.companyId(), authUser.userId(), authUser.role());
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

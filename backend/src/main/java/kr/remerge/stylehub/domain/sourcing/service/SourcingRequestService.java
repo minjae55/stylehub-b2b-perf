@@ -56,6 +56,13 @@ public class SourcingRequestService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
+        // 대표는 회사 전체 요청 조회 가능, 직원은 본인이 작성한 요청만 조회 가능
+        boolean isPresident = "PRESIDENT".equals(role);
+        boolean isWriter = request.getBuyer().getUserId().equals(userId);
+        if (!isPresident && !isWriter) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
         List<SourcingRequestDto.ItemResponse> items =
                 sourcingRequestItemRepository.findBySourcingRequest_SourcingRequestId(sourcingRequestId)
                         .stream()

@@ -5,7 +5,22 @@ import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.category.repository.CategoryRepository;
 import kr.remerge.stylehub.domain.dashboard.dto.buyer.*;
 import kr.remerge.stylehub.domain.dashboard.dto.seller.*;
+import kr.remerge.stylehub.domain.dispute.entity.Dispute;
+import kr.remerge.stylehub.domain.dispute.entity.DisputeItem;
+import kr.remerge.stylehub.domain.dispute.enumtype.DisputeStatus;
+import kr.remerge.stylehub.domain.dispute.repository.DisputeItemRepository;
+import kr.remerge.stylehub.domain.dispute.repository.DisputeRepository;
+import kr.remerge.stylehub.domain.negotiation.entity.Negotiation;
+import kr.remerge.stylehub.domain.negotiation.entity.NegotiationRequest;
+import kr.remerge.stylehub.domain.negotiation.repository.NegotiationRepository;
+import kr.remerge.stylehub.domain.negotiation.repository.NegotiationRequestRepository;
+import kr.remerge.stylehub.domain.order.entity.Order;
+import kr.remerge.stylehub.domain.order.entity.OrderItem;
+import kr.remerge.stylehub.domain.order.enumtype.OrderStatus;
+import kr.remerge.stylehub.domain.order.repository.OrderItemRepository;
+import kr.remerge.stylehub.domain.order.repository.OrderRepository;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
+import kr.remerge.stylehub.domain.quote.repository.QuoteItemRepository;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequest;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingRequestItem;
 import kr.remerge.stylehub.domain.sourcing.entity.SourcingSupplier;
@@ -15,12 +30,14 @@ import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestItemReposit
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingRequestRepository;
 import kr.remerge.stylehub.domain.sourcing.repository.SourcingSupplierRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,6 +51,13 @@ public class DashboardService {
     private final SourcingRequestItemRepository sourcingRequestItemRepository;
     private final SourcingSupplierRepository sourcingSupplierRepository;
     private final CategoryRepository categoryRepository;
+    private final NegotiationRequestRepository negotiationRequestRepository;
+    private final NegotiationRepository negotiationRepository;
+    private final QuoteItemRepository quoteItemRepository;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final DisputeRepository disputeRepository;
+    private final DisputeItemRepository disputeItemRepository;
 
     // =================================================================
     // ── BUYER DASHBOARD SERVICES (바이어 7개 비즈니스 로직) ──
@@ -41,34 +65,59 @@ public class DashboardService {
 
     /**
      * [바이어 1] 소싱 요청 목록 조회
+     * 대표는 회사 전체, 직원은 본인이 작성한 요청만 조회 가능
      */
-    public List<BuyerSourcingDashboardResponse> getBuyerSourcingDashboardList(Integer buyerCompanyId, String statusStr) {
-        List<SourcingStatus> statuses = parseSourcingStatuses(statusStr);
+    public BuyerSourcingDashboardListResponse getBuyerSourcingDashboardList(
+            Integer buyerCompanyId, Integer userId, String role, String statusStr) {
 
-        List<SourcingRequest> requests = sourcingRequestRepository
-                .findByBuyerCompanyIdAndStatusInOrderByCreatedAtDesc(
-                        buyerCompanyId, statuses
-                );
+        List<SourcingStatus> statuses = java.util.Arrays.stream(statusStr.split(","))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .map(s -> {
+                    try {
+                        return SourcingStatus.valueOf(s);
+                    } catch (IllegalArgumentException e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
 
-        if (requests.isEmpty()) return Collections.emptyList();
+        if (statuses.isEmpty()) {
+            statuses = List.of(SourcingStatus.PENDING, SourcingStatus.QUOTED, SourcingStatus.NEGOTIATING);
+        }
 
+        // 1. DB에서 전체 대기중인 '총 개수' 구하기
+        long totalCount = sourcingRequestRepository.countAllBuyerDashboardFeeds(
+                buyerCompanyId, statuses, userId, role
+        );
+
+        // 2. 화면 목록용 최신 5개 데이터 가져오기
+        Pageable topFive = PageRequest.of(0, 5);
+        List<SourcingRequest> requests = sourcingRequestRepository.findTop5BuyerDashboardFeeds(
+                buyerCompanyId, statuses, userId, role, topFive
+        );
+
+        if (requests.isEmpty()) {
+            return new BuyerSourcingDashboardListResponse(totalCount, Collections.emptyList());
+        }
+
+        // 3. 5개의 ID를 추출하여 대용량 매핑 맵(Map) 조립
         List<Integer> requestIds = requests.stream()
                 .map(SourcingRequest::getSourcingRequestId)
                 .collect(Collectors.toList());
 
-        // 카테고리 맵 조립
+        // 💡 람다 final 에러 해결: 선언과 조립을 한 번에 끝내 effectively final 상태로 유지
         Set<Integer> categoryIds = requests.stream()
                 .map(SourcingRequest::getCategoryId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Map<Integer, String> categoryMap = new HashMap<>();
-        if (!categoryIds.isEmpty()) {
-            categoryMap = categoryRepository.findAllById(categoryIds).stream()
-                    .collect(Collectors.toMap(Category::getCategoryId, Category::getCategoryName));
-        }
+        Map<Integer, String> categoryMap = categoryIds.isEmpty() ? Collections.emptyMap() :
+                categoryRepository.findAllById(categoryIds).stream()
+                        .collect(Collectors.toMap(Category::getCategoryId, Category::getCategoryName));
 
-        // 견적 제출 수 맵 조립 (Group By 튜닝)
+        // 견적 제출 수 맵 조립
         List<Tuple> bidCountsTuple = sourcingSupplierRepository
                 .countByStatusGroupedByRequestId(requestIds, SourcingSupplierStatus.QUOTED);
 
@@ -81,136 +130,385 @@ public class DashboardService {
                 (oldVal, newVal) -> newVal
         ));
 
-        // 최종 DTO 매핑
+        // 💡 추가 보정: DTO에 필요한 총 수량(qty) 필드를 채우기 위한 묶음 단일 조회 (N+1 최적화)
+        List<Tuple> qtyTuples = sourcingRequestItemRepository.sumQuantityGroupedByRequestId(requestIds);
+        Map<Integer, Integer> qtyMap = qtyTuples.stream().collect(Collectors.toMap(
+                t -> t.get("requestId", Integer.class),
+                t -> {
+                    Long sum = t.get("sum", Long.class);
+                    return sum != null ? sum.intValue() : 0;
+                },
+                (oldVal, newVal) -> newVal
+        ));
+
+        // 4. 최종 변환 및 응답 반환
+        // 💡 private 액세스 에러 해결: 직접 생성자 호출을 제거하고 정해진 DTO.of(...) static 메서드를 태워 호출
         Map<Integer, String> finalCategoryMap = categoryMap;
-        return requests.stream().map(req -> {
-            List<SourcingRequestItem> items = sourcingRequestItemRepository
-                    .findBySourcingRequest_SourcingRequestId(req.getSourcingRequestId());
-
-            int totalQty = items.stream().mapToInt(item -> item.getQuantity() != null ? item.getQuantity() : 0).sum();
-
-            Integer bidCount = bidCountMap.getOrDefault(req.getSourcingRequestId(), 0);
+        List<BuyerSourcingDashboardResponse> list = requests.stream().map(req -> {
             String categoryName = finalCategoryMap.getOrDefault(req.getCategoryId(), "미지정");
+            int bidCount = bidCountMap.getOrDefault(req.getSourcingRequestId(), 0);
+            int totalQty = qtyMap.getOrDefault(req.getSourcingRequestId(), 0);
 
             return BuyerSourcingDashboardResponse.of(req, categoryName, totalQty, bidCount);
         }).collect(Collectors.toList());
+
+        return new BuyerSourcingDashboardListResponse(totalCount, list);
     }
 
     /**
-     * [바이어 2] 받은 견적 내역 조회
+     * [바이어 2] 견적 수신 목록 조회
      */
-    public List<BuyerQuoteDashboardResponse> getBuyerReceivedQuotes(Integer buyerCompanyId, String statusStr) {
+    public BuyerQuoteDashboardListResponse getBuyerReceivedQuotes(
+            Integer buyerCompanyId, Integer userId, String role, String statusStr) {
+
+        // 바이어에게 들어온 '활성화된' 소싱 상태 정의
         List<SourcingStatus> activeStatuses = List.of(SourcingStatus.PENDING, SourcingStatus.QUOTED, SourcingStatus.NEGOTIATING);
-        List<SourcingRequest> myRequests = sourcingRequestRepository
-                .findByBuyerCompanyIdAndTypeAndStatusInOrderByCreatedAtDesc(buyerCompanyId, "SOURCING", activeStatuses);
 
-        if (myRequests.isEmpty()) return Collections.emptyList();
+        // 1. DB에서 조건에 맞는 받은 견적의 '진짜 전체 총 개수'를 광속으로 구합니다.
+        long totalCount = sourcingSupplierRepository.countAllReceivedQuotes(
+                buyerCompanyId, activeStatuses, userId, role
+        );
 
-        List<Integer> requestIds = myRequests.stream()
-                .map(SourcingRequest::getSourcingRequestId)
-                .collect(Collectors.toList());
+        // 2. 화면 목록에 뿌려줄 딱 '최신 5개'의 견적 공급업체 데이터만 잘라옵니다.
+        Pageable topFive = PageRequest.of(0, 5);
+        List<SourcingSupplier> activeSuppliers = sourcingSupplierRepository.findTop5ReceivedQuotes(
+                buyerCompanyId, activeStatuses, userId, role, topFive
+        );
 
-        List<SourcingSupplier> activeSuppliers = new ArrayList<>();
-        for (Integer reqId : requestIds) {
-            activeSuppliers.addAll(sourcingSupplierRepository.findAllBySourcingRequest_SourcingRequestId(reqId));
+        if (activeSuppliers.isEmpty()) {
+            return new BuyerQuoteDashboardListResponse(totalCount, Collections.emptyList());
         }
 
-        return activeSuppliers.stream()
-                .filter(ss -> ss.getQuote() != null)
-                .map(ss -> {
-                    SourcingRequest sr = ss.getSourcingRequest();
-                    Quote quote = ss.getQuote();
-
-                    List<SourcingRequestItem> items = sourcingRequestItemRepository
-                            .findBySourcingRequest_SourcingRequestId(sr.getSourcingRequestId());
-                    int totalQty = items.stream().mapToInt(item -> item.getQuantity() != null ? item.getQuantity() : 0).sum();
-
-                    String sellerCompanyName = "공급사 " + ss.getSellerCompanyId();
-
-                    // 💡 Quote 엔티티 내부 필드가 아직 미확정 상태이므로 컴파일 에러를 막기 위한 가바인딩 조치
-                    return BuyerQuoteDashboardResponse.of(
-                            quote.getQuoteId(),
-                            "Q-" + quote.getQuoteId(),
-                            sr.getProductName(),
-                            sellerCompanyName,
-                            totalQty,
-                            sr.getUnitPrice() != null ? sr.getUnitPrice() : 0L,   // SourcingRequest의 단가 등으로 대체 방어
-                            sr.getTotalBudget() != null ? sr.getTotalBudget() : 0L, // SourcingRequest의 예산 등으로 대체 방어
-                            "SUBMITTED",
-                            sr.getExpiryDate() != null ? sr.getExpiryDate().atStartOfDay() : LocalDateTime.now()
-                    );
-                })
+        // 3. N+1 문제 방지: 딱 5개의 소싱 요청 ID만 모아서 아이템 총 수량을 한방에 긁어옵니다.
+        List<Integer> requestIds = activeSuppliers.stream()
+                .map(ss -> ss.getSourcingRequest().getSourcingRequestId())
+                .distinct()
                 .collect(Collectors.toList());
+
+        // 소싱요청별 총 아이템 수량 그룹화 쿼리 호출 (아까 소싱목록에서 권장드렸던 최적화 기법!)
+        List<Tuple> qtyTuples = sourcingRequestItemRepository.sumQuantityGroupedByRequestId(requestIds);
+        Map<Integer, Integer> qtyMap = qtyTuples.stream().collect(Collectors.toMap(
+                t -> t.get("requestId", Integer.class),
+                t -> {
+                    Long sum = t.get("sum", Long.class);
+                    return sum != null ? sum.intValue() : 0;
+                },
+                (o, n) -> n
+        ));
+
+        // 4. 최종 딱 5개 데이터에 대해서만 DTO 매핑 수행 (루프 내 DB 조회 0건!)
+        List<BuyerQuoteDashboardResponse> dtoList = activeSuppliers.stream().map(ss -> {
+            SourcingRequest sr = ss.getSourcingRequest();
+            Quote quote = ss.getQuote();
+
+            // 매번 DB 안 가고, 위에서 단 1번의 쿼리로 만들어둔 수량 맵에서 쏙 꺼내옵니다.
+            int totalQty = qtyMap.getOrDefault(sr.getSourcingRequestId(), 0);
+            String sellerCompanyName = "공급사 " + ss.getSellerCompanyId();
+
+            return BuyerQuoteDashboardResponse.of(
+                    quote.getQuoteId(),
+                    "Q-" + quote.getQuoteId(),
+                    sr.getProductName(),
+                    sellerCompanyName,
+                    totalQty,
+                    sr.getUnitPrice() != null ? sr.getUnitPrice() : 0L,
+                    sr.getTotalBudget() != null ? sr.getTotalBudget() : 0L,
+                    "SUBMITTED",
+                    sr.getExpiryDate() != null ? sr.getExpiryDate().atStartOfDay() : LocalDateTime.now()
+            );
+        }).collect(Collectors.toList());
+
+        // 5. 포장 상자에 담아서 리턴
+        return new BuyerQuoteDashboardListResponse(totalCount, dtoList);
     }
 
     /**
      * [바이어 3] 협의 진행중 내역 조회
      */
-    public List<BuyerNegotiationDashboardResponse> getBuyerNegotiations(Integer buyerId, String statusStr) {
-        // TODO: 실제 대화/협의 테이블 조회 로직 연동 예정
-        return List.of(
-                new BuyerNegotiationDashboardResponse(1, "샘플 가디건", "A 공급사", 100, "단가 협의의 건", "OPEN", "최종 단가 확인 부탁드립니다.", LocalDateTime.now(), true)
+    public BuyerNegotiationDashboardListResponse getBuyerNegotiations(
+            Integer buyerCompanyId, Integer userId, String role, String statusStr) {
+
+        List<String> statuses = List.of("OPEN");
+
+        // 1. 진짜 전체 대기 건수
+        long totalCount = negotiationRepository.countAllBuyerNegotiations(
+                buyerCompanyId, statuses, userId, role
         );
+
+        // 2. 최신 5개 데이터 조회
+        Pageable topFive = PageRequest.of(0, 5);
+        List<Negotiation> negotiations = negotiationRepository.findTop5BuyerNegotiations(
+                buyerCompanyId, statuses, userId, role, topFive
+        );
+
+        if (negotiations.isEmpty()) {
+            return new BuyerNegotiationDashboardListResponse(totalCount, Collections.emptyList());
+        }
+
+        // 3. N+1 방지: 최신 메시지 조립용 ID 추출
+        List<Integer> negoIds = negotiations.stream()
+                .map(Negotiation::getNegotiationId)
+                .collect(Collectors.toList());
+
+        List<NegotiationRequest> latestRequests = negotiationRequestRepository.findLatestRequestsByNegotiationIds(negoIds);
+        Map<Integer, String> lastMessageMap = latestRequests.stream().collect(Collectors.toMap(
+                nr -> nr.getNegotiation().getNegotiationId(),
+                NegotiationRequest::getBuyerRequest,
+                (o, n) -> n
+        ));
+
+        // 4. [수량 최적화 핵심] 5개 데이터 중 존재하는 견적 ID만 골라내기
+        List<Integer> quoteIds = negotiations.stream()
+                .map(n -> n.getQuote() != null ? n.getQuote().getQuoteId() : null)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        final Map<Integer, Integer> finalQuoteQtyMap = quoteIds.isEmpty()
+                ? Collections.emptyMap()
+                : quoteItemRepository.sumQuantityGroupedByQuoteId(quoteIds).stream()
+                .collect(Collectors.toMap(
+                        t -> t.get("quoteId", Integer.class),
+                        t -> {
+                            Long sum = t.get("sum", Long.class);
+                            return sum != null ? sum.intValue() : 0;
+                        },
+                        (o, n) -> n
+                ));
+
+        // 5. 루프 돌며 DTO 조립 (변수가 final이므로 에러 없음!)
+        List<BuyerNegotiationDashboardResponse> dtoList = negotiations.stream().map(n -> {
+
+            String lastMessage = lastMessageMap.getOrDefault(n.getNegotiationId(), "진행 중인 협의 내용이 있습니다.");
+            String sellerCompanyName = n.getSeller() != null ? "공급사 " + n.getSeller().getName() : "미지정 공급사";
+
+            int qty = 0;
+            if (n.getQuote() != null) {
+                qty = finalQuoteQtyMap.getOrDefault(n.getQuote().getQuoteId(), 0);
+            }
+
+            return new BuyerNegotiationDashboardResponse(
+                    n.getNegotiationId(),
+                    n.getQuote() != null ? n.getQuote().getProductName() : n.getTitle(),
+                    sellerCompanyName,
+                    qty,
+                    n.getTitle(),
+                    n.getStatus(),
+                    lastMessage,
+                    n.getUpdatedAt(),
+                    false
+            );
+        }).collect(Collectors.toList());
+
+        return new BuyerNegotiationDashboardListResponse(totalCount, dtoList);
     }
 
     /**
      * [바이어 4 & 5] 결제 대기 및 배송 중 주문 목록 조회
      */
-    public List<BuyerOrderDashboardResponse> getBuyerOrders(Integer buyerId, String statusStr) {
-        // TODO: 주문(Order) 도메인 테이블 연동 예정
-        return List.of(
-                new BuyerOrderDashboardResponse(1, "ORD-001", "샘플 가디건", "A 공급사", 100, 1500000L, statusStr, LocalDateTime.now(), false, "CJ대한통운", "123456789")
-        );
+    public BuyerOrderDashboardListResponse getBuyerOrders(
+            Integer buyerCompanyId, Integer userId, String role, String statusStr) {
+
+        List<OrderStatus> statuses = Arrays.stream(statusStr.split(","))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .map(s -> {
+                    try {
+                        return OrderStatus.valueOf(s);
+                    } catch (IllegalArgumentException e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        if (statuses.isEmpty()) {
+            statuses = List.of(OrderStatus.PENDING);
+        }
+
+        // 1. 주문 마스터(Order) 기준으로 전체 카운트를 조회합니다.
+        long totalCount = orderRepository.countAllBuyerOrders(buyerCompanyId, statuses, userId, role);
+
+        // 2. 주문 마스터(Order) 기준으로 최신 5개 주문 데이터만 자릅니다.
+        Pageable topFive = PageRequest.of(0, 5);
+        List<Order> orders = orderRepository.findTop5BuyerOrders(buyerCompanyId, statuses, userId, role, topFive);
+
+        if (orders.isEmpty()) {
+            return new BuyerOrderDashboardListResponse(totalCount, Collections.emptyList());
+        }
+
+        // 3. 딱 5개의 주문 ID만 추출해서 하위 품목(OrderItem)들을 N+1 없이 단 1번의 쿼리로 긁어옵니다.
+        List<Integer> orderIds = orders.stream().map(Order::getOrderId).collect(Collectors.toList());
+        List<OrderItem> allItems = orderItemRepository.findByOrderIds(orderIds);
+
+        // 4. 추출한 자식 품목들을 주문 ID별로 그룹핑 맵(Map)을 생성합니다.
+        Map<Integer, List<OrderItem>> orderItemsGroupByMap = allItems.stream()
+                .collect(Collectors.groupingBy(oi -> oi.getOrder().getOrderId()));
+
+        // 5. 각 주문별로 자식 아이템들을 파싱하여 "첫번째 상품명 외 N건" 및 "총 수량"을 조립합니다.
+        List<BuyerOrderDashboardResponse> dtoList = orders.stream().map(o -> {
+            List<OrderItem> items = orderItemsGroupByMap.getOrDefault(o.getOrderId(), Collections.emptyList());
+
+            String productName = "주문 상품 정보 없음";
+            int totalQty = 0;
+
+            if (!items.isEmpty()) {
+                String firstItemName = items.get(0).getProductName();
+                totalQty = items.stream().mapToInt(OrderItem::getQuantity).sum();
+
+                // 💡 품목 개수가 2개 이상일 때만 "외 N건" 처리를 진행합니다.
+                productName = items.size() > 1 ? firstItemName + " 외 " + (items.size() - 1) + "건" : firstItemName;
+            }
+
+            return new BuyerOrderDashboardResponse(
+                    o.getOrderId(),
+                    o.getOrderNo(),
+                    productName,                  // 묶인 상품명 반영 ("트렌치 코트 외 2건")
+                    o.getSellerCompanyName(),
+                    totalQty,                     // 주문 내 모든 품목 합산 수량 반영
+                    o.getTotalAmount(),
+                    o.getStatus().name(),
+                    o.getCreatedAt(),
+                    false,
+                    o.getCarrier(),
+                    o.getTrackingNumber()
+            );
+        }).collect(Collectors.toList());
+
+        return new BuyerOrderDashboardListResponse(totalCount, dtoList);
     }
 
     /**
      * [바이어 6] 이의제기 진행 내역 조회
+     * 대표는 회사 전체, 직원은 본인이 접수한 이의제기만 조회 가능 스펙 바인딩
      */
     public List<BuyerDisputeDashboardResponse> getBuyerActiveDisputes(Integer buyerId, String statusStr) {
-        // TODO: 클레임/분쟁(Dispute) 도메인 연동 예정
-        return List.of(
-                new BuyerDisputeDashboardResponse(1, "샘플 가디건", "A 공급사", "오염 발생의 건", "DEFECT", "제품 하단에 이염이 심합니다.", "UNDER_REVIEW", LocalDateTime.now())
-        );
+        List<DisputeStatus> statuses = Arrays.stream(statusStr.split(","))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .map(s -> {
+                    try {
+                        return DisputeStatus.valueOf(s);
+                    } catch (IllegalArgumentException e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        if (statuses.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Pageable topFive = PageRequest.of(0, 5);
+        List<Dispute> disputes = disputeRepository.findTop5BuyerDisputes(buyerId, statuses, topFive);
+
+        if (disputes.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Integer> disputeIds = disputes.stream().map(Dispute::getDisputeId).collect(Collectors.toList());
+        List<DisputeItem> disputeItems = disputeItemRepository.findByDisputeIds(disputeIds);
+        Map<Integer, List<DisputeItem>> itemsGroupMap = disputeItems.stream()
+                .collect(Collectors.groupingBy(di -> di.getDispute().getDisputeId()));
+
+        return disputes.stream().map(d -> {
+            List<DisputeItem> items = itemsGroupMap.getOrDefault(d.getDisputeId(), Collections.emptyList());
+            String productName = "정보 없음";
+            if (!items.isEmpty()) {
+                String firstProductName = items.get(0).getOrderItem().getProductName();
+                productName = items.size() > 1 ? firstProductName + " 외 " + (items.size() - 1) + "건" : firstProductName;
+            } else if (d.getOrder() != null) {
+                productName = d.getOrder().getOrderNo();
+            }
+
+            String sellerName = d.getSellerCompany() != null ? d.getSellerCompany().getName() : "미지정 공급사";
+
+            return new BuyerDisputeDashboardResponse(
+                    d.getDisputeId(),
+                    productName,
+                    sellerName,
+                    d.getTitle(),
+                    d.getDisputeType().name(),
+                    d.getBuyerClaim(),
+                    d.getStatus().name(),
+                    d.getCreatedAt()
+            );
+        }).collect(Collectors.toList());
     }
 
     /**
      * [바이어 7] 자동확정 임박 건 조회
+     * 배송 완료 상태 조건 매핑 및 경과 일수 필터 최적화 연동
      */
     public List<UrgentReceiptDashboardResponse> getBuyerUrgentReceipts(Integer buyerId) {
-        // TODO: 배송 완료 후 5일 이상 지난 배송 데이터 필터링 연동 예정
-        return List.of(
-                new UrgentReceiptDashboardResponse(1, "ORD-001", "샘플 가디건", "A 공급사", 100, 6)
+        Pageable topFive = PageRequest.of(0, 5);
+
+        // 현재 시간 기준 5일 전 시점 계산 (이 시점보다 이전에 배송 완료된 건이 5일 이상 경과된 건)
+        LocalDateTime urgentThresholdDate = LocalDateTime.now().minusDays(5);
+
+        List<Order> orders = orderRepository.findTop5UrgentReceipts(
+                buyerId,
+                List.of(OrderStatus.SHIPPED, OrderStatus.DELIVERED),
+                urgentThresholdDate,
+                topFive
         );
+
+        if (orders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Integer> orderIds = orders.stream().map(Order::getOrderId).collect(Collectors.toList());
+        List<OrderItem> allItems = orderItemRepository.findByOrderIds(orderIds);
+        Map<Integer, List<OrderItem>> orderItemsGroupByMap = allItems.stream()
+                .collect(Collectors.groupingBy(oi -> oi.getOrder().getOrderId()));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        return orders.stream().map(o -> {
+            List<OrderItem> items = orderItemsGroupByMap.getOrDefault(o.getOrderId(), Collections.emptyList());
+            String productName = "주문 상품 정보 없음";
+            int totalQty = 0;
+
+            if (!items.isEmpty()) {
+                String firstItemName = items.get(0).getProductName();
+                totalQty = items.stream().mapToInt(OrderItem::getQuantity).sum();
+                productName = items.size() > 1 ? firstItemName + " 외 " + (items.size() - 1) + "건" : firstItemName;
+            }
+
+            // 경과 일수 계산 기준을 o.getDeliveredAt()으로 변경하여 신뢰성 확보
+            long daysElapsed = 0;
+            if (o.getDeliveredAt() != null) {
+                daysElapsed = ChronoUnit.DAYS.between(o.getDeliveredAt(), now);
+            }
+
+            return new UrgentReceiptDashboardResponse(
+                    o.getOrderId(),
+                    o.getOrderNo(),
+                    productName,
+                    o.getSellerCompanyName(),
+                    totalQty,
+                    (int) daysElapsed
+            );
+        }).collect(Collectors.toList());
     }
 
-
+// =================================================================
+    // ── SELLER DASHBOARD SERVICES (셀러 7개 비즈니스 로직 완전 교정) ──
     // =================================================================
-    // ── SELLER DASHBOARD SERVICES (셀러 7개 비즈니스 로직) ──
-    // =================================================================
 
-    /**
-     * [셀러 1] 신규 소싱 요청 피드 조회
-     */
-    public List<SellerSourcingFeedResponse> getSellerSourcingFeedList(Integer sellerCompanyId, String statusStr) {
-        // 💡 [교정] ASSIGNED 대신 실제 존재하는 RECOMMENDED 상태 사용
-        List<SourcingSupplier> suppliers = sourcingSupplierRepository.findSellerRequests(
-                sellerCompanyId,
-                SourcingSupplierStatus.RECOMMENDED,
-                "SOURCING"
-        );
+    public List<SellerSourcingFeedResponse> getSellerSourcingFeedList(
+            Integer sellerCompanyId, Integer sellerUserId, String role, String statusStr) {
+        Pageable topFive = PageRequest.of(0, 5);
+        List<SourcingSupplier> suppliers = sourcingSupplierRepository.findTop5SellerFeeds(
+                sellerCompanyId, SourcingSupplierStatus.RECOMMENDED, topFive);
 
         if (suppliers.isEmpty()) return Collections.emptyList();
 
-        List<SourcingRequest> requests = suppliers.stream()
-                .map(SourcingSupplier::getSourcingRequest)
-                .collect(Collectors.toList());
+        List<SourcingRequest> requests = suppliers.stream().map(SourcingSupplier::getSourcingRequest).collect(Collectors.toList());
+        Set<Integer> categoryIds = requests.stream().map(SourcingRequest::getCategoryId).filter(Objects::nonNull).collect(Collectors.toSet());
 
-        Set<Integer> categoryIds = requests.stream()
-                .map(SourcingRequest::getCategoryId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        Map<Integer, String> categoryMap = new HashMap<>();
+        Map<Integer, String> categoryMap = Collections.emptyMap();
         if (!categoryIds.isEmpty()) {
             categoryMap = categoryRepository.findAllById(categoryIds).stream()
                     .collect(Collectors.toMap(Category::getCategoryId, Category::getCategoryName));
@@ -218,104 +516,135 @@ public class DashboardService {
 
         Map<Integer, String> finalCategoryMap = categoryMap;
         return requests.stream().map(req -> {
-            List<SourcingRequestItem> items = sourcingRequestItemRepository
-                    .findBySourcingRequest_SourcingRequestId(req.getSourcingRequestId());
-
+            List<SourcingRequestItem> items = sourcingRequestItemRepository.findBySourcingRequest_SourcingRequestId(req.getSourcingRequestId());
             int totalQty = items.stream().mapToInt(item -> item.getQuantity() != null ? item.getQuantity() : 0).sum();
-
-            // 💡 [교정] 무리한 객체 그래프 탐색 대신 엔티티 내의 buyerCompanyId를 직접 활용하여 에러 제거
-            String buyerCompanyName = "바이어 회사 " + req.getBuyerCompanyId();
-            String categoryName = finalCategoryMap.getOrDefault(req.getCategoryId(), "미지정");
-
-            return SellerSourcingFeedResponse.of(req, buyerCompanyName, categoryName, totalQty);
+            return SellerSourcingFeedResponse.of(req, "바이어 회사 " + req.getBuyerCompanyId(), finalCategoryMap.getOrDefault(req.getCategoryId(), "미지정"), totalQty);
         }).collect(Collectors.toList());
     }
 
-    /**
-     * [셀러 2] 작성 중이거나 마감 임박인 견적서 조회
-     */
-    public List<QuoteDraftDashboardResponse> getSellerQuoteDrafts(Integer sellerCompanyId, String statusStr) {
-        // 💡 [교정] ASSIGNED 대신 실제 존재하는 RECOMMENDED 상태 사용
-        List<SourcingSupplier> sellerAllocations = sourcingSupplierRepository.findSellerRequests(
-                sellerCompanyId,
-                SourcingSupplierStatus.RECOMMENDED,
-                "SOURCING"
-        );
+    public List<QuoteDraftDashboardResponse> getSellerQuoteDrafts(
+            Integer sellerCompanyId, Integer sellerUserId, String role, String statusStr) {
+        Pageable topFive = PageRequest.of(0, 5);
+        List<SourcingSupplier> sellerAllocations = sourcingSupplierRepository.findTop5SellerQuoteDrafts(sellerCompanyId, SourcingSupplierStatus.RECOMMENDED, topFive);
 
-        return sellerAllocations.stream()
-                .map(ss -> {
-                    SourcingRequest sr = ss.getSourcingRequest();
+        if (sellerAllocations.isEmpty()) return Collections.emptyList();
 
-                    List<SourcingRequestItem> items = sourcingRequestItemRepository
-                            .findBySourcingRequest_SourcingRequestId(sr.getSourcingRequestId());
-                    int totalQty = items.stream().mapToInt(item -> item.getQuantity() != null ? item.getQuantity() : 0).sum();
+        List<Integer> requestIds = sellerAllocations.stream().map(ss -> ss.getSourcingRequest().getSourcingRequestId()).collect(Collectors.toList());
+        Map<Integer, Integer> qtyMap = sourcingRequestItemRepository.sumQuantityGroupedByRequestId(requestIds).stream()
+                .collect(Collectors.toMap(t -> t.get("requestId", Integer.class), t -> {
+                    Long sum = t.get("sum", Long.class);
+                    return sum != null ? sum.intValue() : 0;
+                }, (o, n) -> n));
 
-                    String buyerName = "바이어 회사 " + sr.getBuyerCompanyId();
-
-                    Long totalAmount = sr.getTotalBudget();
-                    Integer quoteId = ss.getSourcingSupplierSId(); // 💡 [교정] 실제 Id 필드명 매핑 완료
-
-                    return QuoteDraftDashboardResponse.of(
-                            quoteId,
-                            sr.getProductName(),
-                            buyerName,
-                            totalQty,
-                            totalAmount != null ? totalAmount : 0L,
-                            sr.getExpiryDate()
-                    );
-                })
-                .collect(Collectors.toList());
+        return sellerAllocations.stream().map(ss -> {
+            SourcingRequest sr = ss.getSourcingRequest();
+            return QuoteDraftDashboardResponse.of(ss.getSourcingSupplierSId(), sr.getProductName(), "바이어 회사 " + sr.getBuyerCompanyId(), qtyMap.getOrDefault(sr.getSourcingRequestId(), 0), sr.getTotalBudget() != null ? sr.getTotalBudget() : 0L, sr.getExpiryDate());
+        }).collect(Collectors.toList());
     }
 
-    /**
-     * [셀러 3] 대화 및 협의 목록 조회
-     */
-    public List<SellerNegotiationDashboardResponse> getSellerNegotiations(Integer sellerCompanyId, String statusStr) {
-        // TODO: 셀러 기준 협의 목록 연동 예정
-        return List.of(
-                new SellerNegotiationDashboardResponse(1, "납기일 조율", "트렌치 코트", "B 바이어", 200, "네 확인했습니다.", LocalDateTime.now(), false)
-        );
+    public List<SellerNegotiationDashboardResponse> getSellerNegotiations(
+            Integer sellerCompanyId, Integer sellerUserId, String role, String statusStr) {
+        List<String> statuses = List.of("OPEN");
+        Pageable topFive = PageRequest.of(0, 5);
+        List<Negotiation> negotiations = negotiationRepository.findTop5SellerNegotiations(sellerCompanyId, statuses, sellerUserId, role, topFive);
+
+        if (negotiations.isEmpty()) return Collections.emptyList();
+
+        List<Integer> quoteIds = negotiations.stream().map(n -> n.getQuote() != null ? n.getQuote().getQuoteId() : null).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        final Map<Integer, Integer> finalQuoteQtyMap = quoteIds.isEmpty() ? Collections.emptyMap() : quoteItemRepository.sumQuantityGroupedByQuoteId(quoteIds).stream()
+                .collect(Collectors.toMap(t -> t.get("quoteId", Integer.class), t -> {
+                    Long sum = t.get("sum", Long.class);
+                    return sum != null ? sum.intValue() : 0;
+                }, (o, n) -> n));
+
+        return negotiations.stream().map(n -> {
+            // 💡 컴파일 오류 유발 코드를 완벽 제거한 확정 라인
+            String lastMessage = n.getTitle() != null ? n.getTitle() : "진행 중인 협의 내용이 있습니다.";
+            return new SellerNegotiationDashboardResponse(n.getNegotiationId(), n.getTitle(), n.getQuote() != null ? n.getQuote().getProductName() : n.getTitle(), n.getBuyer() != null ? n.getBuyer().getName() : "미지정 바이어", n.getQuote() != null ? finalQuoteQtyMap.getOrDefault(n.getQuote().getQuoteId(), 0) : 0, lastMessage, n.getUpdatedAt(), false);
+        }).collect(Collectors.toList());
     }
 
-    /**
-     * [셀러 4 & 5] 출고 대기 및 배송 흐름/확정 대기 목록 조회
-     */
-    public List<SellerShipmentDashboardResponse> getSellerOrders(Integer sellerCompanyId, String statusStr) {
-        // TODO: 셀러의 주문 배송 현황 연동 예정 (PREPARING vs SHIPPED,DELIVERED 분기)
-        return List.of(
-                SellerShipmentDashboardResponse.of(1, "ORD-002", "트렌치 코트", "B 바이어", 200, 4000000L, LocalDateTime.now(), LocalDate.now().plusDays(2))
-        );
+    public List<SellerShipmentDashboardResponse> getSellerOrders(
+            Integer sellerCompanyId, Integer sellerUserId, String role, String statusStr) {
+        List<OrderStatus> statuses = Arrays.stream(statusStr.split(",")).map(String::trim).map(String::toUpperCase).map(s -> {
+            try {
+                return OrderStatus.valueOf(s);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }).filter(Objects::nonNull).collect(Collectors.toList());
+        if (statuses.isEmpty()) statuses = List.of(OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED);
+
+        Pageable topFive = PageRequest.of(0, 5);
+        List<Order> orders = orderRepository.findTop5SellerOrders(sellerCompanyId, statuses, topFive);
+        if (orders.isEmpty()) return Collections.emptyList();
+
+        Map<Integer, List<OrderItem>> orderItemsGroupByMap = orderItemRepository.findByOrderIds(orders.stream().map(Order::getOrderId).collect(Collectors.toList())).stream().collect(Collectors.groupingBy(oi -> oi.getOrder().getOrderId()));
+
+        return orders.stream().map(o -> {
+            List<OrderItem> items = orderItemsGroupByMap.getOrDefault(o.getOrderId(), Collections.emptyList());
+            String productName = "주문 상품 정보 없음";
+            int totalQty = 0;
+            if (!items.isEmpty()) {
+                String firstItemName = items.get(0).getProductName();
+                totalQty = items.stream().mapToInt(OrderItem::getQuantity).sum();
+                productName = items.size() > 1 ? firstItemName + " 외 " + (items.size() - 1) + "건" : firstItemName;
+            }
+            return SellerShipmentDashboardResponse.of(o.getOrderId(), o.getOrderNo(), productName, o.getBuyer() != null ? o.getBuyer().getName() : "미지정 바이어", totalQty, o.getTotalAmount(), o.getCreatedAt(), o.getCreatedAt() != null ? o.getCreatedAt().toLocalDate().plusDays(3) : LocalDate.now().plusDays(3));
+        }).collect(Collectors.toList());
     }
 
-    /**
-     * [셀러 6] 구매자가 제기한 클레임 분쟁 건 조회
-     */
-    public List<SellerDisputeDashboardResponse> getSellerActiveDisputes(Integer sellerCompanyId, String statusStr) {
-        // TODO: 셀러가 받은 분쟁 내역 연동 예정
-        return List.of(
-                new SellerDisputeDashboardResponse(1, "원단 불량 이의제기", "트렌치 코트", "B 바이어", "재봉선이 안 맞습니다.", LocalDateTime.now(), "RECEIVED")
-        );
+    public List<SellerDisputeDashboardResponse> getSellerActiveDisputes(
+            Integer sellerCompanyId, Integer sellerUserId, String role, String statusStr) {
+        List<DisputeStatus> statuses = Arrays.stream(statusStr.split(",")).map(String::trim).map(String::toUpperCase).map(s -> {
+            try {
+                return DisputeStatus.valueOf(s);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }).filter(Objects::nonNull).collect(Collectors.toList());
+        if (statuses.isEmpty())
+            statuses = List.of(DisputeStatus.RECEIVED, DisputeStatus.REVIEWING, DisputeStatus.WAITING_SELLER);
+
+        Pageable topFive = PageRequest.of(0, 5);
+        List<Dispute> disputes = disputeRepository.findTop5SellerDisputes(sellerCompanyId, statuses, topFive);
+        if (disputes.isEmpty()) return Collections.emptyList();
+
+        Map<Integer, List<DisputeItem>> itemsGroupMap = disputeItemRepository.findByDisputeIds(disputes.stream().map(Dispute::getDisputeId).collect(Collectors.toList())).stream().collect(Collectors.groupingBy(di -> di.getDispute().getDisputeId()));
+
+        return disputes.stream().map(d -> {
+            List<DisputeItem> items = itemsGroupMap.getOrDefault(d.getDisputeId(), Collections.emptyList());
+            String productName = "정보 없음";
+            if (!items.isEmpty()) {
+                String firstProductName = items.get(0).getOrderItem().getProductName();
+                productName = items.size() > 1 ? firstProductName + " 외 " + (items.size() - 1) + "건" : firstProductName;
+            } else if (d.getOrder() != null) {
+                productName = d.getOrder().getOrderNo();
+            }
+            return new SellerDisputeDashboardResponse(d.getDisputeId(), d.getTitle(), productName, d.getBuyer() != null ? d.getBuyer().getName() : "미지정 바이어", d.getBuyerClaim(), d.getCreatedAt(), d.getStatus().name());
+        }).collect(Collectors.toList());
     }
 
-    /**
-     * [셀러 7] 정산 예정 내역 조회
-     */
-    public List<SellerSettlementDashboardResponse> getSellerPendingSettlements(Integer sellerCompanyId, String statusStr) {
-        // TODO: 정산(Settlement) 도메인 테이블 연동 예정
-        return List.of(
-                new SellerSettlementDashboardResponse(1, "ORD-002", "트렌치 코트", "B 바이어", 200, 4000000L, 120000L, 3880000L, LocalDateTime.now())
-        );
-    }
+    public List<SellerSettlementDashboardResponse> getSellerPendingSettlements(
+            Integer sellerCompanyId, Integer sellerUserId, String role, String statusStr) {
+        Pageable topFive = PageRequest.of(0, 5);
+        List<Order> orders = orderRepository.findTop5SellerOrders(sellerCompanyId, List.of(OrderStatus.DELIVERED), topFive);
+        if (orders.isEmpty()) return Collections.emptyList();
 
+        Map<Integer, List<OrderItem>> orderItemsGroupByMap = orderItemRepository.findByOrderIds(orders.stream().map(Order::getOrderId).collect(Collectors.toList())).stream().collect(Collectors.groupingBy(oi -> oi.getOrder().getOrderId()));
 
-    // ── 상태값 파싱 헬퍼 메서드 ──
-    private List<SourcingStatus> parseSourcingStatuses(String statusStr) {
-        if (!StringUtils.hasText(statusStr)) {
-            return Arrays.asList(SourcingStatus.PENDING, SourcingStatus.QUOTED, SourcingStatus.NEGOTIATING);
-        }
-        return Arrays.stream(statusStr.split(","))
-                .map(String::trim)
-                .map(SourcingStatus::valueOf)
-                .collect(Collectors.toList());
+        return orders.stream().map(o -> {
+            List<OrderItem> items = orderItemsGroupByMap.getOrDefault(o.getOrderId(), Collections.emptyList());
+            String productName = "주문 상품 정보 없음";
+            int totalQty = 0;
+            if (!items.isEmpty()) {
+                String firstItemName = items.get(0).getProductName();
+                totalQty = items.stream().mapToInt(OrderItem::getQuantity).sum();
+                productName = items.size() > 1 ? firstItemName + " 외 " + (items.size() - 1) + "건" : firstItemName;
+            }
+            long totalAmount = o.getTotalAmount() != null ? o.getTotalAmount() : 0L;
+            long fee = (long) (totalAmount * 0.03);
+            return new SellerSettlementDashboardResponse(o.getOrderId(), o.getOrderNo(), productName, o.getBuyer() != null ? o.getBuyer().getName() : "미지정 바이어", totalQty, totalAmount, fee, totalAmount - fee, o.getCreatedAt());
+        }).collect(Collectors.toList());
     }
 }

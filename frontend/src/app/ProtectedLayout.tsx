@@ -100,10 +100,19 @@ export function ProtectedLayout() {
 
     if (isPageForAdminOnly) {
         if (user.role !== "ADMIN") {
-            alert("관리자만 접근할 수 있는 페이지입니다.");
-            return <Navigate to="/" replace />;
+            alert("접근 권한이 없는 페이지입니다.");
+            return <Navigate to="/" replace/>;
         }
-        return <Outlet />; // ADMIN이 맞으면 즉시 통과
+        return <Outlet/>;
+    }
+    const isPageForPresidentOnly = requiredRole === "PRESIDENT" || requiredRoles?.includes("PRESIDENT");
+
+    if (isPageForPresidentOnly) {
+        if (user.role !== "PRESIDENT") {
+            alert("접근 권한이 없는 페이지입니다.");
+            return <Navigate to="/" replace/>;
+        }
+        return <Outlet/>;
     }
 
     // 2. 최고 관리자(ADMIN)는 일반 비즈니스(BUYER/SELLER) 페이지를 무조건 프리패스

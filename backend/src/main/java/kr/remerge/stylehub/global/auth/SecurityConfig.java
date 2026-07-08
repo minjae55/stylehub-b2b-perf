@@ -27,19 +27,20 @@ public class SecurityConfig {
     private static final String[] PUBLIC_URLS = {
             "/api/auth/**",
             "/ws/**",
-            "/login/**",
+            "/api/login/**",
             "/oauth2/**",
             "/error",
             "/favicon.ico",
 
             // 회원가입
+            "/api/upload/image",
             "/api/company/ocr",
             "/api/company/verify",
             "/api/company/lookup",
             "/api/users/signup/buyer",
             "/api/users/signup/seller",
-            "/api/users/signup/employee"
-
+            "/api/users/signup/employee",
+            "/api/categories/main"
     };
 
     private final JwtFilter jwtFilter;
