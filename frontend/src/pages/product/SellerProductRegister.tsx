@@ -998,7 +998,7 @@ export function SellerProductRegister() {
               {isEdit ? (
                   <>변경 사항이 저장되었습니다.<br />셀러 페이지에서 확인하실 수 있습니다.</>
               ) : (
-                  <>관리자 검토 후 <strong>1~2 영업일 이내</strong>에 제품이 플랫폼에 게시됩니다.<br />셀러 페이지에서 등록 제품을 확인하실 수 있습니다.</>
+                  <>등록한 제품은 즉시 플랫폼에 게시되며.<br />셀러 페이지에서 등록 제품을 확인하실 수 있습니다.</>
               )}
             </p>
             <div className="flex justify-center gap-3">
