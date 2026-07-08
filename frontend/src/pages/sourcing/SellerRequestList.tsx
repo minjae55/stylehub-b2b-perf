@@ -391,6 +391,8 @@ function DeclineModal({ req, onClose, onConfirm }: {
 }
 
 // ── 요청 행 ──────────────────────────────────────────────────────────
+// 카드 전체를 클릭 가능하게 만들어 PastRow/CompletedRow와 동작을 통일하고,
+// 거절/견적제출 버튼 클릭 시에는 상세 이동이 함께 발생하지 않도록 stopPropagation 처리
 function RequestRow({ req, myBids, onDecline, onDetail }: {
   req: SellerSourcingResponse; myBids: MyBid[];
   onDecline: (r: SellerSourcingResponse) => void;
@@ -403,7 +405,10 @@ function RequestRow({ req, myBids, onDecline, onDetail }: {
   const hasSamplePaid = myBids.some((b) => b.status === "샘플결제됨");
 
   return (
-      <div className="bg-white border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors">
+      <div
+          onClick={() => onDetail(req)}
+          className="bg-white border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors cursor-pointer"
+      >
         <div className="px-5 py-4 flex items-center gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -415,7 +420,7 @@ function RequestRow({ req, myBids, onDecline, onDetail }: {
               {isCustom && hasSamplePaid && <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1"><FlaskConical size={9} /> 샘플결제됨</span>}
               {isCustom && req.supplierStatus === "QUOTED" && <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${SOURCING_STATUS_STYLE[req.sourcingStatus]}`}>{SOURCING_STATUS_LABEL[req.sourcingStatus]}</span>}
             </div>
-            <div className="font-semibold text-foreground text-sm truncate cursor-pointer hover:text-primary transition-colors" onClick={() => onDetail(req)}>{req.productName}</div>
+            <div className="font-semibold text-foreground text-sm truncate hover:text-primary transition-colors">{req.productName}</div>
           </div>
           <div className="hidden md:flex items-center gap-5 text-center flex-shrink-0">
             <div>
@@ -431,13 +436,16 @@ function RequestRow({ req, myBids, onDecline, onDetail }: {
             {myBids.length === 0 && (
                 <>
                   <button
-                      onClick={() => onDecline(req)}
+                      onClick={(e) => { e.stopPropagation(); onDecline(req); }}
                       className="flex items-center gap-1 px-3 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded text-xs font-semibold transition-colors"
                   >
                     <XCircle size={12} /> 거절
                   </button>
                   <button
-                      onClick={() => navigate(`/seller/sourcing/${req.sourcingRequestId}/quote`, { state: { request: req } })}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/seller/sourcing/${req.sourcingRequestId}/quote`, { state: { request: req } });
+                      }}
                       className="flex items-center gap-1 px-3 py-2 bg-primary hover:bg-primary/90 text-white rounded text-xs font-semibold transition-colors"
                   >
                     <Zap size={12} /> 견적 제출
@@ -652,7 +660,7 @@ export function SellerRequestList() {
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center border border-border rounded px-3 py-2 gap-2 flex-1 min-w-[240px]">
                     <Search size={15} className="text-muted-foreground" />
-                    <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명, 요구사항 검색..." className="text-sm outline-none flex-1" />
+                    <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명/상세내용 검색" className="text-sm outline-none flex-1" />
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground">
                     <div onClick={() => setUrgentOnly(!urgentOnly)} className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${urgentOnly ? "bg-red-500" : "bg-[#ddd]"}`}>
