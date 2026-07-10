@@ -1,0 +1,1062 @@
+Project stylehub_b2b {
+  database_type: 'MySQL'
+  Note: 'Generated from stylehub_b2b MySQL DDL'
+}
+
+//////////////////////////////////////////////////
+// ENUMS
+//////////////////////////////////////////////////
+
+Enum bank_transfer_payment_status {
+  CANCELED
+  CONFIRMED
+  WAITING
+}
+
+Enum cart_type_enum {
+  NORMAL
+  SAMPLE
+}
+
+Enum company_seller_status_enum {
+  APPROVED
+  NONE
+  PENDING
+  REJECTED
+}
+
+Enum company_status_enum {
+  APPROVED
+  DELETED
+  PENDING
+  REJECTED
+  SUSPENDED
+}
+
+Enum store_type_enum {
+  BOTH
+  OFFLINE
+  ONLINE
+}
+
+Enum signer_role_enum {
+  BUYER
+  SELLER
+}
+
+Enum contract_status_enum {
+  BUYER_SIGNED
+  CANCELED
+  COMPLETED
+  DRAFT
+  EXPIRED
+  SELLER_SIGNED
+}
+
+Enum delivery_last_status_enum {
+  ATTEMPT_FAIL
+  DELIVERED
+  EXCEPTION
+  EXPIRED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  PICKED_UP
+  REGISTERED
+}
+
+Enum dispute_response_role_enum {
+  ADMIN
+  BUYER
+  SELLER
+}
+
+Enum dispute_flow_status_enum {
+  CANCELED
+  RECEIVED
+  REJECTED
+  RESOLVED
+  REVIEWING
+  WAITING_BUYER
+  WAITING_SELLER
+}
+
+Enum dispute_type_enum {
+  DELIVERY_DELAY
+  ETC
+  MISSING_ITEM
+  PAYMENT
+  PRODUCT_DEFECT
+  WRONG_ITEM
+}
+
+Enum dispute_requested_action_enum {
+  ETC
+  EXCHANGE
+  PARTIAL_REFUND
+  REFUND
+  RE_DELIVERY
+}
+
+Enum dispute_resolution_type_enum {
+  ETC
+  EXCHANGE
+  PARTIAL_REFUND
+  REFUND
+  REJECTED
+  RE_DELIVERY
+}
+
+Enum inquiry_category_enum {
+  ACCOUNT
+  DELIVERY
+  ETC
+  ORDER
+  PAYMENT
+  PRODUCT
+}
+
+Enum inquiry_status_enum {
+  ANSWERED
+  CLOSED
+  OPEN
+  WAITING
+}
+
+Enum notification_type_enum {
+  COMPANY_APPROVAL_REQUESTED
+  CONTRACT_CREATED
+  CONTRACT_SIGNED
+  DISPUTE_RAISED
+  ORDER_CONFIRMED
+  ORDER_DELIVERED
+  ORDER_SHIPPED
+  QUOTE_APPROVED
+  QUOTE_NEGOTIATING
+  QUOTE_RECEIVED
+  QUOTE_REJECTED
+  SAMPLE_REQUESTED
+  SOURCING_ASSIGNED
+  SOURCING_CREATED
+  USER_JOINED
+}
+
+Enum order_item_status_enum {
+  READY
+  WAITING
+}
+
+Enum log_type_enum {
+  PROCESS
+  STATUS
+}
+
+Enum order_status_enum {
+  CANCELED
+  COMPLETED
+  CONFIRMED
+  DELIVERED
+  DISPUTE
+  PENDING
+  PREPARING
+  REFUNDED
+  SHIPPED
+}
+
+Enum order_process_step_enum {
+  CONTRACT_CONFIRMED
+  CONTRACT_SIGNING
+  PRODUCTION_COMPLETED
+  PRODUCTION_STARTED
+  SAMPLE_DELIVERED
+  SAMPLE_NEGOTIATING
+  SAMPLE_PREPARING
+  SAMPLE_SHIPPED
+}
+
+Enum order_type_enum {
+  CUSTOM
+  NORMAL
+  READY
+}
+
+Enum payment_method_enum {
+  CORP_CARD
+  TRANSFER
+}
+
+Enum settlement_status_enum {
+  COMPLETED
+  DISPUTE
+  PENDING
+  REFUNDED
+}
+
+Enum social_provider_enum {
+  GOOGLE
+  KAKAO
+  NAVER
+}
+
+Enum sourcing_request_status_enum {
+  CANCELLED
+  COMPLETED
+  EXPIRED
+  NEGOTIATING
+  PENDING
+  QUOTED
+  TRADING
+  WITHDRAWN
+}
+
+Enum sourcing_supplier_status_enum {
+  CANCELLED
+  DECLINED
+  EXPIRED
+  QUOTED
+  RECOMMENDED
+  REJECTED
+  SUGGESTED
+}
+
+Enum supplier_sourcing_type_enum {
+  BOTH
+  CUSTOM
+  NONE
+  READY
+}
+
+Enum user_business_role_enum {
+  BOTH
+  BUYER
+  SELLER
+}
+
+Enum user_role_enum {
+  ADMIN
+  EMPLOYEE
+  PRESIDENT
+}
+
+Enum user_status_enum {
+  APPROVED
+  DELETED
+  PENDING
+  SUSPENDED
+}
+
+//////////////////////////////////////////////////
+// TABLES
+//////////////////////////////////////////////////
+
+Table addresses {
+  address_id int [pk, increment]
+  company_id int [not null, ref: > companies.company_id]
+  created_at datetime
+  deleted_at datetime
+  updated_at datetime
+  zipcode varchar(20)
+  address_name varchar(50) [not null]
+  address varchar(255) [not null]
+  address_detail varchar(255)
+}
+
+Table bank_transfer_payment_orders {
+  order_id int
+  bank_transfer_payment_id bigint [not null, ref: > bank_transfer_payments.id]
+}
+
+Table bank_transfer_payments {
+  id bigint [pk, increment]
+  canceled_at datetime
+  confirmed_at datetime
+  created_at datetime [not null]
+  deposit_account_id bigint [not null, ref: > deposit_accounts.id]
+  deposit_deadline datetime [not null]
+  cancel_reason varchar(255)
+  depositor_name varchar(255) [not null]
+  status bank_transfer_payment_status [not null]
+}
+
+Table brands {
+  brand_id int [pk, increment]
+  company_id int [not null, ref: > companies.company_id]
+  created_at datetime
+  updated_at datetime
+  brand_name varchar(100) [not null]
+  brand_logo_url varchar(2000)
+}
+
+Table cart_items {
+  cart_item_id int [pk, increment]
+  is_checked boolean [not null]
+  product_option_id int [not null, ref: > product_options.product_option_id]
+  quantity int [not null]
+  user_id int [not null, ref: > users.user_id]
+  created_at datetime
+  updated_at datetime
+  cart_type cart_type_enum [not null]
+
+  indexes {
+    (user_id, product_option_id, cart_type) [unique, name: 'uk_cart_user_option_type']
+  }
+}
+
+Table categories {
+  category_id int [pk, increment]
+  depth int [not null]
+  is_active boolean [not null]
+  parent_id int [ref: > categories.category_id]
+  sort_order int [not null]
+  category_name varchar(50) [not null]
+}
+
+Table companies {
+  company_id int [pk, increment]
+  answer_average double
+  avg_lead_time_days int
+  default_return_address_id int [ref: > addresses.address_id]
+  base_shipping_fee bigint [not null]
+  created_at datetime
+  deleted_at datetime
+  free_shipping_threshold bigint
+  updated_at datetime
+  business_number varchar(20) [not null, unique]
+  representative_phone varchar(20)
+  representative_name varchar(50)
+  name varchar(100) [not null]
+  business_license_url varchar(2000)
+  description varchar(2000)
+  logo_url varchar(2000)
+  address varchar(255)
+  address_detail varchar(255)
+  website_url varchar(255)
+  seller_status company_seller_status_enum [not null]
+  status company_status_enum [not null]
+  store_type store_type_enum
+}
+
+Table company_bank_accounts {
+  bank_account_id int [pk, increment]
+  company_id int [not null, ref: > companies.company_id]
+  is_default boolean [not null]
+  is_verified boolean [not null]
+  created_at datetime
+  deleted_at datetime
+  updated_at datetime
+  account_holder varchar(50) [not null]
+  account_number varchar(50) [not null]
+  bank_name varchar(50) [not null]
+
+  indexes {
+    company_id [name: 'idx_company_id']
+    (company_id, is_default) [name: 'idx_company_is_default']
+  }
+}
+
+Table company_handled_categories {
+  company_handled_category_id int [pk, increment]
+  category_id int [not null]
+  company_id int [not null]
+  created_at datetime [not null]
+
+  indexes {
+    (company_id, category_id) [unique, name: 'uk_company_category']
+  }
+}
+
+Table contract_items {
+  contract_item_id int [pk, increment]
+  contract_id int [not null, ref: > contracts.contract_id]
+  product_id int [ref: > products.product_id]
+  product_option_id int [ref: > product_options.product_option_id]
+  quantity int [not null]
+  created_at datetime [not null]
+  total_price bigint [not null]
+  unit_price bigint [not null]
+  product_name varchar(150) [not null]
+  material varchar(255)
+  option_summary varchar(255)
+}
+
+Table contract_signatures {
+  contract_signature_id int [pk, increment]
+  contract_id int [not null, ref: > contracts.contract_id]
+  signer_id int [not null, ref: > users.user_id]
+  signed_at datetime [not null]
+  signed_ip varchar(45)
+  signature_text varchar(100)
+  signed_user_agent varchar(500)
+  signature_image_url varchar(2000)
+  signature_hash varchar(255)
+  signer_role signer_role_enum [not null]
+}
+
+Table contracts {
+  contract_id int [pk, increment]
+  company_id int [not null, ref: > companies.company_id]
+  delivery_date date [not null]
+  parent_contract_id int [ref: > contracts.contract_id]
+  quote_id int [not null, ref: > quotes.quote_id]
+  version int [not null]
+  buyer_signed_at datetime
+  canceled_at datetime
+  completed_at datetime
+  contract_amount bigint [not null]
+  created_at datetime [not null]
+  seller_signed_at datetime
+  shipping_fee bigint [not null]
+  submitted_at datetime
+  contract_no varchar(30) [not null, unique]
+  pdf_hash varchar(64)
+  buyer_company_name varchar(100) [not null]
+  seller_company_name varchar(100) [not null]
+  contract_name varchar(150)
+  payment_terms varchar(500) [not null]
+  pdf_url varchar(2000)
+  contract_hash varchar(255)
+  return_policy text [not null]
+  special_terms text
+  status contract_status_enum [not null]
+}
+
+Table delivery_tracking_status {
+  id int [pk, increment]
+  order_id int [not null, unique]
+  created_at datetime [not null]
+  synced_at datetime [not null]
+  carrier_id varchar(50) [not null]
+  last_event_time varchar(50)
+  last_location varchar(100)
+  tracking_number varchar(100) [not null]
+  last_description varchar(255)
+  last_status delivery_last_status_enum [not null]
+}
+
+Table deposit_accounts {
+  id bigint [pk, increment]
+  active boolean [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  account_holder varchar(255) [not null]
+  account_number varchar(255) [not null]
+  bank_name varchar(255) [not null]
+}
+
+Table dispute_files {
+  dispute_file_id int [pk, increment]
+  dispute_id int [not null, ref: > disputes.dispute_id]
+  dispute_response_id int [ref: > dispute_responses.dispute_response_id]
+  uploaded_by_user_id int [not null, ref: > users.user_id]
+  created_at datetime [not null]
+  file_size bigint
+  file_type varchar(50)
+  file_url varchar(2000) [not null]
+  file_name varchar(255) [not null]
+
+  indexes {
+    dispute_id [name: 'idx_dispute_file']
+    dispute_response_id [name: 'idx_dispute_response_file']
+  }
+}
+
+Table dispute_products {
+  dispute_product_id int [pk, increment]
+  claim_quantity int
+  dispute_id int [not null, ref: > disputes.dispute_id]
+  order_item_id int [not null, ref: > order_items.order_item_id]
+  created_at datetime [not null]
+  resolution_amount bigint
+  requested_action varchar(30)
+  resolution_type varchar(30)
+  claim_reason text
+}
+
+Table dispute_responses {
+  dispute_response_id int [pk, increment]
+  dispute_id int [not null, ref: > disputes.dispute_id]
+  responder_id int [not null, ref: > users.user_id]
+  created_at datetime [not null]
+  content text [not null]
+  responder_role dispute_response_role_enum [not null]
+  status dispute_flow_status_enum [not null]
+
+  indexes {
+    (dispute_id, created_at) [name: 'idx_dispute_created']
+    responder_id [name: 'idx_responder']
+  }
+}
+
+Table disputes {
+  dispute_id int [pk, increment]
+  admin_id int [ref: > users.user_id]
+  buyer_id int [not null, ref: > users.user_id]
+  order_id int [not null, ref: > orders.order_id]
+  seller_company_id int [not null, ref: > companies.company_id]
+  created_at datetime
+  received_at datetime [not null]
+  resolution_amount bigint
+  resolved_at datetime
+  updated_at datetime
+  title varchar(150) [not null]
+  admin_memo text
+  buyer_claim text [not null]
+  dispute_type dispute_type_enum [not null]
+  requested_action dispute_requested_action_enum [not null]
+  resolution_type dispute_resolution_type_enum
+  status dispute_flow_status_enum [not null]
+
+  indexes {
+    order_id [name: 'idx_dispute_order']
+    (buyer_id, status) [name: 'idx_dispute_buyer_status']
+    (seller_company_id, status) [name: 'idx_dispute_seller_company_status']
+    (admin_id, status) [name: 'idx_dispute_admin_status']
+    (dispute_type, status) [name: 'idx_dispute_type_status']
+  }
+}
+
+Table faqs {
+  faq_id int [pk, increment]
+  sort_order int [not null]
+  created_at datetime
+  updated_at datetime
+  category varchar(50)
+  answer varchar(1000) [not null]
+  question varchar(1000) [not null]
+}
+
+Table inquiries {
+  inquiry_id int [pk, increment]
+  assigned_admin_id int [ref: > users.user_id]
+  company_id int [not null, ref: > companies.company_id]
+  created_by_user_id int [not null, ref: > users.user_id]
+  last_sender_id int [ref: > users.user_id]
+  closed_at datetime
+  created_at datetime
+  last_message_at datetime
+  title varchar(100) [not null]
+  last_message_preview varchar(255)
+  category inquiry_category_enum [not null]
+  status inquiry_status_enum [not null]
+}
+
+Table inquiry_message_reads {
+  message_read_id int [pk, increment]
+  message_id int [not null, ref: > inquiry_messages.message_id]
+  user_id int [not null, ref: > users.user_id]
+  read_at datetime
+
+  indexes {
+    (message_id, user_id) [name: 'idx_message_user']
+  }
+}
+
+Table inquiry_messages {
+  message_id int [pk, increment]
+  inquiry_id int [not null, ref: > inquiries.inquiry_id]
+  sender_id int [not null, ref: > users.user_id]
+  created_at datetime
+  message text
+}
+
+Table negotiation_files {
+  negotiation_file_id int [pk, increment]
+  negotiation_request_id int [not null, ref: > negotiation_requests.negotiation_request_id]
+  uploaded_by_user_id int [not null, ref: > users.user_id]
+  created_at datetime [not null]
+  file_size bigint
+  file_type varchar(50)
+  file_url varchar(2000) [not null]
+  file_name varchar(255) [not null]
+}
+
+Table negotiation_requests {
+  negotiation_request_id int [pk, increment]
+  negotiation_id int [not null, ref: > negotiations.negotiation_id]
+  requested_contract_id int [ref: > contracts.contract_id]
+  requested_quote_id int [ref: > quotes.quote_id]
+  revised_contract_id int [ref: > contracts.contract_id]
+  revised_quote_id int [ref: > quotes.quote_id]
+  accepted_at datetime
+  canceled_at datetime
+  created_at datetime [not null]
+  requested_at datetime [not null]
+  responded_at datetime
+  updated_at datetime [not null]
+  status varchar(30) [not null]
+  buyer_request text [not null]
+  seller_memo text
+  desired_lead_time_days int
+  desired_unit_price bigint
+}
+
+Table negotiations {
+  negotiation_id int [pk, increment]
+  admin_id int [ref: > users.user_id]
+  buyer_id int [not null, ref: > users.user_id]
+  contract_id int [ref: > contracts.contract_id]
+  quote_id int [ref: > quotes.quote_id]
+  seller_id int [not null, ref: > users.user_id]
+  agreed_at datetime
+  closed_at datetime
+  created_at datetime [not null]
+  opened_at datetime [not null]
+  updated_at datetime [not null]
+  negotiation_type varchar(30) [not null]
+  status varchar(30) [not null]
+  title varchar(150) [not null]
+}
+
+Table notices {
+  notice_id int [pk, increment]
+  created_by_user_id int [not null, ref: > users.user_id]
+  is_pinned boolean [not null]
+  created_at datetime
+  updated_at datetime
+  title varchar(200) [not null]
+  content text [not null]
+}
+
+Table notifications {
+  notification_id int [pk, increment]
+  is_read boolean [not null]
+  reference_id int
+  target_company_id int
+  target_user_id int
+  created_at datetime [not null]
+  target_role varchar(20)
+  reference_type varchar(30)
+  message varchar(255) [not null]
+  type notification_type_enum [not null]
+
+  indexes {
+    (target_user_id, created_at) [name: 'idx_notif_user']
+    (target_company_id, created_at) [name: 'idx_notif_company']
+    (target_role, created_at) [name: 'idx_notif_role']
+  }
+}
+
+Table order_items {
+  order_item_id int [pk, increment]
+  assigned_user_id int [not null, ref: > users.user_id]
+  order_id int [not null, ref: > orders.order_id]
+  product_id int [ref: > products.product_id]
+  product_option_id int [ref: > product_options.product_option_id]
+  quantity int [not null]
+  additional_price bigint [not null]
+  created_at datetime [not null]
+  prepared_at datetime
+  total_price bigint [not null]
+  unit_price bigint [not null]
+  product_name varchar(150) [not null]
+  option_summary varchar(255)
+  product_image_url varchar(255)
+  item_status order_item_status_enum [not null]
+
+  indexes {
+    order_id [name: 'idx_order_items_order_id']
+    product_id [name: 'idx_order_items_product_id']
+    assigned_user_id [name: 'idx_order_items_assigned_user_id']
+  }
+}
+
+Table order_logs {
+  order_log_id int [pk, increment]
+  actor_user_id int [ref: > users.user_id]
+  order_id int [not null, ref: > orders.order_id]
+  created_at datetime
+  updated_at datetime
+  memo text
+  log_type log_type_enum [not null]
+  new_status order_status_enum
+  previous_status order_status_enum
+  process_step order_process_step_enum
+
+  indexes {
+    order_id [name: 'idx_order_logs_order_id']
+    (order_id, created_at) [name: 'idx_order_logs_order_created']
+    (log_type, created_at) [name: 'idx_order_logs_log_type_created']
+  }
+}
+
+Table orders {
+  order_id int [pk, increment]
+  buyer_id int [not null, ref: > users.user_id]
+  canceled_by_user_id int [ref: > users.user_id]
+  contract_id int [ref: > contracts.contract_id]
+  is_sample boolean [not null]
+  parent_order_id int [ref: > orders.order_id]
+  quote_id int [ref: > quotes.quote_id]
+  seller_company_id int [not null, ref: > companies.company_id]
+  agreed_at datetime
+  canceled_at datetime
+  created_at datetime
+  delivered_at datetime
+  platform_fee bigint [not null]
+  shipped_at datetime
+  shipping_fee bigint [not null]
+  subtotal_amount bigint [not null]
+  total_amount bigint [not null]
+  updated_at datetime
+  receiver_zipcode varchar(20)
+  sender_zipcode varchar(20)
+  order_no varchar(30) [not null, unique]
+  receiver_phone varchar(30) [not null]
+  sender_phone varchar(30)
+  carrier varchar(50)
+  receiver_name varchar(50) [not null]
+  sender_name varchar(50)
+  seller_company_name varchar(100) [not null]
+  tracking_number varchar(100)
+  receiver_address varchar(255) [not null]
+  receiver_address_detail varchar(255)
+  receiver_memo varchar(255)
+  sender_address varchar(255)
+  sender_address_detail varchar(255)
+  canceled_reason text
+  order_type order_type_enum [not null]
+  payment_method payment_method_enum
+  status order_status_enum [not null]
+  settlement_status settlement_status_enum
+
+  indexes {
+    (buyer_id, created_at) [name: 'idx_orders_buyer_created']
+    (seller_company_id, status, created_at) [name: 'idx_orders_seller_company_status_created']
+  }
+}
+
+Table product_certification {
+  product_certification_id int [pk, increment]
+  expiry_month int
+  expiry_year int
+  product_id int [not null, ref: > products.product_id]
+  cert_name varchar(100) [not null]
+  file_url varchar(2000) [not null]
+}
+
+Table product_images {
+  product_image_id int [pk, increment]
+  is_main boolean [not null]
+  product_option_id int [not null, ref: > product_options.product_option_id]
+  sort_order int [not null]
+  created_at datetime
+  updated_at datetime
+  image_url varchar(2000) [not null]
+
+  indexes {
+    product_option_id [name: 'idx_product_images_product_option_id']
+  }
+}
+
+Table product_option_values {
+  product_option_value_id int [pk, increment]
+  product_option_id int [not null, ref: > product_options.product_option_id]
+  sort_order int [not null]
+  created_at datetime [not null]
+  option_name varchar(50) [not null]
+  option_value varchar(50) [not null]
+
+  indexes {
+    (product_option_id, option_name, option_value) [unique, name: 'uk_product_option_value']
+    product_option_id [name: 'idx_product_option_values_product_option_id']
+  }
+}
+
+Table product_options {
+  product_option_id int [pk, increment]
+  is_active boolean [not null]
+  product_id int [not null, ref: > products.product_id]
+  restock_alert_quantity int
+  sample_max_quantity int
+  stock_quantity int [not null]
+  additional_price bigint [not null]
+  created_at datetime
+  sample_price bigint
+  updated_at datetime
+  option_label varchar(100) [not null]
+  sku varchar(100)
+
+  indexes {
+    (product_id, option_label) [unique, name: 'uk_product_option_label']
+    (product_id, sku) [unique, name: 'uk_product_sku']
+    product_id [name: 'idx_product_options_product_id']
+  }
+}
+
+Table products {
+  product_id int [pk, increment]
+  brand_id int [not null, ref: > brands.brand_id]
+  category_id int [not null, ref: > categories.category_id]
+  company_id int [not null, ref: > companies.company_id]
+  is_active boolean [not null]
+  lead_time_days int
+  moq int [not null]
+  oem_available boolean [not null]
+  sample_available boolean [not null]
+  seller_id int [not null, ref: > users.user_id]
+  view_count int
+  white_label boolean [not null]
+  created_at datetime
+  unit_price bigint [not null]
+  updated_at datetime
+  season varchar(30)
+  product_eng_name varchar(150)
+  product_name varchar(150) [not null]
+  care_instruction varchar(1000)
+  product_url varchar(2000)
+  main_material varchar(255)
+  material_cert varchar(255)
+  description longtext
+  return_policy text
+}
+
+Table quote_items {
+  quote_item_id int [pk, increment]
+  is_sample boolean [not null]
+  quantity int [not null]
+  quote_id int [not null, ref: > quotes.quote_id]
+  created_at datetime [not null]
+  total_price bigint [not null]
+  unit_price bigint [not null]
+  option_summary varchar(255)
+
+  indexes {
+    quote_id [name: 'idx_quote_items_quote_id']
+  }
+}
+
+Table quotes {
+  quote_id int [pk, increment]
+  buyer_id int [not null, ref: > users.user_id]
+  company_id int [not null, ref: > companies.company_id]
+  lead_time_days int [not null]
+  parent_quote_id int [ref: > quotes.quote_id]
+  seller_id int [not null, ref: > users.user_id]
+  sourcing_id int [not null, ref: > sourcing_requests.sourcing_request_id]
+  version int [not null]
+  accepted_at datetime
+  created_at datetime [not null]
+  expired_at datetime
+  negotiated_at datetime
+  shipping_fee bigint [not null]
+  submitted_at datetime [not null]
+  subtotal_amount bigint [not null]
+  total_amount bigint [not null]
+  valid_until datetime [not null]
+  viewed_at datetime
+  quote_no varchar(30) [not null, unique]
+  status varchar(30) [not null]
+  buyer_name varchar(50)
+  company_name varchar(50)
+  delivery_company varchar(50)
+  seller_name varchar(50)
+  brand_name varchar(100)
+  category_name varchar(100)
+  sample_available varchar(100) [not null]
+  product_name varchar(150) [not null]
+  material varchar(255)
+  seller_memo text
+
+  indexes {
+    sourcing_id [name: 'idx_quotes_sourcing_id']
+    seller_id [name: 'idx_quotes_seller_id']
+    (seller_id, status, created_at) [name: 'idx_quotes_seller_status_created']
+  }
+}
+
+Table settlements {
+  settlement_id int [pk, increment]
+  admin_id int [not null, ref: > users.user_id]
+  buyer_id int [not null, ref: > users.user_id]
+  order_no int [not null, ref: > orders.order_id]
+  seller_id int [not null, ref: > users.user_id]
+  created_at datetime [not null]
+  final_amount bigint [not null]
+  platform_fee bigint [not null]
+  settled_at datetime [not null]
+  total_amount bigint [not null]
+  status varchar(50) [not null]
+  receiver_name varchar(255) [not null]
+
+  indexes {
+    status [name: 'idx_settlement_status']
+  }
+}
+
+Table social_accounts {
+  social_account_id int [pk, increment]
+  user_id int [not null, ref: > users.user_id]
+  created_at datetime [not null]
+  deleted_at datetime
+  provider_uid varchar(255) [not null]
+  provider social_provider_enum [not null]
+
+  indexes {
+    (provider, provider_uid) [unique, name: 'idx_provider_uid']
+  }
+}
+
+Table sourcing_request_files {
+  sourcing_request_file_id int [pk, increment]
+  sourcing_request_id int [not null, ref: > sourcing_requests.sourcing_request_id]
+  file_type varchar(20) [not null]
+  file_url varchar(2000) [not null]
+  file_name varchar(255) [not null]
+}
+
+Table sourcing_request_items {
+  sourcing_request_item_id int [pk, increment]
+  quantity int [not null]
+  sample_quantity int
+  sourcing_id int [not null, ref: > sourcing_requests.sourcing_request_id]
+  option_summary varchar(255) [not null]
+}
+
+Table sourcing_requests {
+  sourcing_request_id int [pk, increment]
+  buyer_company_id int [not null]
+  buyer_id int [not null, ref: > users.user_id]
+  category_id int
+  delivery_date date
+  expiry_date date
+  need_sample varchar(1) [not null]
+  created_at datetime
+  total_budget bigint
+  unit_price bigint
+  updated_at datetime
+  type varchar(10) [not null]
+  brand_name varchar(50)
+  sourcing_no varchar(50) [not null, unique]
+  product_name varchar(100) [not null]
+  main_material varchar(255)
+  detail longtext
+  ref_url text
+  status sourcing_request_status_enum [not null]
+}
+
+Table sourcing_suppliers {
+  sourcing_supplier_id int [pk, increment]
+  assigned_by int [ref: > users.user_id]
+  quote_id int [ref: > quotes.quote_id]
+  seller_company_id int [not null]
+  sourcing_request_id int [not null, ref: > sourcing_requests.sourcing_request_id]
+  approved_at datetime
+  created_at datetime
+  responded_at datetime
+  updated_at datetime
+  version bigint [not null]
+  manager_note text
+  seller_feedback text
+  status sourcing_supplier_status_enum [not null]
+
+  indexes {
+    (sourcing_request_id, seller_company_id) [unique, name: 'uk_sourcing_supplier']
+  }
+}
+
+Table supplier_profile {
+  company_id int [pk]
+  auto_assign_enabled boolean [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  sourcing_type supplier_sourcing_type_enum [not null]
+}
+
+Table supplier_statistics {
+  company_id int [pk]
+  response_rate decimal(5,2) [not null]
+  total_requests int [not null]
+  total_responses int [not null]
+  updated_at datetime [not null]
+}
+
+Table toss_payment_orders {
+  toss_payment_id varchar(200) [not null, ref: > toss_payments.toss_payment_id]
+  order_id varchar(255)
+}
+
+Table toss_payments {
+  toss_payment_id varchar(200) [pk]
+  amount bigint [not null]
+  approved_at datetime
+  canceled_at datetime
+  requested_at datetime [not null]
+  va_bank_code varchar(10)
+  status varchar(20) [not null]
+  method varchar(30)
+  va_account_number varchar(30)
+  va_customer_name varchar(50)
+  toss_order_id varchar(64) [not null]
+  cancel_resaon varchar(2000)
+  va_due_date varchar(255)
+}
+
+Table toss_refunds {
+  toss_refund_id int [pk, increment]
+  amount bigint [not null]
+  canceled_at datetime [not null]
+  toss_payment_id varchar(200) [not null, ref: > toss_payments.toss_payment_id]
+  cancel_reason text
+}
+
+Table user_preferred_categories {
+  preferred_category_id int [pk, increment]
+  category_id int [not null, ref: > categories.category_id]
+  user_id int [not null, ref: > users.user_id]
+  created_at datetime [not null]
+
+  indexes {
+    (user_id, category_id) [unique, name: 'uk_user_category']
+  }
+}
+
+Table users {
+  user_id int [pk, increment]
+  company_id int [ref: > companies.company_id]
+  default_receiving_address_id int [ref: > addresses.address_id]
+  default_shipping_address_id int [ref: > addresses.address_id]
+  failed_login_attempts tinyint [not null, default: 0]
+  created_at datetime
+  deleted_at datetime
+  last_login_at datetime
+  updated_at datetime
+  name varchar(20)
+  phone varchar(20)
+  last_login_ip varchar(45)
+  email varchar(100) [not null, unique]
+  profile_image_url varchar(2000)
+  password varchar(255)
+  business_role user_business_role_enum [not null]
+  role user_role_enum [not null]
+  status user_status_enum [not null]
+}
+
+Table wishlist_folders {
+  wishlist_folder_id int [pk, increment]
+  is_default boolean [not null]
+  sort_order int [not null]
+  user_id int [not null, ref: > users.user_id]
+  created_at datetime
+  updated_at datetime
+  folder_name varchar(50) [not null]
+
+  indexes {
+    (user_id, folder_name) [unique, name: 'uk_wishlist_folder_user_name']
+    user_id [name: 'idx_wishlist_folders_user_id']
+  }
+}
+
+Table wishlists {
+  wishlist_id int [pk, increment]
+  product_id int [not null, ref: > products.product_id]
+  user_id int [not null, ref: > users.user_id]
+  wishlist_folder_id int [not null, ref: > wishlist_folders.wishlist_folder_id]
+  created_at datetime
+  updated_at datetime
+
+  indexes {
+    (wishlist_folder_id, product_id) [unique, name: 'uk_wishlist_folder_product']
+    wishlist_folder_id [name: 'idx_wishlists_folder_id']
+    user_id [name: 'idx_wishlists_user_id']
+    product_id [name: 'idx_wishlists_product_id']
+  }
+}
