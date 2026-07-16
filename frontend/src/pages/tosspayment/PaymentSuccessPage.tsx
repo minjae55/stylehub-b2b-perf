@@ -72,7 +72,12 @@ export default function PaymentSuccessPage() {
                 // 카드결제 등 즉시 완료된 경우 기존 흐름 그대로
                 console.log('결제 성공, 이동 시도:', result);
                 sessionStorage.removeItem("pending_order_ids");
-                navigate('/payment/ordersuccess', { replace: true });
+                // 완료 페이지에서 간단한 주문 요약을 보여줄 수 있도록 방금 결제된
+                // 주문번호(orderNo) 목록을 그대로 넘겨준다 (다건결제 시 여러 건일 수 있음).
+                navigate('/payment/ordersuccess', {
+                    replace: true,
+                    state: { orderNumbers: orderIds },
+                });
             })
             .catch((error) => {
                 console.error('결제 승인 실패:', error);

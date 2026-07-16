@@ -2,6 +2,7 @@ package kr.remerge.stylehub.domain.order.service;
 
 import kr.remerge.stylehub.domain.address.Address;
 import kr.remerge.stylehub.domain.address.AddressRepository;
+import kr.remerge.stylehub.domain.company.entity.Company;
 import kr.remerge.stylehub.domain.contract.entity.Contract;
 import kr.remerge.stylehub.domain.contract.entity.ContractItem;
 import kr.remerge.stylehub.domain.contract.enumtype.ContractStatus;
@@ -101,8 +102,20 @@ public class ContractOrderService {
                         contract.getContractId()
                 );
 
+        // 같은 견적으로 샘플 주문을 먼저 진행했을 수 있으므로, 있으면 본생산 주문의
+        // parentOrder로 연결해 "어느 샘플 주문에서 이어진 본주문인지" 추적할 수 있게 한다.
+        // 샘플을 거치지 않고 바로 계약까지 간 경우도 있으므로 없으면 null로 둔다.
+        Order sampleOrder = orderRepository
+                .findByQuote_QuoteIdInAndBuyer_UserIdAndIsSampleTrueOrderByCreatedAtDesc(
+                        List.of(contract.getQuote().getQuoteId()),
+                        buyer.getUserId()
+                )
+                .stream()
+                .findFirst()
+                .orElse(null);
+
         Order order = orderRepository.save(
-                buildOrder(buyer, contract, address, request)
+                buildOrder(buyer, contract, address, request, sampleOrder)
         );
 
         orderItemRepository.saveAll(
@@ -143,12 +156,16 @@ public class ContractOrderService {
             User buyer,
             Contract contract,
             Address address,
-            ContractOrderCreateRequest request
+            ContractOrderCreateRequest request,
+            Order sampleOrder
     ) {
+        Company sellerCompany = contract.getCompany();
+
         return Order.builder()
                 .orderNo(createOrderNo())
                 .buyer(buyer)
-                .sellerCompany(contract.getCompany())
+                .sellerCompany(sellerCompany)
+                .parentOrder(sampleOrder)
                 .contract(contract)
                 .quote(contract.getQuote())
                 .orderType(OrderType.CUSTOM)
@@ -169,6 +186,10 @@ public class ContractOrderService {
                 .receiverAddress(address.getAddress())
                 .receiverAddressDetail(address.getAddressDetail())
                 .receiverMemo(request.receiverMemo())
+                .senderName(sellerCompany.getName())
+                .senderPhone(sellerCompany.getRepresentativePhone())
+                .senderAddress(sellerCompany.getAddress())
+                .senderAddressDetail(sellerCompany.getAddressDetail())
                 .build();
     }
 

@@ -673,7 +673,30 @@ export function BuyerContractSign() {
                   모든 계약 내용을 확인한 뒤 동의와 서명을 완료해 주세요.
                 </p>
 
-                <div className="mt-5 space-y-4">
+                <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-2.5 transition hover:bg-slate-100">
+                  <input
+                    type="checkbox"
+                    checked={
+                      agreements.specification &&
+                      agreements.returnPolicy &&
+                      agreements.final
+                    }
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setAgreements({
+                        specification: checked,
+                        returnPolicy: checked,
+                        final: checked,
+                      });
+                    }}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm font-black text-slate-900">
+                    전체 선택 및 동의
+                  </span>
+                </label>
+
+                <div className="mt-4 space-y-4 border-t border-slate-100 pt-4">
                   <Agreement
                     checked={agreements.specification}
                     onChange={(checked) =>

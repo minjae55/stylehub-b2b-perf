@@ -82,4 +82,16 @@ public class SellerOrderController {
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
+    // [테스트용] 실제 배송 API 연동 없이 배송완료로 전환한다. 데모/QA 목적.
+    @PatchMapping("/{orderId}/delivered/test")
+    public ResponseEntity<ApiResponse<Void>> markDeliveredTest(
+            @LoginUser AuthUser authUser,
+            @PathVariable Integer orderId
+    ) {
+
+        sellerOrderService.markDeliveredTest(authUser.userId(), orderId);
+
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
 }

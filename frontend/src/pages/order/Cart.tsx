@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import api from "@/api/axios";
 import {
@@ -227,13 +227,18 @@ export function Cart() {
         )
       );
 
-      const response = await api.patch<CartItem>(`/carts/${id}/quantity`, {
+      const response = await api.patch<CartApiItem>(`/carts/${id}/quantity`, {
         quantity: nextQuantity,
       });
       if (response?.cartItemId === id) {
+        // 백엔드는 GET /carts와 동일하게 companyId/baseShippingFee 형태로 응답한다.
+        // 여기서 mapCartApiItems를 거치지 않고 그대로 state에 덮어쓰면 이 아이템만
+        // sellerId/shippingFee가 undefined가 되어(-> 0으로 폴백) 같은 판매자의 다른
+        // 상품들과 배송비 묶음 키가 달라지면서 묶음이 쪼개져 보이는 버그가 있었다.
+        const [mappedItem] = mapCartApiItems([response]);
         setItems((prev) =>
           prev.map((cartItem) =>
-            cartItem.cartItemId === id ? response : cartItem
+            cartItem.cartItemId === id ? mappedItem : cartItem
           )
         );
       }
@@ -258,6 +263,21 @@ export function Cart() {
     if (!item) return;
 
     await updateQtyTo(id, Math.max(1, item.quantity + delta), type);
+  };
+
+  // 수량 입력창에 직접 타이핑하는 동안(blur 전) 서버 반영 없이 화면(주문 요약 포함)만
+  // 즉시 갱신한다. 실제 API 커밋은 여전히 onBlur/Enter 시점에 updateQtyTo가 담당한다 —
+  // 키 입력마다 API를 호출하면 요청이 과도하게 쌓이기 때문에, 입력 중엔 로컬 상태만 바꾼다.
+  const updateQtyDraft = (id: number, nextQuantity: number) => {
+    if (!Number.isFinite(nextQuantity) || nextQuantity < 1) return;
+
+    setItems((prev) =>
+      prev.map((cartItem) =>
+        cartItem.cartItemId === id
+          ? { ...cartItem, quantity: nextQuantity, totalPrice: cartItem.unitPrice * nextQuantity }
+          : cartItem
+      )
+    );
   };
 
   const removeItemFromState = (id: number) => {
@@ -498,7 +518,8 @@ export function Cart() {
                               </span>
                             </div>
                             <p className="mt-1 pl-11 text-xs text-slate-500">
-                              같은 출고처 상품 · 배송비 함께 계산 · 선택 합계 <strong className="font-bold text-slate-800">{formatPrice(sellerSubtotal)}</strong>
+                              {group.items.length > 1 && "같은 출고처 상품 · 배송비 함께 계산 · "}
+                              선택 합계 <strong className="font-bold text-slate-800">{formatPrice(sellerSubtotal)}</strong>
                             </p>
                           </div>
                           <div
@@ -529,6 +550,7 @@ export function Cart() {
                             onToggle={() => toggleSelect(item.cartItemId, "BULK")}
                             onRemove={() => removeItem(item.cartItemId)}
                             onQtyChange={(delta) => updateQty(item.cartItemId, delta, "bulk")}
+                            onQuantityDraft={(quantity) => updateQtyDraft(item.cartItemId, quantity)}
                             onQuantityInput={(quantity) => updateQtyTo(item.cartItemId, quantity, "bulk")}
                             onAddSample={() => handleAddSample(item)}
                             sampleAdded={sampleOptionIds.has(item.productOptionId)}
@@ -554,6 +576,7 @@ export function Cart() {
                 onToggle={(id) => toggleSelect(id, "SAMPLE")}
                 onRemove={(id) => removeItem(id)}
                 onQtyChange={(id, delta) => updateQty(id, delta, "sample")}
+                onQuantityDraft={(id, quantity) => updateQtyDraft(id, quantity)}
                 onQuantityChange={(id, quantity) => updateQtyTo(id, quantity, "sample")}
                 updatingQuantityIds={updatingQuantityIds}
               />
@@ -670,6 +693,7 @@ function CartProductCard({
   onToggle,
   onRemove,
   onQtyChange,
+  onQuantityDraft,
   onQuantityInput,
   onAddSample,
   sampleAdded = false,
@@ -683,6 +707,7 @@ function CartProductCard({
   onToggle: () => void;
   onRemove: () => void;
   onQtyChange: (delta: number) => void;
+  onQuantityDraft?: (quantity: number) => void;
   onQuantityInput: (quantity: number) => void;
   onAddSample?: () => void;
   sampleAdded?: boolean;
@@ -790,6 +815,7 @@ function CartProductCard({
                 stepLabel={isSample ? `최대 ${sampleMaxQuantity.toLocaleString()}개` : "10벌 단위"}
                 onMinus={() => onQtyChange(isSample ? -1 : -10)}
                 onPlus={() => onQtyChange(isSample ? 1 : 10)}
+                onDraftChange={onQuantityDraft}
                 onValueCommit={onQuantityInput}
                 min={minimumQuantity}
                 minusDisabled={isUpdatingQuantity || quantity <= minimumQuantity}
@@ -841,6 +867,7 @@ function QuantityControl({
   stepLabel,
   onMinus,
   onPlus,
+  onDraftChange,
   onValueCommit,
   min,
   max,
@@ -852,6 +879,7 @@ function QuantityControl({
   stepLabel: string;
   onMinus: () => void;
   onPlus: () => void;
+  onDraftChange?: (value: number) => void;
   onValueCommit: (value: number) => void;
   min: number;
   max?: number;
@@ -859,6 +887,11 @@ function QuantityControl({
   plusDisabled?: boolean;
 }) {
   const [draftValue, setDraftValue] = useState(String(value));
+
+  // 타이핑 중에는 화면 반영을 위해 value prop 자체가 (draft 반영으로) 계속 바뀌므로,
+  // "서버에 실제로 반영된 마지막 값"을 별도로 기억해둬야 blur 시 진짜 변경 여부를
+  // 판단할 수 있다. 포커스가 들어온 시점의 value를 기준값으로 스냅샷해둔다.
+  const lastCommittedRef = useRef(value);
 
   useEffect(() => {
     setDraftValue(String(value));
@@ -877,7 +910,8 @@ function QuantityControl({
 
     setDraftValue(String(clampedValue));
 
-    if (clampedValue !== value) {
+    if (clampedValue !== lastCommittedRef.current) {
+      lastCommittedRef.current = clampedValue;
       onValueCommit(clampedValue);
     }
   };
@@ -897,7 +931,22 @@ function QuantityControl({
         value={draftValue}
         min={min}
         max={max}
-        onChange={(event) => setDraftValue(event.target.value)}
+        onFocus={() => {
+          // 타이핑 시작 전 시점의 값을 "마지막 커밋값" 기준으로 스냅샷.
+          lastCommittedRef.current = value;
+        }}
+        onChange={(event) => {
+          const nextDraft = event.target.value;
+          setDraftValue(nextDraft);
+
+          // blur 전이라도 유효한 값이면 주문 요약 등 화면에는 바로 반영한다.
+          // (실제 서버 반영 여부 판단은 여전히 blur/Enter의 commitValue가
+          // lastCommittedRef와 비교해서 처리한다)
+          const parsed = Number(nextDraft);
+          if (Number.isFinite(parsed) && nextDraft.trim() !== "") {
+            onDraftChange?.(Math.max(min, Math.floor(parsed)));
+          }
+        }}
         onBlur={commitValue}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
@@ -932,6 +981,7 @@ function SampleCart({
   onToggle,
   onRemove,
   onQtyChange,
+  onQuantityDraft,
   onQuantityChange,
   updatingQuantityIds,
 }: {
@@ -945,6 +995,7 @@ function SampleCart({
   onToggle: (id: number) => void;
   onRemove: (id: number) => void;
   onQtyChange: (id: number, delta: number) => void;
+  onQuantityDraft?: (id: number, quantity: number) => void;
   onQuantityChange: (id: number, quantity: number) => void;
   updatingQuantityIds: Set<number>;
 }) {
@@ -988,6 +1039,7 @@ function SampleCart({
         onToggle={() => onToggle(item.cartItemId)}
         onRemove={() => onRemove(item.cartItemId)}
         onQtyChange={(delta) => onQtyChange(item.cartItemId, delta)}
+        onQuantityDraft={(quantity) => onQuantityDraft?.(item.cartItemId, quantity)}
         onQuantityInput={(quantity) => onQuantityChange(item.cartItemId, quantity)}
         isUpdatingQuantity={updatingQuantityIds.has(item.cartItemId)}
       />

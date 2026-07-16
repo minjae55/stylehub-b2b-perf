@@ -15,6 +15,7 @@ import kr.remerge.stylehub.domain.negotiation.entity.NegotiationRequest;
 import kr.remerge.stylehub.domain.negotiation.repository.NegotiationFileRepository;
 import kr.remerge.stylehub.domain.negotiation.repository.NegotiationRepository;
 import kr.remerge.stylehub.domain.negotiation.repository.NegotiationRequestRepository;
+import kr.remerge.stylehub.domain.order.entity.Order;
 import kr.remerge.stylehub.domain.order.entity.OrderLog;
 import kr.remerge.stylehub.domain.order.enumtype.OrderProcessStep;
 import kr.remerge.stylehub.domain.order.repository.OrderLogRepository;
@@ -38,6 +39,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -88,23 +90,28 @@ public class NegotiationService {
                 .map(Negotiation::getNegotiationId)
                 .toList();
 
+        List<NegotiationRequest> allRequests =
+                negotiationRequestRepository
+                        .findByNegotiation_NegotiationIdInOrderByCreatedAtDesc(
+                                negotiationIds
+                        );
+
         Map<Integer, NegotiationRequest> latestRequestByNegotiationId =
                 new HashMap<>();
 
-        negotiationRequestRepository
-                .findByNegotiation_NegotiationIdInOrderByCreatedAtDesc(
-                        negotiationIds
+        allRequests.forEach(request ->
+                latestRequestByNegotiationId.putIfAbsent(
+                        request.getNegotiation()
+                                .getNegotiationId(),
+                        request
                 )
-                .forEach(request ->
-                        latestRequestByNegotiationId.putIfAbsent(
-                                request.getNegotiation()
-                                        .getNegotiationId(),
-                                request
-                        )
-                );
+        );
 
         Map<Integer, Integer> linkedNegotiationIdByNegotiationId =
                 buildLinkedNegotiationIdMap(negotiations);
+
+        Map<Integer, Order> sampleOrderByNegotiationId =
+                buildSampleOrderByNegotiationIdMap(negotiations, allRequests);
 
         return negotiations.stream()
                 .map(negotiation ->
@@ -115,11 +122,92 @@ public class NegotiationService {
                                 ),
                                 linkedNegotiationIdByNegotiationId.get(
                                         negotiation.getNegotiationId()
+                                ),
+                                sampleOrderByNegotiationId.get(
+                                        negotiation.getNegotiationId()
                                 )
                         )
                 )
                 .toList();
 
+    }
+
+    // 협의 건으로 이미 생성된 샘플 주문이 있으면 그 중 가장 최근 건을 negotiationId 기준으로
+    // 매핑해준다. 바이어가 샘플을 결제/주문한 뒤에도 셀러 협의 목록에서 진행 상황을 볼 수 있게 하기
+    // 위함. 재협의로 견적이 v1->v2->v3로 여러 버전이 생길 수 있고, 샘플 주문은 그중 어느 버전으로도
+    // 걸릴 수 있어서 negotiation.quote(원본)만이 아니라 이 협의의 모든 요청/응답 라운드에 등장한
+    // 견적 버전(requestedQuote/revisedQuote)까지 전부 후보로 모아서 조회한다.
+    private Map<Integer, Order> buildSampleOrderByNegotiationIdMap(
+            List<Negotiation> negotiations,
+            List<NegotiationRequest> allRequests
+    ) {
+
+        Map<Integer, Set<Integer>> quoteIdsByNegotiationId = new HashMap<>();
+
+        for (Negotiation negotiation : negotiations) {
+            if (negotiation.getQuote() != null) {
+                quoteIdsByNegotiationId
+                        .computeIfAbsent(negotiation.getNegotiationId(), key -> new HashSet<>())
+                        .add(negotiation.getQuote().getQuoteId());
+            }
+        }
+
+        for (NegotiationRequest request : allRequests) {
+            Integer negotiationId = request.getNegotiation().getNegotiationId();
+            Set<Integer> quoteIds = quoteIdsByNegotiationId
+                    .computeIfAbsent(negotiationId, key -> new HashSet<>());
+
+            if (request.getRequestedQuote() != null) {
+                quoteIds.add(request.getRequestedQuote().getQuoteId());
+            }
+            if (request.getRevisedQuote() != null) {
+                quoteIds.add(request.getRevisedQuote().getQuoteId());
+            }
+        }
+
+        List<Integer> allQuoteIds = quoteIdsByNegotiationId.values().stream()
+                .flatMap(Set::stream)
+                .distinct()
+                .toList();
+
+        if (allQuoteIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Integer, Order> latestOrderByQuoteId = new HashMap<>();
+
+        orderRepository
+                .findByQuote_QuoteIdInAndIsSampleTrueOrderByCreatedAtDesc(allQuoteIds)
+                .forEach(order ->
+                        latestOrderByQuoteId.putIfAbsent(
+                                order.getQuote().getQuoteId(),
+                                order
+                        )
+                );
+
+        Map<Integer, Order> sampleOrderByNegotiationId = new HashMap<>();
+
+        quoteIdsByNegotiationId.forEach((negotiationId, quoteIds) -> {
+            Order latest = null;
+
+            for (Integer quoteId : quoteIds) {
+                Order candidate = latestOrderByQuoteId.get(quoteId);
+
+                if (candidate == null) {
+                    continue;
+                }
+
+                if (latest == null || candidate.getCreatedAt().isAfter(latest.getCreatedAt())) {
+                    latest = candidate;
+                }
+            }
+
+            if (latest != null) {
+                sampleOrderByNegotiationId.put(negotiationId, latest);
+            }
+        });
+
+        return sampleOrderByNegotiationId;
     }
 
     // 같은 딜(같은 견적, 같은 바이어·셀러)의 견적 협의(QUOTE)와 계약 협의(CONTRACT)를
@@ -241,7 +329,9 @@ public class NegotiationService {
                         negotiation,
                         currentQuote,
                         null,
-                        request.content().trim()
+                        request.content().trim(),
+                        request.desiredUnitPrice(),
+                        request.desiredLeadTimeDays()
                 )
         );
 
@@ -357,7 +447,10 @@ public class NegotiationService {
                         negotiation,
                         null,
                         currentContract,
-                        request.content().trim()
+                        request.content().trim(),
+                        // 계약 협의에서는 단가/납기 개념이 없어(납품 예정일·계약금액과 별개) 항상 null.
+                        null,
+                        null
                 )
         );
 

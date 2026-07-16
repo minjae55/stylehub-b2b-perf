@@ -19,9 +19,13 @@ import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
 import kr.remerge.stylehub.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @RestController
@@ -93,6 +97,26 @@ public class BuyerOrderController {
                 buyerOrderService.getOrderDetail(authUser.userId(), orderId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping(value = "/{orderId}/receipt", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> downloadReceipt(
+            @LoginUser AuthUser authUser,
+            @PathVariable Integer orderId
+    ) {
+
+        byte[] pdfBytes =
+                buyerOrderService.generateReceiptPdf(authUser.userId(), orderId);
+
+        ContentDisposition disposition = ContentDisposition
+                .attachment()
+                .filename("order-receipt-" + orderId + ".pdf", StandardCharsets.UTF_8)
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
     }
 
     @PostMapping("/sample")

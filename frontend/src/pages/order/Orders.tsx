@@ -222,13 +222,13 @@ const statusConfig: Record<
   },
   CONTRACT_SIGNING: {
     label: "계약 서명",
-    tone: "border-primary/25 bg-secondary text-primary",
+    tone: "border-blue-200 bg-blue-50 text-blue-700",
     icon: <PenLine size={13} />,
     group: "contract",
   },
   CONTRACT_CONFIRMED: {
     label: "계약 완료",
-    tone: "border-primary/25 bg-secondary text-primary",
+    tone: "border-blue-200 bg-blue-50 text-blue-700",
     icon: <ShieldCheck size={13} />,
     group: "contract",
   },
@@ -279,7 +279,7 @@ const statusConfig: Record<
 const typeConfig: Record<OrderType, { label: string; tone: string }> = {
   GENERAL: { label: "일반 주문", tone: "border-blue-200 bg-blue-50 text-blue-700" },
   SAMPLE: { label: "샘플 주문", tone: "border-amber-200 bg-amber-50 text-amber-700" },
-  SOURCING: { label: "소싱 주문", tone: "border-primary/25 bg-secondary text-primary" },
+  SOURCING: { label: "소싱 주문", tone: "border-blue-200 bg-blue-50 text-blue-700" },
 };
 
 const exampleOrders: Order[] = [
@@ -425,7 +425,16 @@ function formatPrice(value: number) {
 }
 
 function getOrderTotal(order: Order) {
-  return order.subtotal + order.platformFee + (order.shippingFee ?? 0);
+  return order.subtotal + (order.shippingFee ?? 0);
+}
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CORP_CARD: "법인카드",
+  TRANSFER: "무통장 입금",
+};
+
+function getPaymentMethodLabel(paymentMethod: string) {
+  return PAYMENT_METHOD_LABELS[paymentMethod] ?? paymentMethod;
 }
 
 function getTotalQuantity(order: Order) {
@@ -591,23 +600,19 @@ function getPassiveNotice(order: Order) {
   }
 }
 
+// 샘플 주문은 resolveDisplayOrderStatus에서 실제 상태(SHIPPED/DELIVERED)를
+// SAMPLE_SHIPPED/SAMPLE_DELIVERED로 바꿔서 쓰기 때문에, "배송 중"/"배송 완료" 탭도
+// 그 별칭까지 같이 봐야 한다. 이걸 빼먹으면 배송이 시작되거나 끝난 샘플 주문이
+// 영영 "진행 중" 탭에만 머물러서 탭과 실제 진행 상태가 어긋나 보인다.
+// (CONTRACT_SIGNING/CONTRACT_CONFIRMED/SAMPLE_RENEGOTIATING는 현재 STATUS_STEP_ALIAS에
+// 대응 항목이 없어 order.status가 실제로 이 값이 되는 경우가 없다 — 죽은 분기라 제거)
 function matchesFilter(order: Order, filter: string) {
   if (filter === "ALL") return true;
   if (filter === "PROGRESS") {
-    return [
-      "PENDING",
-      "CONFIRMED",
-      "SAMPLE_PREPARING",
-      "SAMPLE_SHIPPED",
-      "SAMPLE_DELIVERED",
-      "SAMPLE_RENEGOTIATING",
-      "CONTRACT_SIGNING",
-      "CONTRACT_CONFIRMED",
-      "PREPARING",
-    ].includes(order.status);
+    return ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "PREPARING"].includes(order.status);
   }
-  if (filter === "SHIPPING") return order.status === "SHIPPED";
-  if (filter === "DELIVERED") return order.status === "DELIVERED";
+  if (filter === "SHIPPING") return order.status === "SHIPPED" || order.status === "SAMPLE_SHIPPED";
+  if (filter === "DELIVERED") return order.status === "DELIVERED" || order.status === "SAMPLE_DELIVERED";
   if (filter === "DONE") return order.status === "COMPLETED";
   if (filter === "ISSUE") return ["DISPUTE", "CANCELED", "REFUNDED"].includes(order.status);
   return true;
@@ -615,7 +620,7 @@ function matchesFilter(order: Order, filter: string) {
 
 export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isOrderDemo = import.meta.env.DEV && searchParams.get("demo") === "orders";
   const [orders, setOrders] = useState<Order[]>(isOrderDemo ? exampleOrders : []);
   const [isLoading, setIsLoading] = useState(false);
@@ -623,7 +628,22 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loadingOverviewId, setLoadingOverviewId] = useState<string | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState("PROGRESS");
+  // 탭(필터)을 URL 쿼리(?tab=)에도 반영해서, 상세보기 등 다른 페이지에 갔다가 뒤로가기로
+  // 돌아왔을 때도 보고 있던 탭이 그대로 유지되게 한다.
+  const [activeFilter, setActiveFilterState] = useState(
+    () => searchParams.get("tab") ?? "PROGRESS"
+  );
+  const setActiveFilter = (filter: string) => {
+    setActiveFilterState(filter);
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.set("tab", filter);
+        return next;
+      },
+      { replace: true }
+    );
+  };
   const [searchType, setSearchType] = useState<SearchType>("product");
   const [search, setSearch] = useState("");
   const [confirmTarget, setConfirmTarget] = useState<Order | null>(null);
@@ -648,6 +668,9 @@ export function Orders({ role = "BUYER" }: { role?: "BUYER" | "SELLER" }) {
   const [cancelError, setCancelError] = useState("");
   const [isConfirmingTrade, setIsConfirmingTrade] = useState(false);
   const [confirmTradeError, setConfirmTradeError] = useState("");
+  const [pageNotice, setPageNotice] = useState<
+    { type: "success" | "error"; message: string } | null
+  >(null);
 
 const handleCancelOrder = async () => {
   if (!cancelTarget?.orderId || !cancelReason.trim() || isCanceling) {
@@ -848,16 +871,17 @@ const handleOpenDispute = async (order: Order) => {
   };
 
   const stats = useMemo(() => {
+    // matchesFilter와 동일한 기준으로 집계해야 탭 배지 숫자와 실제 탭 목록이 일치한다.
     const inProgress = orders.filter((order) =>
-      ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "SAMPLE_SHIPPED", "SAMPLE_DELIVERED", "SAMPLE_RENEGOTIATING", "PREPARING"].includes(order.status)
+      ["PENDING", "CONFIRMED", "SAMPLE_PREPARING", "PREPARING"].includes(order.status)
     ).length;
-    const shipping = orders.filter((order) => order.status === "SHIPPED").length;
-    const delivered = orders.filter((order) => order.status === "DELIVERED").length;
+    const shipping = orders.filter((order) => order.status === "SHIPPED" || order.status === "SAMPLE_SHIPPED").length;
+    const delivered = orders.filter((order) => order.status === "DELIVERED" || order.status === "SAMPLE_DELIVERED").length;
     const done = orders.filter((order) => order.status === "COMPLETED").length;
     const issues = orders.filter((order) => ["DISPUTE", "CANCELED", "REFUNDED"].includes(order.status)).length;
 
     return [
-      { filter: "ALL", label: "전체 주문", value: `${orders.length}건`, icon: <ReceiptText size={18} />, tone: "bg-secondary text-primary" },
+      { filter: "ALL", label: "전체 주문", value: `${orders.length}건`, icon: <ReceiptText size={18} />, tone: "bg-blue-50 text-blue-700" },
       { filter: "PROGRESS", label: "진행 중", value: `${inProgress}건`, icon: <Truck size={18} />, tone: "bg-sky-50 text-sky-700" },
       { filter: "SHIPPING", label: "배송 중", value: `${shipping}건`, icon: <Package size={18} />, tone: "bg-amber-50 text-amber-700" },
       { filter: "DELIVERED", label: "배송 완료", value: `${delivered}건`, icon: <PackageCheck size={18} />, tone: "bg-emerald-50 text-emerald-700" },
@@ -885,7 +909,10 @@ const handleOpenDispute = async (order: Order) => {
 
       setActiveFilter("DONE");
       setConfirmTarget(null);
-      alert("거래가 확정되었습니다. 셀러 정산이 진행됩니다.");
+      setPageNotice({
+        type: "success",
+        message: "거래가 확정되었습니다 감사합니다.",
+      });
     } catch (error) {
       console.error("거래 확정 실패", error);
       setConfirmTradeError("거래 확정에 실패했습니다.");
@@ -1006,7 +1033,10 @@ const handleOpenDispute = async (order: Order) => {
       });
 
       closeRenegotiateModal();
-      alert("재협상 요청이 접수되었습니다. 공급사가 검토 후 수정안을 전달합니다.");
+      setPageNotice({
+        type: "success",
+        message: "재협상 요청이 접수되었습니다. 공급사가 검토 후 수정안을 전달합니다.",
+      });
     } catch (error) {
       console.error("재협상 요청 실패", error);
       setRenegotiateError(
@@ -1024,7 +1054,7 @@ const handleOpenDispute = async (order: Order) => {
       <main className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
         <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-bold text-primary">
+            <p className="text-sm font-bold text-blue-700">
               {role === "SELLER" ? "셀러 주문 관리" : "구매 관리"}
             </p>
             <h1 className="mt-1 text-2xl font-black text-slate-950">주문 관리</h1>
@@ -1035,7 +1065,7 @@ const handleOpenDispute = async (order: Order) => {
           <div className="flex items-center gap-3">
             <Link
               to="/cart"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary/90"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700"
             >
               <Package size={15} />
               주문 하기
@@ -1043,35 +1073,54 @@ const handleOpenDispute = async (order: Order) => {
           </div>
         </header>
 
+        {pageNotice && (
+          <div
+            className={`mb-5 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm font-semibold ${
+              pageNotice.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            <span>{pageNotice.message}</span>
+            <button
+              type="button"
+              onClick={() => setPageNotice(null)}
+              className="text-xs font-bold"
+            >
+              닫기
+            </button>
+          </div>
+        )}
+
         <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-6">
           {stats.map((stat) => (
             <button
               key={stat.label}
               type="button"
               onClick={() => setActiveFilter(stat.filter)}
-              className={`border-y border-slate-200 bg-white px-4 py-4 text-left transition sm:border sm:shadow-sm ${
+              className={`rounded-lg border-y border-slate-200 bg-white px-4 py-4 text-left transition sm:border sm:shadow-sm ${
                 activeFilter === stat.filter
-                  ? "border-b-2 border-b-primary"
-                  : "hover:border-primary/30"
+                  ? "border-b-2 border-b-blue-600"
+                  : "hover:border-blue-200"
               }`}
             >
               <div className="flex items-center justify-between">
                 <span className={`flex h-8 w-8 items-center justify-center rounded-md ${stat.tone}`}>{stat.icon}</span>
                 <span className="text-2xl font-black text-slate-950">{stat.value}</span>
               </div>
-              <p className={`mt-2 text-sm font-bold ${activeFilter === stat.filter ? "text-primary" : "text-slate-600"}`}>
+              <p className={`mt-2 text-sm font-bold ${activeFilter === stat.filter ? "text-blue-700" : "text-slate-600"}`}>
                 {stat.label}
               </p>
             </button>
           ))}
         </section>
 
-        <section className="mb-5 border border-slate-200 bg-white p-4">
+        <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <select
               value={searchType}
               onChange={(event) => setSearchType(event.target.value as SearchType)}
-              className="h-10 border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition focus:border-primary"
+              className="h-10 border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-500"
             >
               {searchOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -1089,26 +1138,26 @@ const handleOpenDispute = async (order: Order) => {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={`${searchOptions.find((option) => option.value === searchType)?.label} 검색`}
-                className="h-10 w-full border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-primary focus:bg-white"
+                className="h-10 w-full border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
               />
             </div>
           </div>
         </section>
 
         {(isLoading || loadError) && (
-          <div className="mb-5 border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
             {isLoading ? "주문 목록을 불러오는 중입니다." : loadError}
           </div>
         )}
 
         {payableOrders.length > 0 && (
-          <section className="mb-5 flex flex-col gap-3 border border-primary/20 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+          <section className="mb-5 flex flex-col gap-3 rounded-lg border border-blue-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <label className="flex cursor-pointer items-center gap-3 text-sm font-bold text-slate-700">
               <input
                 type="checkbox"
                 checked={allPayableSelected}
                 onChange={toggleAllPayableOrders}
-                className="h-4 w-4 accent-primary"
+                className="h-4 w-4 accent-blue-600"
               />
               결제 대기 주문 전체 선택
               <span className="text-xs font-semibold text-slate-400">
@@ -1123,7 +1172,7 @@ const handleOpenDispute = async (order: Order) => {
                 type="button"
                 onClick={handleSelectedOrdersCheckout}
                 disabled={selectedPaymentOrderIds.length === 0}
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-bold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
               >
                 선택 주문 결제하기
               </button>
@@ -1151,7 +1200,7 @@ const handleOpenDispute = async (order: Order) => {
         </div>
 
         {!isLoading && !loadError && filteredOrders.length === 0 && (
-          <div className="border border-dashed border-slate-300 bg-white py-16 text-center">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white py-16 text-center">
             <Package size={40} className="mx-auto mb-3 text-slate-300" />
             <p className="font-bold text-slate-700">
               {orders.length === 0 ? "아직 주문 내역이 없습니다" : "조건에 맞는 주문이 없습니다"}
@@ -1176,7 +1225,7 @@ const handleOpenDispute = async (order: Order) => {
                 <select
                   value={renegotiateType}
                   onChange={(event) => setRenegotiateType(event.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                 >
                   <option>색상 수정</option>
                   <option>소재 변경</option>
@@ -1193,7 +1242,7 @@ const handleOpenDispute = async (order: Order) => {
                   value={renegotiateText}
                   onChange={(event) => setRenegotiateText(event.target.value)}
                   placeholder="예) 블루그레이 컬러가 너무 밝습니다. 한 단계 진한 톤으로 재제작 요청드립니다."
-                  className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
+                  className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
                 />
               </div>
               {renegotiateError && (
@@ -1223,7 +1272,7 @@ const handleOpenDispute = async (order: Order) => {
             title="거래를 확정하시겠습니까?"
           >
             <p className="mb-4 text-sm leading-6 text-slate-500">
-              상품 수량과 하자 여부를 확인한 뒤 거래를 확정해 주세요. 확정 후 셀러 정산이 진행됩니다.
+              상품 수량과 하자 여부를 확인한 뒤 거래를 확정해 주세요.
             </p>
             <OrderMiniSummary order={confirmTarget} />
             {confirmTradeError && (
@@ -1261,7 +1310,7 @@ const handleOpenDispute = async (order: Order) => {
                 <select
                   value={disputeType}
                   onChange={(event) => setDisputeType(event.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                 >
                   <option value="PRODUCT_DEFECT">상품 불량</option>
                   <option value="WRONG_ITEM">오배송</option>
@@ -1277,7 +1326,7 @@ const handleOpenDispute = async (order: Order) => {
                 <select
                   value={requestedAction}
                   onChange={(event) => setRequestedAction(event.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                 >
                   <option value="REFUND">환불</option>
                   <option value="EXCHANGE">교환</option>
@@ -1293,7 +1342,7 @@ const handleOpenDispute = async (order: Order) => {
                   <select
                     value={disputeItemId ?? ""}
                     onChange={(event) => setDisputeItemId(Number(event.target.value))}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                   >
                     {disputeTarget.items
                       .filter((item) => item.orderItemId !== undefined)
@@ -1317,7 +1366,7 @@ const handleOpenDispute = async (order: Order) => {
                     onChange={(event) =>
                       setClaimQuantity(Math.max(1, Number(event.target.value) || 1))
                     }
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                   />
 
                   <label className="mb-1.5 mt-3 block text-xs font-bold text-slate-500">상품별 문제 사유</label>
@@ -1327,7 +1376,7 @@ const handleOpenDispute = async (order: Order) => {
                     onChange={(event) => setClaimReason(event.target.value)}
                     maxLength={1000}
                     placeholder="선택한 상품에서 확인한 문제를 작성해 주세요."
-                    className="w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                    className="w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
               )}
@@ -1339,7 +1388,7 @@ const handleOpenDispute = async (order: Order) => {
                 onChange={(event) => setDisputeClaim(event.target.value)}
                 maxLength={2000}
                 placeholder="문제 상황과 요청 사항을 자세히 작성해 주세요."
-                className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
+                className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
               />
 
               {disputeError && (
@@ -1386,7 +1435,7 @@ const handleOpenDispute = async (order: Order) => {
                   onChange={(event) => setCancelReason(event.target.value)}
                   placeholder="주문 취소 사유를 입력해 주세요."
                   maxLength={500}
-                  className="mt-4 w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
+                  className="mt-4 w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
                 />
 
                 <div className="mt-1 text-right text-xs text-slate-400">
@@ -1472,7 +1521,7 @@ function OrderCard({
   const passiveNotice = getPassiveNotice(order);
 
   return (
-    <article className="overflow-hidden border border-slate-200 bg-white">
+    <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <button type="button" onClick={onToggle} className="block w-full text-left transition hover:bg-slate-50/70">
         <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
           <div className="min-w-0">
@@ -1504,21 +1553,21 @@ function OrderCard({
           <div className="flex items-end justify-between gap-4 lg:block lg:text-right">
             <div>
               <p className="text-xs font-bold text-slate-500">결제 금액</p>
-              <p className="mt-1 whitespace-nowrap text-xl font-black text-primary">{formatPrice(getOrderTotal(order))}</p>
+              <p className="mt-1 whitespace-nowrap text-xl font-black text-blue-700">{formatPrice(getOrderTotal(order))}</p>
             </div>
           </div>
         </div>
       </button>
 
-      <div className={`border-t px-5 ${showActionNotice ? "border-primary/15 bg-secondary/80 py-3" : "border-slate-100 bg-slate-50/70 py-2.5"}`}>
+      <div className={`border-t px-5 ${showActionNotice ? "border-blue-200 bg-blue-50 py-3" : "border-slate-100 bg-slate-50/70 py-2.5"}`}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {showActionNotice ? (
             <div className="flex min-w-0 items-start gap-2 text-sm">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
                 <Clock size={14} />
               </span>
               <div>
-                <p className="font-black text-primary">확인 필요</p>
+                <p className="font-black text-blue-700">확인 필요</p>
                 <p className="mt-0.5 font-semibold text-slate-700">{getNextAction(order)}</p>
               </div>
             </div>
@@ -1585,13 +1634,13 @@ function OrderCard({
                     <div
                       key={step.key}
                       className={`rounded-lg border p-3 ${
-                        step.done ? "border-primary/25 bg-secondary/60" : "border-slate-200 bg-white"
+                        step.done ? "border-blue-200 bg-blue-50" : "border-slate-200 bg-white"
                       }`}
                     >
                       <div className="mb-2 flex items-center gap-2">
                         <span
                           className={`flex h-6 w-6 items-center justify-center rounded-full ${
-                            step.done ? "bg-primary text-white" : "bg-slate-100 text-slate-400"
+                            step.done ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"
                           }`}
                         >
                           {step.done ? <CheckCircle size={13} /> : <Clock size={13} />}
@@ -1611,16 +1660,15 @@ function OrderCard({
               )}
             </div>
 
-            <aside className="border border-slate-200 bg-white p-4">
+            <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <SectionLabel icon={<ReceiptText size={14} />} title="주문 요약" />
               <div className="space-y-3 text-sm">
                 <SummaryRow label="상품 금액" value={formatPrice(order.subtotal)} />
                 <SummaryRow label="배송비" value={order.shippingFee === null ? "착불" : formatPrice(order.shippingFee)} />
-                <SummaryRow label="플랫폼 수수료" value={formatPrice(order.platformFee)} />
                 <div className="border-t border-slate-100 pt-3">
                   <SummaryRow label="최종 금액" value={formatPrice(getOrderTotal(order))} strong />
                 </div>
-                <SummaryRow label="결제 방식" value={order.paymentMethod} />
+                <SummaryRow label="결제 방식" value={getPaymentMethodLabel(order.paymentMethod)} />
                 <SummaryRow label="수령인" value={order.receiverName} />
                 <div>
                   <p className="text-xs font-bold text-slate-500">배송지</p>
@@ -1668,7 +1716,7 @@ function OrderActions({
                   type="checkbox"
                   checked={paymentSelected}
                   onChange={() => onPaymentSelect(order.orderId!)}
-                  className="h-3.5 w-3.5 accent-primary"
+                  className="h-3.5 w-3.5 accent-blue-600"
                 />
                 함께 결제
               </label>
@@ -1693,7 +1741,14 @@ function OrderActions({
         <>
           <ActionButton tone="ghost" icon={<XCircle size={13} />} onClick={() => onCancel(order)}>샘플 거절</ActionButton>
           <ActionButton tone="orange" icon={<RefreshCw size={13} />} onClick={() => onRenegotiate(order)}>재협상 요청</ActionButton>
-          <LinkButton to={`/buyer/checkout`} icon={<PenLine size={13} />}>본생산 확정</LinkButton>
+          {/* 본생산은 견적 채택 → 셀러 계약서 발송 → 바이어 계약서 서명까지 끝나야
+             확정되는 단계라, 샘플 도착 시점에는 여기서 바로 결제로 보낼 수 없다.
+             대신 견적 상세로 보내 채택 여부부터 진행하게 한다. */}
+          {order.quoteId ? (
+            <LinkButton to={`/buyer/quotes/${order.quoteId}`} icon={<PenLine size={13} />}>견적 확인하러 가기</LinkButton>
+          ) : (
+            <ActionButton tone="ghost" icon={<PenLine size={13} />} onClick={() => undefined}>연결된 견적 없음</ActionButton>
+          )}
         </>
       )}
 
@@ -1709,22 +1764,24 @@ function OrderActions({
         <LinkButton to={`/checkout?type=custom&orderId=${order.id}`} icon={<FileText size={13} />}>결제 진행</LinkButton>
       )}
 
-      {order.status === "SHIPPED" && order.trackingNo && (
+      {(order.status === "SHIPPED" || order.status === "SAMPLE_SHIPPED") && order.trackingNo && (
         <a
           href={getTrackingUrl(order.carrier, order.trackingNo)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-white px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-secondary"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-50"
         >
           <ExternalLink size={13} />
           배송 추적
         </a>
       )}
 
-      {order.status === "SHIPPED" && !order.trackingNo && (
+      {(order.status === "SHIPPED" || order.status === "SAMPLE_SHIPPED") && !order.trackingNo && (
         <ActionButton tone="ghost" icon={<Truck size={13} />} onClick={() => undefined}>배송 진행 중</ActionButton>
       )}
 
+      {/* SAMPLE_DELIVERED(샘플 도착)는 위쪽에 이미 전용 액션(거절/재협상/본생산 확정)이 있어
+          여기서는 일반 DELIVERED만 처리한다 — 같이 넣으면 버튼이 중복으로 뜬다. */}
       {order.status === "DELIVERED" && (
         <>
           <ActionButton icon={<CheckCircle size={13} />} onClick={() => onConfirm(order)}>거래 확정</ActionButton>
@@ -1742,7 +1799,7 @@ function OrderActions({
 
       <Link
         to={order.orderId ? `/buyer/orders/${order.orderId}` : `/buyer/orders/${order.id}`}
-        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-white hover:text-primary"
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-white hover:text-blue-700"
       >
         <Eye size={13} />
         상세
@@ -1762,7 +1819,7 @@ function Badge({ children, className }: { children: ReactNode; className: string
 function SectionLabel({ icon, title }: { icon: ReactNode; title: string }) {
   return (
     <div className="mb-3 flex items-center gap-2">
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-primary">{icon}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700">{icon}</span>
       <h3 className="text-sm font-black text-slate-950">{title}</h3>
     </div>
   );
@@ -1772,7 +1829,7 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
   return (
     <div className="flex items-start justify-between gap-3">
       <span className="text-slate-500">{label}</span>
-      <span className={`text-right ${strong ? "text-base font-black text-primary" : "font-semibold text-slate-900"}`}>
+      <span className={`text-right ${strong ? "text-base font-black text-blue-700" : "font-semibold text-slate-900"}`}>
         {value}
       </span>
     </div>
@@ -1791,8 +1848,8 @@ function ActionButton({
   onClick: () => void;
 }) {
   const className = {
-    primary: "bg-primary text-white hover:bg-primary/90",
-    ghost: "border border-slate-200 bg-white text-slate-600 hover:border-primary/30 hover:text-primary",
+    primary: "bg-blue-600 text-white hover:bg-blue-700",
+    ghost: "border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700",
     red: "border border-red-200 bg-white text-red-600 hover:bg-red-50",
     orange: "border border-orange-200 bg-white text-orange-600 hover:bg-orange-50",
   }[tone];
@@ -1813,7 +1870,7 @@ function LinkButton({ to, icon, children }: { to: string; icon: ReactNode; child
   return (
     <Link
       to={to}
-      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-primary/90"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700"
     >
       {icon}
       {children}
@@ -1878,9 +1935,9 @@ function ModalButton({
   tone?: "primary" | "red";
   variant?: "solid" | "ghost";
 }) {
-  const solidClass = tone === "red" ? "bg-red-500 text-white hover:bg-red-600" : "bg-primary text-white hover:bg-primary/90";
+  const solidClass = tone === "red" ? "bg-red-500 text-white hover:bg-red-600" : "bg-blue-600 text-white hover:bg-blue-700";
   const className = variant === "ghost"
-    ? "border border-slate-200 bg-white text-slate-600 hover:border-primary/30 hover:text-primary"
+    ? "border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700"
     : solidClass;
 
   return (

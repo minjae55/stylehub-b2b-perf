@@ -46,6 +46,15 @@ public class NegotiationRequest {
     @Column(name = "buyer_request", nullable = false, columnDefinition = "TEXT")
     private String buyerRequest;
 
+    // 바이어가 희망하는 단가/납기를 자유 텍스트(buyerRequest)와 별개로 구조화된 값으로 받는다.
+    // QUOTE 타입 협의에서만 의미가 있어 CONTRACT 협의에서는 null로 남는다.
+    // 이전 라운드와 비교(증감 표시)하려면 텍스트 파싱이 아니라 실제 숫자 컬럼이 필요해서 추가했다.
+    @Column(name = "desired_unit_price")
+    private Long desiredUnitPrice;
+
+    @Column(name = "desired_lead_time_days")
+    private Integer desiredLeadTimeDays;
+
     @Column(name = "seller_memo", columnDefinition = "TEXT")
     private String sellerMemo;
 
@@ -71,12 +80,16 @@ public class NegotiationRequest {
             Negotiation negotiation,
             Quote requestedQuote,
             Contract requestedContract,
-            String buyerRequest
+            String buyerRequest,
+            Long desiredUnitPrice,
+            Integer desiredLeadTimeDays
     ) {
         this.negotiation = negotiation;
         this.requestedQuote = requestedQuote;
         this.requestedContract = requestedContract;
         this.buyerRequest = buyerRequest;
+        this.desiredUnitPrice = desiredUnitPrice;
+        this.desiredLeadTimeDays = desiredLeadTimeDays;
         this.status = "REQUESTED";
         this.requestedAt = LocalDateTime.now();
     }

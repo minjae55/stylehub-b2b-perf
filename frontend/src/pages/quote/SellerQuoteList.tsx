@@ -509,6 +509,7 @@ export function SellerQuoteList() {
                                   state: {
                                     quoteId: quote.quoteId,
                                     requestId: quote.sourcingRequestId,
+                                    mode: "select",
                                   },
                                 });
                               }}

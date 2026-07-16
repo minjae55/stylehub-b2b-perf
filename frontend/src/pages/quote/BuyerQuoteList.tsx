@@ -60,6 +60,10 @@ type BuyerQuote = {
   contractId: number | null;
   contractName: string | null;
   contractStatus: ContractStatus | null;
+  // 계약 완료(양측 서명)와 결제 완료는 별개라서, 실제 본주문(샘플 아님) 존재 여부를
+  // 별도로 받아 "결제하러 가기" 버튼을 계속 보여줄지 판단한다.
+  orderId: number | null;
+  orderStatus: SampleOrderStatus | null;
   version: number;
   parentQuoteId: number | null;
   previousTotalAmount: number | null;
@@ -788,6 +792,14 @@ export default function BuyerQuoteList() {
                           const isContractCompleted =
                             quote.contractId !== null
                             && quote.contractStatus === "COMPLETED";
+                          // quote.orderId !== null만 쓰면, 백엔드가 아직 재배포되지 않아
+                          // 응답에 orderId 키 자체가 없는 경우(undefined) "undefined !== null"이
+                          // true가 되어 버튼이 잘못 "결제 완료"로 뜨고 /buyer/orders/undefined로
+                          // 연결되는 버그가 생긴다. != null로 null/undefined를 모두 걸러낸다.
+                          const hasActiveOrder =
+                            quote.orderId != null
+                            && quote.orderStatus !== "CANCELED"
+                            && quote.orderStatus !== "REFUNDED";
                           const canCreateSampleOrder =
                             quote.sampleOrderStatus === null ||
                             quote.sampleOrderStatus === "CANCELED" ||
@@ -852,7 +864,7 @@ export default function BuyerQuoteList() {
                                 </p>
                                 {quote.parentQuoteId !== null && (
                                   <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">
-                                    재견적 v{quote.version}
+                                    {quote.version}차 견적
                                   </span>
                                 )}
                                 <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-emerald-700">
@@ -1059,19 +1071,35 @@ export default function BuyerQuoteList() {
                                         <FileText size={14} />
                                         계약서 보기
                                       </button>
-                                      <button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          navigate(
-                                            `/checkout?contractId=${quote.contractId}`,
-                                          );
-                                        }}
-                                        className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700"
-                                      >
-                                        <CreditCard size={14} />
-                                        결제하러 가기
-                                      </button>
+                                      {hasActiveOrder ? (
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            navigate(
+                                              `/buyer/orders/${quote.orderId}`,
+                                            );
+                                          }}
+                                          className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                                        >
+                                          <CheckCircle2 size={14} />
+                                          결제 완료 · 주문 보기
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            navigate(
+                                              `/checkout?contractId=${quote.contractId}`,
+                                            );
+                                          }}
+                                          className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700"
+                                        >
+                                          <CreditCard size={14} />
+                                          결제하러 가기
+                                        </button>
+                                      )}
                                     </>
                                   )}
                                   {!canRespond &&

@@ -31,10 +31,9 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     List<Order> findBySellerCompany_CompanyIdOrderByCreatedAtDesc(Integer companyId);
 
     @Query("""
-            
-                    select count(o) > 0
-                    from Order o
-                    where o.quote.quoteId = :quoteId
+    select count(o) > 0
+    from Order o
+    where o.quote.quoteId = :quoteId
       and o.buyer.userId = :buyerId
       and o.isSample = true
       and o.status in :statuses
@@ -46,10 +45,9 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     );
 
     @Query("""
-            
-                    select count(o) > 0
-                    from Order o
-                    where o.contract.contractId = :contractId
+    select count(o) > 0
+    from Order o
+    where o.contract.contractId = :contractId
       and o.buyer.userId = :buyerId
       and o.isSample = false
       and o.status in :statuses
@@ -68,10 +66,21 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             Integer buyerId
     );
 
-    @EntityGraph(attributePaths = {
-            "buyer",
-            "sellerCompany"
-    })
+    // 바이어 견적 목록에서 "이미 본주문 결제까지 끝난 계약인지"를 판단해 결제 버튼을
+    // 계속 노출하지 않도록 하기 위함 (샘플 주문 조회와 동일한 패턴).
+    @EntityGraph(attributePaths = "quote")
+    List<Order> findByQuote_QuoteIdInAndBuyer_UserIdAndIsSampleFalseOrderByCreatedAtDesc(
+            List<Integer> quoteIds,
+            Integer buyerId
+    );
+
+    // 협의 목록 화면에서 "이 협의 건으로 샘플 주문이 이미 생성됐는지"를 배지/링크로 보여주기 위해
+    // 바이어 제한 없이 quoteId 목록으로 샘플 주문을 한 번에 조회한다.
+    @EntityGraph(attributePaths = "quote")
+    List<Order> findByQuote_QuoteIdInAndIsSampleTrueOrderByCreatedAtDesc(
+            List<Integer> quoteIds
+    );
+
     Optional<Order> findOneByOrderId(Integer orderId);
 
     List<Order> findByOrderNoIn(List<String> orderNos);

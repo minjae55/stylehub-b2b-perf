@@ -155,6 +155,10 @@ public class SampleOrderService {
                 .receiverAddress(address.getAddress())
                 .receiverAddressDetail(address.getAddressDetail())
                 .receiverMemo(request.receiverMemo())
+                .senderName(sellerCompany.getName())
+                .senderPhone(sellerCompany.getRepresentativePhone())
+                .senderAddress(sellerCompany.getAddress())
+                .senderAddressDetail(sellerCompany.getAddressDetail())
                 .build();
     }
 

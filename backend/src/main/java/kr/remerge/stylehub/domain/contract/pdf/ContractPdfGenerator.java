@@ -234,13 +234,22 @@ public class ContractPdfGenerator {
                 new Cell()
                         .setBorder(Border.NO_BORDER)
                         .setBackgroundColor(NAVY)
-                        .setPaddingTop(22)
-                        .setPaddingBottom(22)
+                        .setPaddingTop(24)
+                        .setPaddingBottom(20)
                         .setPaddingLeft(20)
                         .setPaddingRight(20)
                         .add(
+                                new Paragraph("StyleHub B2B")
+                                        .setFontSize(9)
+                                        .simulateBold()
+                                        .setFontColor(BLUE)
+                                        .setCharacterSpacing(1.2f)
+                                        .setTextAlignment(TextAlignment.CENTER)
+                                        .setMarginBottom(8)
+                        )
+                        .add(
                                 new Paragraph("상품 공급계약서")
-                                        .setFontSize(22)
+                                        .setFontSize(23)
                                         .simulateBold()
                                         .setFontColor(ColorConstants.WHITE)
                                         .setTextAlignment(TextAlignment.CENTER)
@@ -258,7 +267,17 @@ public class ContractPdfGenerator {
                         )
         );
 
-        document.add(titleBox.setMarginBottom(8));
+        document.add(titleBox);
+
+        Table accentBar = new Table(1).useAllAvailableWidth();
+        accentBar.addCell(
+                new Cell()
+                        .setBorder(Border.NO_BORDER)
+                        .setBackgroundColor(BLUE)
+                        .setHeight(4)
+                        .setPadding(0)
+        );
+        document.add(accentBar.setMarginBottom(10));
 
         document.add(
                 new Paragraph(
@@ -311,12 +330,16 @@ public class ContractPdfGenerator {
         addHeaderCell(table, "단가");
         addHeaderCell(table, "금액");
 
-        for (ContractItem item : items) {
-            addBodyCell(table, item.getProductName());
-            addBodyCell(table, valueOrDash(item.getOptionSummary()));
-            addBodyCell(table, item.getQuantity() + "개");
-            addBodyCell(table, formatPrice(item.getUnitPrice()));
-            addBodyCell(table, formatPrice(item.getTotalPrice()));
+        for (int i = 0; i < items.size(); i++) {
+            ContractItem item = items.get(i);
+            DeviceRgb rowBackground = (i % 2 == 0)
+                    ? new DeviceRgb(255, 255, 255)
+                    : LIGHT_GRAY;
+            addBodyCell(table, item.getProductName(), rowBackground);
+            addBodyCell(table, valueOrDash(item.getOptionSummary()), rowBackground);
+            addBodyCell(table, item.getQuantity() + "개", rowBackground);
+            addBodyCell(table, formatPrice(item.getUnitPrice()), rowBackground);
+            addBodyCell(table, formatPrice(item.getTotalPrice()), rowBackground);
         }
 
         document.add(table);
@@ -516,14 +539,15 @@ public class ContractPdfGenerator {
                         .setFontSize(13)
                         .simulateBold()
                         .setFontColor(NAVY)
-                        .setMarginTop(18)
-                        .setMarginBottom(8)
+                        .setMarginTop(20)
+                        .setMarginBottom(6)
         );
 
+        SolidLine accentLine = new SolidLine(1.4f);
+        accentLine.setColor(BLUE);
+
         document.add(
-                new LineSeparator(
-                        new SolidLine(0.8f)
-                ).setMarginBottom(10)
+                new LineSeparator(accentLine).setMarginBottom(10)
         );
     }
 
@@ -588,12 +612,16 @@ public class ContractPdfGenerator {
     ) {
         table.addHeaderCell(
                 new Cell()
-                        .add(new Paragraph(value).simulateBold())
+                        .add(
+                                new Paragraph(value)
+                                        .simulateBold()
+                                        .setFontSize(9)
+                        )
                         .setBackgroundColor(NAVY)
                         .setFontColor(ColorConstants.WHITE)
                         .setBorder(new SolidBorder(NAVY, 0.7f))
                         .setTextAlignment(TextAlignment.CENTER)
-                        .setPadding(7)
+                        .setPadding(8)
         );
     }
 
@@ -601,12 +629,21 @@ public class ContractPdfGenerator {
             Table table,
             String value
     ) {
+        addBodyCell(table, value, ColorConstants.WHITE);
+    }
+
+    private void addBodyCell(
+            Table table,
+            String value,
+            com.itextpdf.kernel.colors.Color background
+    ) {
         table.addCell(
                 new Cell()
-                        .add(new Paragraph(valueOrDash(value)))
-                        .setFontSize(8)
+                        .add(new Paragraph(valueOrDash(value)).setFontSize(8.5f))
+                        .setFontSize(8.5f)
+                        .setBackgroundColor(background)
                         .setBorder(new SolidBorder(BORDER_COLOR, 0.7f))
-                        .setPadding(7)
+                        .setPadding(8)
         );
     }
 
@@ -659,3 +696,4 @@ public class ContractPdfGenerator {
                 : value;
     }
 }
+   

@@ -75,8 +75,17 @@ type ContractDraft = {
   specialTerms: string | null;
 };
 
+// new Date().toISOString()는 항상 UTC 기준 날짜를 반환한다. 한국(KST, UTC+9)에서는
+// 자정부터 오전 9시 사이에 이 함수를 호출하면 실제 로컬 날짜보다 하루 이른 날짜가 나와서,
+// 그 값을 그대로 납품 예정일 기본값/최소값으로 쓰면 서버의 @FutureOrPresent 검증(서버 기준
+// "오늘")에 걸려 계약 초안 저장/미리보기/서명 발송이 전부 400(잘못된 입력값입니다)으로
+// 실패했다. 로컬 타임존 기준 연/월/일을 직접 조합해 이 문제를 피한다.
 function getToday() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 const INITIAL_FORM: ContractForm = {
@@ -811,7 +820,29 @@ export function SellerContractCreate() {
               <h2 className="text-sm font-black text-slate-900">
                 계약 확인 및 동의
               </h2>
-              <div className="mt-3 space-y-1">
+              <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-2.5 transition hover:bg-slate-100">
+                <input
+                  type="checkbox"
+                  checked={
+                    agreements.items &&
+                    agreements.delivery &&
+                    agreements.signature
+                  }
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setAgreements({
+                      items: checked,
+                      delivery: checked,
+                      signature: checked,
+                    });
+                  }}
+                  className="size-4 shrink-0 accent-blue-600"
+                />
+                <span className="text-sm font-black text-slate-900">
+                  전체 선택 및 동의
+                </span>
+              </label>
+              <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">
                 {[
                   {
                     key: "items" as const,

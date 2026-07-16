@@ -3,14 +3,13 @@ import { useNavigate, useParams } from "react-router";
 import api from "@/api/axios";
 import {
   ArrowLeft, Package, FileText, FlaskConical, Clock,
-  XCircle, CreditCard,
-  ChevronRight, ChevronDown, BadgeCheck,
+  CheckCircle, XCircle, MessageSquare, CreditCard,
+  ChevronRight, ChevronDown, X, BadgeCheck,
   CircleDot, AlertTriangle, Loader2, Ban,
 } from "lucide-react";
 import { SourcingStatusStepper } from "./SourcingStatusStepper";
 
 const SOURCING_LIST_PATH = "/buyer/my-sourcing";
-const QUOTE_MANAGEMENT_PATH = "/buyer/quotes";
 
 // ── 타입 ────────────────────────────────────────────────────────────────────
 type RequestStatus = "PENDING" | "QUOTED" | "TRADING" | "NEGOTIATING" | "CANCELLED" | "COMPLETED" | "WITHDRAWN" | "EXPIRED";
@@ -30,8 +29,6 @@ export interface SourcingFileDetail {
   fileUrl: string;
 }
 
-// 견적 상태 - 실제 승인/거절/협의/샘플결제 액션은 견적관리(/buyer/quotes)에서만 처리하므로
-// 이 페이지에서는 표시(라벨링) 용도로만 사용
 type QuoteStatus =
     | "SUBMITTED"
     | "NEGOTIATING"
@@ -41,14 +38,19 @@ type QuoteStatus =
     | "NOT_SELECTED"
     | "EXPIRED";
 
-const QUOTE_STATUS_LABEL: Partial<Record<QuoteStatus, string>> = {
-  SUBMITTED:        "검토 대기",
-  NEGOTIATING:      "협의중",
-  SAMPLE_REQUESTED: "샘플 결제 대기",
-  APPROVED:         "승인 완료",
-  REJECTED:         "거절됨",
-  NOT_SELECTED:     "미채택",
-  EXPIRED:          "기간 만료",
+const ACTIONABLE_QUOTE_STATUSES: QuoteStatus[] = ["SUBMITTED", "NEGOTIATING", "SAMPLE_REQUESTED"];
+
+function isActionable(bid: BidDetail): boolean {
+  return bid.canManage === true
+      && bid.quoteStatus != null
+      && ACTIONABLE_QUOTE_STATUSES.includes(bid.quoteStatus);
+}
+
+const QUOTE_STATUS_DONE_LABEL: Partial<Record<QuoteStatus, string>> = {
+  APPROVED:     "승인 완료",
+  REJECTED:     "거절됨",
+  NOT_SELECTED: "미채택",
+  EXPIRED:      "기간 만료",
 };
 
 export interface BidDetail {
@@ -60,6 +62,13 @@ export interface BidDetail {
   quoteId?: number;
   quoteStatus?: QuoteStatus;
   totalAmount?: number;
+  unitPrice?: number;
+  leadTimeDays?: number;
+  availableDate?: string;
+  // 백엔드가 "AVAILABLE" 문자열로 내려줌 (Quote 엔티티의 sampleAvailable 원본 값)
+  sampleAvailable?: string;
+  sellerMemo?: string;
+  validUntil?: string;
   canManage?: boolean;
 }
 
@@ -155,6 +164,12 @@ async function withdrawSourcingRequest(sourcingRequestId: number): Promise<void>
   await api.patch(`/sourcing/buyer/requests/${sourcingRequestId}/withdraw`);
 }
 
+type QuoteActionStatus = "APPROVED" | "REJECTED" | "NEGOTIATING" | "SAMPLE_REQUESTED";
+
+async function updateQuoteStatus(quoteId: number, status: QuoteActionStatus): Promise<void> {
+  await api.patch(`/quotes/${quoteId}/status`, { status });
+}
+
 // ── 취소 확인 모달 ────────────────────────────────────────────────────────────
 function WithdrawConfirmModal({ onClose, onConfirm, isLoading }: {
   onClose: () => void;
@@ -171,7 +186,7 @@ function WithdrawConfirmModal({ onClose, onConfirm, isLoading }: {
               <h3 className="font-bold text-foreground">소싱 요청 취소</h3>
             </div>
             <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
-              <XCircle size={18} />
+              <X size={18} />
             </button>
           </div>
           <div className="px-6 py-5 space-y-4">
@@ -195,17 +210,109 @@ function WithdrawConfirmModal({ onClose, onConfirm, isLoading }: {
   );
 }
 
-// ── 공급사 카드 (읽기 전용 - 실제 액션은 견적관리 페이지에서 처리) ────────────
+// ── 견적 액션(승인/거절/샘플결제) 확인 모달 ─────────────────────────────────
+interface PendingQuoteAction {
+  quoteId: number;
+  status: QuoteActionStatus;
+  companyName: string;
+}
+
+const QUOTE_ACTION_META: Record<
+    QuoteActionStatus,
+    { title: string; icon: React.ReactNode; tone: string; confirmLabel: string; description: (companyName: string) => string }
+> = {
+  APPROVED: {
+    title: "견적 승인",
+    icon: <CheckCircle size={16} className="text-green-600" />,
+    tone: "bg-green-500 hover:bg-green-600",
+    confirmLabel: "승인하기",
+    description: (companyName) =>
+        `${companyName}의 견적을 승인하면 같은 소싱 요청에 접수된 다른 견적은 모두 자동으로 거절 처리됩니다. 이 작업은 되돌릴 수 없습니다.`,
+  },
+  REJECTED: {
+    title: "견적 거절",
+    icon: <XCircle size={16} className="text-red-500" />,
+    tone: "bg-red-500 hover:bg-red-600",
+    confirmLabel: "거절하기",
+    description: (companyName) =>
+        `${companyName}의 견적을 거절합니다. 거절 후에는 되돌릴 수 없습니다.`,
+  },
+  SAMPLE_REQUESTED: {
+    title: "샘플 결제",
+    icon: <FlaskConical size={16} className="text-amber-600" />,
+    tone: "bg-amber-500 hover:bg-amber-600",
+    confirmLabel: "결제 페이지로 이동",
+    description: (companyName) =>
+        `${companyName}의 견적으로 샘플 결제를 진행합니다. 결제 페이지로 이동합니다.`,
+  },
+  NEGOTIATING: {
+    title: "협의 요청",
+    icon: <MessageSquare size={16} className="text-purple-600" />,
+    tone: "bg-purple-500 hover:bg-purple-600",
+    confirmLabel: "계속하기",
+    description: (companyName) => `${companyName}와 협의를 진행합니다.`,
+  },
+};
+
+function QuoteActionConfirmModal({ action, onClose, onConfirm, isLoading }: {
+  action: PendingQuoteAction;
+  onClose: () => void;
+  onConfirm: () => void;
+  isLoading: boolean;
+}) {
+  const meta = QUOTE_ACTION_META[action.status];
+
+  return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              {meta.icon}
+              <h3 className="font-bold text-foreground">{meta.title}</h3>
+            </div>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-sm text-foreground leading-relaxed">
+              {meta.description(action.companyName)}
+            </p>
+            <p className="text-xs text-muted-foreground">정말 진행하시겠습니까?</p>
+            <div className="flex gap-2 pt-1">
+              <button onClick={onClose}
+                      className="flex-1 py-2.5 border border-border rounded text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors font-medium">
+                취소
+              </button>
+              <button onClick={onConfirm} disabled={isLoading}
+                      className={`flex-1 py-2.5 disabled:opacity-50 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-1.5 ${meta.tone}`}>
+                {isLoading ? "처리 중..." : meta.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+  );
+}
+
+// ── 공급사 카드 ───────────────────────────────────────────────────────────────
 function SupplierCard({
                         bid,
                         anonymousLabel,
                         request,
-                        onGoToQuoteManagement,
+                        onNavigateNegotiation,
+                        onRequestAction,
+                        actionLoading,
+                        onViewDetail,
                       }: {
   bid: BidDetail;
   anonymousLabel: string;
   request: SourcingRequestDetail;
-  onGoToQuoteManagement: () => void;
+  onNavigateNegotiation: () => void;
+  onRequestAction: (quoteId: number, status: QuoteActionStatus, companyName: string) => void;
+  actionLoading: boolean;
+  onViewDetail: () => void;
 }) {
   const budgetDiff = request.totalBudget && bid.totalAmount != null
       ? request.totalBudget - bid.totalAmount
@@ -249,11 +356,6 @@ function SupplierCard({
               <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium flex items-center gap-1 ${BID_STATUS_STYLE[bid.status]}`}>
                 {BID_STATUS_ICON[bid.status]} {BID_STATUS_LABEL[bid.status]}
               </span>
-              {bid.quoteStatus && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-medium">
-                    {QUOTE_STATUS_LABEL[bid.quoteStatus] ?? bid.quoteStatus}
-                  </span>
-              )}
             </div>
             <div className="text-xs text-muted-foreground">
               {bid.totalAmount != null && `${(bid.totalAmount / 10000).toLocaleString()}만원`}
@@ -266,15 +368,158 @@ function SupplierCard({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+            {isActionable(bid) ? (
+                <>
+                  <button
+                      onClick={() => bid.quoteId && onRequestAction(bid.quoteId, "REJECTED", displayName)}
+                      disabled={actionLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <XCircle size={12} /> 거절
+                  </button>
+                  {request.needSample === "Y" ? (
+                      <button
+                          onClick={() => bid.quoteId && onRequestAction(bid.quoteId, "SAMPLE_REQUESTED", displayName)}
+                          disabled={actionLoading}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FlaskConical size={12} /> 샘플 결제하기
+                      </button>
+                  ) : (
+                      <button
+                          onClick={() => bid.quoteId && onRequestAction(bid.quoteId, "APPROVED", displayName)}
+                          disabled={actionLoading}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-green-200 text-green-600 hover:bg-green-50 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <CheckCircle size={12} /> 승인
+                      </button>
+                  )}
+                  <button
+                      onClick={onNavigateNegotiation}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    <MessageSquare size={12} /> 협의하기
+                  </button>
+                </>
+            ) : (
+                <span className="text-xs font-semibold text-slate-400 px-1">
+                  {bid.quoteStatus ? (QUOTE_STATUS_DONE_LABEL[bid.quoteStatus] ?? bid.quoteStatus) : "-"}
+                </span>
+            )}
+            {/* 상세보기 → QuoteDetail 페이지로 이동 */}
             <button
-                onClick={onGoToQuoteManagement}
+                onClick={onViewDetail}
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-muted-foreground hover:border-primary hover:text-primary rounded-lg text-xs font-semibold transition-colors"
             >
-              견적 관리에서 확인 <ChevronRight size={12} />
+              상세보기 <ChevronRight size={12} />
             </button>
           </div>
         </div>
+      </div>
+  );
+}
+
+// ── 견적 비교표 ───────────────────────────────────────────────────────────────
+// 접수된 견적이 2건 이상일 때, 가격/납기/샘플 여부를 나란히 비교할 수 있도록 보여준다.
+// 회사명은 SupplierCard와 동일하게 승인 전까지 익명(공급사 N) 처리한다.
+function QuoteComparisonTable({
+                                bids,
+                                getLabel,
+                                onViewDetail,
+                              }: {
+  bids: BidDetail[];
+  getLabel: (bid: BidDetail) => string;
+  onViewDetail: (quoteId: number) => void;
+}) {
+  const amounts = bids
+      .map((bid) => bid.totalAmount)
+      .filter((value): value is number => value != null);
+  const leadTimes = bids
+      .map((bid) => bid.leadTimeDays)
+      .filter((value): value is number => value != null);
+  const lowestAmount = amounts.length > 0 ? Math.min(...amounts) : null;
+  const shortestLeadTime = leadTimes.length > 0 ? Math.min(...leadTimes) : null;
+
+  return (
+      <div className="mb-4 overflow-x-auto bg-white border border-border rounded-xl">
+        <table className="w-full min-w-[720px] text-left">
+          <thead className="border-b border-border bg-secondary/40 text-xs font-semibold text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3">공급사</th>
+              <th className="px-4 py-3 text-right">총 견적 금액</th>
+              <th className="px-4 py-3">납기</th>
+              <th className="px-4 py-3">샘플</th>
+              <th className="px-4 py-3">유효기간</th>
+              <th className="px-4 py-3 text-right"> </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {bids.map((bid) => {
+              const isLowest = lowestAmount !== null && bid.totalAmount === lowestAmount;
+              const isFastest = shortestLeadTime !== null && bid.leadTimeDays === shortestLeadTime;
+              const sampleAvailable = bid.sampleAvailable === "AVAILABLE";
+
+              return (
+                  <tr
+                      key={bid.sourcingSupplierId}
+                      role={bid.quoteId ? "link" : undefined}
+                      tabIndex={bid.quoteId ? 0 : undefined}
+                      onClick={() => bid.quoteId && onViewDetail(bid.quoteId)}
+                      onKeyDown={(event) => {
+                        if (bid.quoteId && (event.key === "Enter" || event.key === " ")) {
+                          event.preventDefault();
+                          onViewDetail(bid.quoteId);
+                        }
+                      }}
+                      className={`align-middle transition-colors ${bid.quoteId ? "cursor-pointer hover:bg-secondary/40" : ""}`}
+                  >
+                    <td className="px-4 py-3">
+                      <span className="font-semibold text-foreground">{getLabel(bid)}</span>
+                      <div className="mt-1">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${BID_STATUS_STYLE[bid.status]}`}>
+                          {BID_STATUS_LABEL[bid.status]}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <p className="font-bold text-foreground">
+                        {bid.totalAmount != null ? `${bid.totalAmount.toLocaleString()}원` : "—"}
+                      </p>
+                      {isLowest && bids.length > 1 && (
+                          <span className="mt-1 inline-flex rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700">
+                            최저가
+                          </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-foreground">
+                        {bid.leadTimeDays != null ? `${bid.leadTimeDays}일` : "—"}
+                      </p>
+                      {isFastest && bids.length > 1 && (
+                          <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                            최단 납기
+                          </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-semibold ${sampleAvailable ? "text-green-600" : "text-muted-foreground"}`}>
+                        {sampleAvailable ? "가능" : "불가"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {bid.validUntil ? bid.validUntil.slice(0, 10) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {bid.quoteId != null && (
+                          <span className="text-xs font-semibold text-primary">상세보기 →</span>
+                      )}
+                    </td>
+                  </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
   );
 }
@@ -289,6 +534,9 @@ export function BuyerSourcingDetail() {
   const [error, setError] = useState<string | null>(null);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingQuoteAction | null>(null);
+  const [actionQuoteId, setActionQuoteId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [showWithdrawnBids, setShowWithdrawnBids] = useState(false);
 
   useEffect(() => {
@@ -312,6 +560,37 @@ export function BuyerSourcingDetail() {
     } finally {
       setWithdrawing(false);
     }
+  };
+
+  // 실제 승인/거절/샘플결제 API 실행 (확인 모달에서 최종 확정 시 호출)
+  const executeQuoteAction = async (quoteId: number, status: QuoteActionStatus) => {
+    if (!requestId) return;
+    setActionQuoteId(quoteId);
+    setActionError(null);
+    try {
+      await updateQuoteStatus(quoteId, status);
+      setPendingAction(null);
+      if (status === "SAMPLE_REQUESTED") {
+        navigate(`/checkout?type=sample&quoteId=${quoteId}`);
+        return;
+      }
+      if (status === "APPROVED") {
+        // 승인 완료 → 승인된 견적 목록 페이지로 이동
+        navigate("/buyer/quotes?status=APPROVED");
+        return;
+      }
+      const refreshed = await fetchSourcingDetail(requestId);
+      setRequest(refreshed);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "처리 중 오류가 발생했습니다.");
+    } finally {
+      setActionQuoteId(null);
+    }
+  };
+
+  // 버튼 클릭 시 바로 실행하지 않고 확인 모달을 먼저 띄움 (오클릭 방지)
+  const requestQuoteAction = (quoteId: number, status: QuoteActionStatus, companyName: string) => {
+    setPendingAction({ quoteId, status, companyName });
   };
 
   if (loading) {
@@ -344,9 +623,12 @@ export function BuyerSourcingDetail() {
   const quotedBids = allBids.filter((b) => b.quoteId != null);
   const pendingBidsCount = allBids.length - quotedBids.length;
 
-  const goToQuoteManagement = (quoteId?: number) => {
-    navigate(quoteId ? `${QUOTE_MANAGEMENT_PATH}?quoteId=${quoteId}` : QUOTE_MANAGEMENT_PATH);
-  };
+  // 카드 목록과 동일한 "공급사 N" 번호를 비교표에서도 그대로 사용해 혼동을 줄인다.
+  const supplierLabelById = new Map(
+      allBids.map((bid, index) => [bid.sourcingSupplierId, `공급사 ${index + 1}`])
+  );
+  const getSupplierLabel = (bid: BidDetail) =>
+      bid.companyName ?? supplierLabelById.get(bid.sourcingSupplierId) ?? "공급사";
 
   const renderSupplierCard = (bid: BidDetail, index: number) => (
       <SupplierCard
@@ -354,7 +636,13 @@ export function BuyerSourcingDetail() {
           bid={bid}
           anonymousLabel={`공급사 ${index + 1}`}
           request={request}
-          onGoToQuoteManagement={() => goToQuoteManagement(bid.quoteId)}
+          onNavigateNegotiation={() => navigate("/negotiations", {
+            state: { supplierId: bid.sellerCompanyId, requestId: request.sourcingRequestId },
+          })}
+          onRequestAction={requestQuoteAction}
+          actionLoading={actionQuoteId === bid.quoteId}
+          // 상세보기 클릭 → QuoteDetail 페이지로 이동 (perspective는 백엔드가 authUser.companyId 기준으로 판단)
+          onViewDetail={() => bid.quoteId && navigate(`/buyer/quotes/${bid.quoteId}`)}
       />
   );
 
@@ -503,15 +791,21 @@ export function BuyerSourcingDetail() {
                   </span>
               )}
             </div>
-            {quotedBids.length > 0 && (
-                <button
-                    onClick={() => goToQuoteManagement()}
-                    className="flex items-center gap-1 px-3 py-1.5 border border-border text-muted-foreground hover:border-primary hover:text-primary rounded-lg text-xs font-semibold transition-colors"
-                >
-                  견적관리로 이동 <ChevronRight size={12} />
-                </button>
-            )}
           </div>
+
+          {actionError && (
+              <div className="mb-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {actionError}
+              </div>
+          )}
+
+          {quotedBids.length > 1 && (
+              <QuoteComparisonTable
+                  bids={quotedBids}
+                  getLabel={getSupplierLabel}
+                  onViewDetail={(quoteId) => navigate(`/buyer/quotes/${quoteId}`)}
+              />
+          )}
 
           {request.status === "TRADING" && (
               <div className="flex items-center justify-between gap-3 mb-4 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4">
@@ -520,7 +814,7 @@ export function BuyerSourcingDetail() {
                   <span>거래가 진행중입니다. 자세한 내용은 견적관리에서 확인해 주세요.</span>
                 </div>
                 <button
-                    onClick={() => navigate(`${QUOTE_MANAGEMENT_PATH}?status=APPROVED`)}
+                    onClick={() => navigate("/buyer/quotes?status=APPROVED")}
                     className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors"
                 >
                   견적관리로 이동 <ChevronRight size={12} />
@@ -574,6 +868,15 @@ export function BuyerSourcingDetail() {
                 onClose={() => setShowWithdraw(false)}
                 onConfirm={handleWithdraw}
                 isLoading={withdrawing}
+            />
+        )}
+
+        {pendingAction && (
+            <QuoteActionConfirmModal
+                action={pendingAction}
+                onClose={() => setPendingAction(null)}
+                onConfirm={() => executeQuoteAction(pendingAction.quoteId, pendingAction.status)}
+                isLoading={actionQuoteId === pendingAction.quoteId}
             />
         )}
       </div>

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -71,11 +72,35 @@ public class QuoteBuyerService {
                 )
         );
 
+        // 본주문(샘플이 아닌 실제 결제 주문)도 동일한 방식으로 조회한다.
+        // 계약이 COMPLETED(양측 서명 완료)여도 결제가 안 됐을 수 있어서, "결제하러 가기" 버튼을
+        // 계속 보여줄지 판단하려면 계약 상태만으로는 부족하고 실제 주문 존재 여부가 필요하다.
+        List<Order> orders =
+                orderRepository
+                        .findByQuote_QuoteIdInAndBuyer_UserIdAndIsSampleFalseOrderByCreatedAtDesc(
+                                quoteIds,
+                                userId
+                        );
+
+        Map<Integer, Order> latestOrderByQuoteId = new HashMap<>();
+
+        orders.forEach(order ->
+                latestOrderByQuoteId.putIfAbsent(
+                        order.getQuote().getQuoteId(),
+                        order
+                )
+        );
+
+        // 한 견적에 계약 버전이 여러 개(재계약) 있을 수 있으므로, 버전 내림차순으로 먼저
+        // 처리해 최신 계약이 우선 저장되도록 한다. (DB가 조회 순서를 보장하지 않으므로
+        // 정렬 없이 그냥 덮어쓰면 오래된/취소된 계약이 남을 수 있음)
         Map<Integer, Contract> contractByQuoteId = new HashMap<>();
 
         contractRepository.findByQuote_QuoteIdIn(quoteIds)
+                .stream()
+                .sorted(Comparator.comparing(Contract::getVersion).reversed())
                 .forEach(contract ->
-                        contractByQuoteId.put(
+                        contractByQuoteId.putIfAbsent(
                                 contract.getQuote().getQuoteId(),
                                 contract
                         )
@@ -86,7 +111,8 @@ public class QuoteBuyerService {
                 .map(quote -> QuoteBuyerListResponse.from(
                         quote,
                         findInChain(quote, latestSampleOrderByQuoteId),
-                        findInChain(quote, contractByQuoteId)
+                        findInChain(quote, contractByQuoteId),
+                        findInChain(quote, latestOrderByQuoteId)
                 ))
                 .toList();
     }
