@@ -26,6 +26,7 @@ import kr.remerge.stylehub.domain.order.repository.OrderRepository;
 import kr.remerge.stylehub.domain.order.validation.CartOrderValidator;
 import kr.remerge.stylehub.domain.product.entity.Product;
 import kr.remerge.stylehub.domain.product.entity.ProductOption;
+import kr.remerge.stylehub.domain.product.repository.ProductOptionRepository;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.support.UserReader;
 import kr.remerge.stylehub.global.exception.BusinessException;
@@ -57,6 +58,7 @@ public class BuyerOrderService {
     private final OrderLogRepository orderLogRepository;
     private final CartOrderValidator cartOrderValidator;
     private final OrderPdfGenerator orderPdfGenerator;
+    private final ProductOptionRepository productOptionRepository;
 
     @Transactional
     public void confirmOrder(Integer userId, Integer orderId) {
@@ -94,6 +96,16 @@ public class BuyerOrderService {
         List<CartItem> cartItems = getCartItems(userId, request);
 
         cartOrderValidator.validate(cartItems);
+
+        for (CartItem cartItem : cartItems) {
+            int updated = productOptionRepository.decreaseStock(
+                    cartItem.getProductOption().getProductOptionId(),
+                    cartItem.getQuantity()
+            );
+            if (updated == 0) {
+                throw new BusinessException(ErrorCode.OUT_OF_STOCK);
+            }
+        }
 
         Map<Integer, List<CartItem>> itemsByCompany = getItemsByCompany(cartItems);
 
