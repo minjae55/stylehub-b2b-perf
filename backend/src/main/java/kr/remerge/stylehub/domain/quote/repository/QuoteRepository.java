@@ -1,19 +1,14 @@
 package kr.remerge.stylehub.domain.quote.repository;
 
-import kr.remerge.stylehub.domain.quote.dto.QuoteBuyerListResponse;
+import io.lettuce.core.dynamic.annotation.Param;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 public interface QuoteRepository extends JpaRepository<Quote, Integer> {
-
-    List<Quote> findBySeller_UserIdAndSourcingRequest_SourcingRequestId(
-            Integer sellerId, Integer sourcingRequestId);
-
-    List<Quote> findByStatusAndValidUntilBefore(String status, LocalDateTime now);
 
     List<Quote> findBySourcingRequest_SourcingRequestIdAndQuoteIdNot(
             Integer sourcingRequestId, Integer quoteId);
@@ -27,4 +22,15 @@ public interface QuoteRepository extends JpaRepository<Quote, Integer> {
     Optional<Quote> findByQuoteIdAndBuyer_UserId(Integer quoteId, Integer userId);
 
     List<Quote> findBySourcingRequest_SourcingRequestId(Integer sourcingRequestSourcingRequestId);
+
+    @Query(value = """
+            WITH RECURSIVE quote_chain AS (
+            SELECT * FROM quotes WHERE quote_id = :quoteId
+            UNION ALL
+            SELECT q.* FROM quotes q
+            JOIN quote_chain qc ON q.quote_id = qc.parent_quote_id
+            )
+            SELECT * FROM quote_chain WHERE parent_quote_id IS NULL
+            """, nativeQuery = true)
+    Optional<Quote> findRootQuote(@Param("quoteId") Integer quoteId);
 }

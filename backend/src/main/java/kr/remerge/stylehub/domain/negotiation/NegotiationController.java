@@ -26,11 +26,13 @@ public class NegotiationController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<NegotiationListResponse>>> getNegotiationList(
-            @LoginUser AuthUser authUser
+            @LoginUser AuthUser authUser,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
 
         List<NegotiationListResponse> responses =
-                negotiationService.getNegotiationList(authUser.userId());
+                negotiationService.getNegotiationList(authUser.userId(), page, size);
 
         return ResponseEntity.ok(ApiResponse.success(responses));
 
