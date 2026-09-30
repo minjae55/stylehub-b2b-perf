@@ -40,7 +40,12 @@ public class SecurityConfig {
             "/api/users/signup/buyer",
             "/api/users/signup/seller",
             "/api/users/signup/employee",
-            "/api/categories/main"
+            "/api/categories/main",
+
+            // Swagger UI (배포 데모용)
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/v3/api-docs/**"
     };
 
     private final JwtFilter jwtFilter;

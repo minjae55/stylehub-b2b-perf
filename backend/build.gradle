@@ -36,6 +36,7 @@ dependencies {
 	implementation 'net.nurigo:sdk:4.3.2'                                        // CoolSMS(누리고) SDK
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'    // Swagger UI 자동 생성
 
     implementation 'net.datafaker:datafaker:2.4.2'
 
