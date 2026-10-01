@@ -107,3 +107,4 @@ backend/src/main/resources/application (1).yaml
 docker-compose.local.yml
 application-local.yml
 application-local.yaml
+application-deploy.yaml
