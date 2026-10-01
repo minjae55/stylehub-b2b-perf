@@ -41,10 +41,11 @@ jobs:
 
       - name: 서버 재시작
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key.pem ec2-user@${{ secrets.EC2_HOST }} '
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key.pem ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
             pkill -f "app.jar" || true
             sleep 3
-            mv ~/app-new.jar ~/app.jar
-            nohup java -Xmx384m -jar ~/app.jar --spring.profiles.active=local > ~/app.log 2>&1 &
-            disown
-          '
+            mv -f ~/app-new.jar ~/app.jar
+            nohup java -Xmx384m -jar ~/app.jar --spring.profiles.active=local > ~/app.log 2>&1 < /dev/null &
+            sleep 2
+            echo "재시작 완료"
+          EOF
