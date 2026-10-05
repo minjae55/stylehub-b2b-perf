@@ -6,6 +6,7 @@ import kr.remerge.stylehub.domain.negotiation.entity.Negotiation;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
 import kr.remerge.stylehub.domain.user.entity.User;
 import kr.remerge.stylehub.domain.user.enumtype.BusinessRole;
+import kr.remerge.stylehub.domain.user.enumtype.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,4 +67,44 @@ class NegotiationListTest extends NegotiationTestBase {
                 .containsExactly(n3.getNegotiationId(), n1.getNegotiationId());
     }
 
+    @Test
+    @DisplayName("목록 응답에 협의 유형, 양측 id와 이름이 담긴다")
+    void 응답_정보_확인() {
+
+        NegotiationListResponse response = negotiationService
+                .getNegotiationList(buyer1.getUserId(), 0, 20).stream()
+                .filter(r -> r.negotiationId().equals(n1.getNegotiationId()))
+                .findFirst().orElseThrow();
+
+        assertThat(response.negotiationType()).isEqualTo("QUOTE");
+
+        assertThat(response.buyerId()).isEqualTo(buyer1.getUserId());
+        assertThat(response.sellerId()).isEqualTo(seller1.getUserId());
+
+        assertThat(response.buyerName()).isEqualTo(buyer1.getName());
+        assertThat(response.sellerName()).isEqualTo(seller1.getName());
+
+
+    }
+
+    @Test
+    @DisplayName("관리자가 배정된 협의는 관리자 이름이 담기고, 배정 전이면 null이다")
+    void 관리자_이름() {
+
+        User admin = fixtures.createUser("admin@test.com", "관리자", null, UserRole.ADMIN, BusinessRole.BUYER);
+        em.find(Negotiation.class, n1.getNegotiationId()).assignAdmin(admin);
+        flushAndClear();
+
+        List<NegotiationListResponse> result =
+                negotiationService.getNegotiationList(buyer1.getUserId(), 0, 20);
+
+        assertThat(result)
+                .filteredOn(r -> r.negotiationId().equals(n1.getNegotiationId()))
+                .extracting(NegotiationListResponse::adminName)
+                .containsExactly("관리자");
+        assertThat(result)
+                .filteredOn(r -> r.negotiationId().equals(n2.getNegotiationId()))
+                .extracting(NegotiationListResponse::adminName)
+                .containsExactly((String) null);
+    }
 }
