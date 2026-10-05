@@ -9,9 +9,7 @@ import kr.remerge.stylehub.domain.user.enumtype.BusinessRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
 import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class NegotiationListTest extends NegotiationTestBase {
