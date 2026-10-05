@@ -33,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import kr.remerge.stylehub.domain.user.repository.UserRepository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -58,6 +59,14 @@ public class DashboardService {
     private final OrderItemRepository orderItemRepository;
     private final DisputeRepository disputeRepository;
     private final DisputeItemRepository disputeItemRepository;
+    private final UserRepository userRepository;
+
+    private Map<Integer, String> findUserNames(Collection<Integer> userIds) {
+        Map<Integer, String> userNameById = new HashMap<>();
+        userRepository.findAllById(userIds)
+                .forEach(user -> userNameById.put(user.getUserId(), user.getName()));
+        return userNameById;
+    }
 
     // =================================================================
     // ── BUYER DASHBOARD SERVICES (바이어 7개 비즈니스 로직) ──
@@ -276,11 +285,15 @@ public class DashboardService {
                         (o, n) -> n
                 ));
 
+        Map<Integer, String> sellerNameById = findUserNames(
+                negotiations.stream().map(Negotiation::getSellerId).collect(Collectors.toSet()));
+
         // 5. 루프 돌며 DTO 조립 (변수가 final이므로 에러 없음!)
         List<BuyerNegotiationDashboardResponse> dtoList = negotiations.stream().map(n -> {
 
             String lastMessage = lastMessageMap.getOrDefault(n.getNegotiationId(), "진행 중인 협의 내용이 있습니다.");
-            String sellerCompanyName = n.getSeller() != null ? "공급사 " + n.getSeller().getName() : "미지정 공급사";
+            String sellerName = sellerNameById.get(n.getSellerId());
+            String sellerCompanyName = sellerName != null ? "공급사 " + sellerName : "미지정 공급사";
 
             int qty = 0;
             if (n.getQuote() != null) {
@@ -557,10 +570,14 @@ public class DashboardService {
                     return sum != null ? sum.intValue() : 0;
                 }, (o, n) -> n));
 
+        Map<Integer, String> buyerNameById = findUserNames(
+                negotiations.stream().map(Negotiation::getBuyerId).collect(Collectors.toSet()));
+
         return negotiations.stream().map(n -> {
             // 💡 컴파일 오류 유발 코드를 완벽 제거한 확정 라인
             String lastMessage = n.getTitle() != null ? n.getTitle() : "진행 중인 협의 내용이 있습니다.";
-            return new SellerNegotiationDashboardResponse(n.getNegotiationId(), n.getTitle(), n.getQuote() != null ? n.getQuote().getProductName() : n.getTitle(), n.getBuyer() != null ? n.getBuyer().getName() : "미지정 바이어", n.getQuote() != null ? finalQuoteQtyMap.getOrDefault(n.getQuote().getQuoteId(), 0) : 0, lastMessage, n.getUpdatedAt(), false);
+            String buyerName = buyerNameById.get(n.getBuyerId());
+            return new SellerNegotiationDashboardResponse(n.getNegotiationId(), n.getTitle(), n.getQuote() != null ? n.getQuote().getProductName() : n.getTitle(), buyerName != null ? buyerName : "미지정 바이어", n.getQuote() != null ? finalQuoteQtyMap.getOrDefault(n.getQuote().getQuoteId(), 0) : 0, lastMessage, n.getUpdatedAt(), false);
         }).collect(Collectors.toList());
     }
 

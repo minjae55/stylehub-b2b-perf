@@ -92,7 +92,7 @@ class NegotiationListTest extends NegotiationTestBase {
     void 관리자_이름() {
 
         User admin = fixtures.createUser("admin@test.com", "관리자", null, UserRole.ADMIN, BusinessRole.BUYER);
-        em.find(Negotiation.class, n1.getNegotiationId()).assignAdmin(admin);
+        em.find(Negotiation.class, n1.getNegotiationId()).assignAdmin(admin.getUserId());
         flushAndClear();
 
         List<NegotiationListResponse> result =

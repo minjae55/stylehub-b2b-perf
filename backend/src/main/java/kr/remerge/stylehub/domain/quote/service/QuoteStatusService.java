@@ -68,7 +68,7 @@ public class QuoteStatusService {
         Quote rootQuote = resolveRootQuote(quote);
 
         negotiationRepository
-                .findFirstByQuote_QuoteIdAndBuyer_UserIdOrderByOpenedAtDesc(
+                .findFirstByQuote_QuoteIdAndBuyerIdOrderByOpenedAtDesc(
                         rootQuote.getQuoteId(),
                         quote.getBuyer().getUserId()
                 )

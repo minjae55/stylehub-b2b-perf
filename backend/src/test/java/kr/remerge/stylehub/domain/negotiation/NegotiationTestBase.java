@@ -73,7 +73,7 @@ abstract class NegotiationTestBase {
     protected Negotiation createNegotiation(Quote quote, User buyer, User seller,
                                             String title, LocalDateTime updatedAt) {
 
-        Negotiation negotiation = new Negotiation("QUOTE", quote, null, buyer, seller, title);
+        Negotiation negotiation = new Negotiation("QUOTE", quote, null, buyer.getUserId(), seller.getUserId(), title);
 
         em.persist(negotiation);
         em.flush();

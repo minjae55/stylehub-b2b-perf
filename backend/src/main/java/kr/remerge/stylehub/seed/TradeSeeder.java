@@ -153,8 +153,8 @@ public class TradeSeeder {
                     "QUOTE",
                     quote,
                     null,
-                    quote.getBuyer(),
-                    quote.getSeller(),
+                    quote.getBuyer().getUserId(),
+                    quote.getSeller().getUserId(),
                     quote.getProductName() + " 견적 협의"
             ));
         }
