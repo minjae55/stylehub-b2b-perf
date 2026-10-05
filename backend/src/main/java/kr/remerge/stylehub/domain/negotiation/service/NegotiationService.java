@@ -28,6 +28,7 @@ import kr.remerge.stylehub.domain.quote.repository.QuoteItemRepository;
 import kr.remerge.stylehub.domain.quote.repository.QuoteRepository;
 import kr.remerge.stylehub.domain.quote.service.QuoteService;
 import kr.remerge.stylehub.domain.user.entity.User;
+import kr.remerge.stylehub.domain.user.repository.UserRepository;
 import kr.remerge.stylehub.domain.user.support.UserReader;
 import kr.remerge.stylehub.global.common.ImageUploadService;
 import kr.remerge.stylehub.global.exception.BusinessException;
@@ -67,6 +68,7 @@ public class NegotiationService {
     private final QuoteService quoteService;
     private final ContractService contractService;
     private final UserReader userReader;
+    private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final OrderLogRepository orderLogRepository;
     private final ImageUploadService imageUploadService;
@@ -110,10 +112,24 @@ public class NegotiationService {
         Map<Integer, Order> sampleOrderByNegotiationId =
                 buildSampleOrderByNegotiationIdMap(negotiations, allRequests);
 
+        Set<Integer> userIds = new HashSet<>();
+        for (Negotiation negotiation : negotiations) {
+            userIds.add(negotiation.getBuyerId());
+            userIds.add(negotiation.getSellerId());
+            if (negotiation.getAdminId() != null) {
+                userIds.add(negotiation.getAdminId());
+            }
+        }
+
+        Map<Integer, String> userNameById = new HashMap<>();
+        userRepository.findAllById(userIds)
+                .forEach(user -> userNameById.put(user.getUserId(), user.getName()));
+
         return negotiations.stream()
                 .map(negotiation ->
                         NegotiationListResponse.from(
                                 negotiation,
+                                userNameById,
                                 latestRequestByNegotiationId.get(
                                         negotiation.getNegotiationId()
                                 ),
@@ -210,8 +226,8 @@ public class NegotiationService {
                 .filter(negotiation -> negotiation.getQuote() != null)
                 .collect(Collectors.groupingBy(negotiation ->
                         negotiation.getQuote().getQuoteId()
-                                + ":" + negotiation.getBuyer().getUserId()
-                                + ":" + negotiation.getSeller().getUserId()
+                                + ":" + negotiation.getBuyerId()
+                                + ":" + negotiation.getSellerId()
                 ));
 
         Map<Integer, Integer> linkedIdByNegotiationId = new HashMap<>();
@@ -263,10 +279,9 @@ public class NegotiationService {
         Quote rootQuote = resolveRootQuote(quote);
 
         User buyer = userReader.getUser(userId);
-        User seller = userReader.getUser(quote.getSeller().getUserId());
 
         Negotiation negotiation = negotiationRepository
-                .findFirstByQuote_QuoteIdAndBuyer_UserIdOrderByOpenedAtDesc(
+                .findFirstByQuote_QuoteIdAndBuyerIdOrderByOpenedAtDesc(
                         rootQuote.getQuoteId(),
                         userId
                 )
@@ -276,8 +291,8 @@ public class NegotiationService {
                                         "QUOTE",
                                         rootQuote,
                                         null,
-                                        buyer,
-                                        seller,
+                                        userId,
+                                        quote.getSeller().getUserId(),
                                         rootQuote.getProductName()
                                                 + " 견적 조건 협의"
                                 )
@@ -356,11 +371,8 @@ public class NegotiationService {
         Contract rootContract = resolveRootContract(contract);
 
         Quote quote = resolveRootQuote(rootContract.getQuote());
-        User buyer = userReader.getUser(userId);
-        User seller = userReader.getUser(quote.getSeller().getUserId());
-
         Negotiation negotiation = negotiationRepository
-                .findFirstByContract_ContractIdAndBuyer_UserIdOrderByOpenedAtDesc(
+                .findFirstByContract_ContractIdAndBuyerIdOrderByOpenedAtDesc(
                         rootContract.getContractId(),
                         userId
                 )
@@ -370,8 +382,8 @@ public class NegotiationService {
                                         "CONTRACT",
                                         quote,
                                         rootContract,
-                                        buyer,
-                                        seller,
+                                        userId,
+                                        quote.getSeller().getUserId(),
                                         (rootContract.getContractName() != null
                                                 ? rootContract.getContractName()
                                                 : quote.getProductName())
@@ -422,7 +434,7 @@ public class NegotiationService {
 
         Negotiation negotiation = negotiationRequest.getNegotiation();
 
-        if (!Objects.equals(negotiation.getSeller().getUserId(), sellerUserId)) {
+        if (!Objects.equals(negotiation.getSellerId(), sellerUserId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
@@ -529,7 +541,7 @@ public class NegotiationService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NEGOTIATION_REQUEST_NOT_FOUND));
 
         if (!Objects.equals(
-                negotiationRequest.getNegotiation().getBuyer().getUserId(),
+                negotiationRequest.getNegotiation().getBuyerId(),
                 buyerUserId
         )) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
@@ -546,8 +558,8 @@ public class NegotiationService {
         Negotiation negotiation = negotiationRepository.findById(negotiationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NEGOTIATION_NOT_FOUND));
 
-        boolean isParty = Objects.equals(negotiation.getBuyer().getUserId(), userId)
-                || Objects.equals(negotiation.getSeller().getUserId(), userId);
+        boolean isParty = Objects.equals(negotiation.getBuyerId(), userId)
+                || Objects.equals(negotiation.getSellerId(), userId);
 
         if (!isParty) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
@@ -581,10 +593,10 @@ public class NegotiationService {
                 "QUOTE".equals(negotiation.getNegotiationType()) ? "CONTRACT" : "QUOTE";
 
         return negotiationRepository
-                .findFirstByQuote_QuoteIdAndBuyer_UserIdAndSeller_UserIdAndNegotiationTypeOrderByOpenedAtDesc(
+                .findFirstByQuote_QuoteIdAndBuyerIdAndSellerIdAndNegotiationTypeOrderByOpenedAtDesc(
                         negotiation.getQuote().getQuoteId(),
-                        negotiation.getBuyer().getUserId(),
-                        negotiation.getSeller().getUserId(),
+                        negotiation.getBuyerId(),
+                        negotiation.getSellerId(),
                         otherType
                 );
     }
@@ -610,8 +622,8 @@ public class NegotiationService {
 
         Negotiation negotiation = negotiationRequest.getNegotiation();
 
-        boolean isParty = Objects.equals(negotiation.getBuyer().getUserId(), userId)
-                || Objects.equals(negotiation.getSeller().getUserId(), userId);
+        boolean isParty = Objects.equals(negotiation.getBuyerId(), userId)
+                || Objects.equals(negotiation.getSellerId(), userId);
 
         if (!isParty) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
@@ -646,8 +658,8 @@ public class NegotiationService {
 
         Negotiation negotiation = negotiationRequest.getNegotiation();
 
-        boolean isParty = Objects.equals(negotiation.getBuyer().getUserId(), userId)
-                || Objects.equals(negotiation.getSeller().getUserId(), userId);
+        boolean isParty = Objects.equals(negotiation.getBuyerId(), userId)
+                || Objects.equals(negotiation.getSellerId(), userId);
 
         if (!isParty) {
             throw new BusinessException(ErrorCode.FORBIDDEN);

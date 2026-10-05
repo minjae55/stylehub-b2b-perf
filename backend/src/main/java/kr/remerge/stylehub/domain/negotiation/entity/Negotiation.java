@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import kr.remerge.stylehub.domain.contract.entity.Contract;
 import kr.remerge.stylehub.domain.negotiation.dto.NegotiationCreateRequest;
 import kr.remerge.stylehub.domain.quote.entity.Quote;
-import kr.remerge.stylehub.domain.user.entity.User;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -40,17 +39,14 @@ public class Negotiation {
     @JoinColumn(name = "contract_id")
     private Contract contract;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "buyer_id", nullable = false)
-    private User buyer;
+    @Column(name = "buyer_id", nullable = false)
+    private Integer buyerId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "seller_id", nullable = false)
-    private User seller;
+    @Column(name = "seller_id", nullable = false)
+    private Integer sellerId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "admin_id")
-    private User admin;
+    @Column(name = "admin_id")
+    private Integer adminId;
 
     @Column(nullable = false, length = 30)
     private String status;
@@ -77,15 +73,15 @@ public class Negotiation {
             String negotiationType,
             Quote quote,
             Contract contract,
-            User buyer,
-            User seller,
+            Integer buyerId,
+            Integer sellerId,
             String title
     ) {
         this.negotiationType = negotiationType;
         this.quote = quote;
         this.contract = contract;
-        this.buyer = buyer;
-        this.seller = seller;
+        this.buyerId = buyerId;
+        this.sellerId = sellerId;
         this.title = title;
         this.status = "OPEN";
         this.openedAt = LocalDateTime.now();
@@ -111,8 +107,8 @@ public class Negotiation {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void assignAdmin(User admin) {
-        this.admin = admin;
+    public void assignAdmin(Integer adminId) {
+        this.adminId = adminId;
     }
 
     public void markRequested() {
