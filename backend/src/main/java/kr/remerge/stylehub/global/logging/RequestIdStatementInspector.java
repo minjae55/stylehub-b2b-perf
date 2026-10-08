@@ -16,6 +16,6 @@ public class RequestIdStatementInspector implements StatementInspector {
             return sql;
         }
 
-        return "/* requestId=" + id + " */ " + sql;
+        return "/* traceId=" + id + " */ " + sql;
     }
 }

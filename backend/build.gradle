@@ -39,6 +39,7 @@ dependencies {
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'    // Swagger UI 자동 생성
 
     implementation 'net.datafaker:datafaker:2.4.2'
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
 
     // ── 서명 전용  ───────────────────────────
     implementation 'com.itextpdf:kernel:9.6.0'
