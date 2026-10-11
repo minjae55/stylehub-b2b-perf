@@ -1,0 +1,29 @@
+services:
+  mysqld-exporter:
+    image: prom/mysqld-exporter
+    command:
+      - "--config.my-cnf=/etc/mysqld-exporter/.my.cnf"
+      - "--mysqld.address=host.docker.internal:3308"
+    volumes:
+      - ./.my.cnf:/etc/mysqld-exporter/.my.cnf:ro
+    ports:
+      - "9104:9104"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  grafana-data:
