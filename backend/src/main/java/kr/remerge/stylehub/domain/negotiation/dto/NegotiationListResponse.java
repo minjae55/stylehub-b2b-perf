@@ -5,6 +5,7 @@ import kr.remerge.stylehub.domain.negotiation.entity.NegotiationRequest;
 import kr.remerge.stylehub.domain.order.entity.Order;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 public record NegotiationListResponse(
 
@@ -28,11 +29,7 @@ public record NegotiationListResponse(
         LocalDateTime updatedAt,
         LocalDateTime agreedAt,
         LocalDateTime closedAt,
-        // 같은 딜의 다른 타입(QUOTE<->CONTRACT) 협의가 있으면 그 negotiationId.
-        // 화면에서 두 협의를 하나의 연속된 대화로 묶어 보여줄 때 사용한다.
         Integer linkedNegotiationId,
-        // 이 협의(quote)로 이미 샘플 주문이 생성됐다면 그 주문 정보. 협의 목록에서
-        // "샘플 결제/주문 진행 상황"을 배지로 보여주고 주문관리 화면으로 링크하기 위함.
         Integer sampleOrderId,
         String sampleOrderNo,
         String sampleOrderStatus
@@ -40,6 +37,7 @@ public record NegotiationListResponse(
 
     public static NegotiationListResponse from(
             Negotiation negotiation,
+            Map<Integer, String> userNameById,
             NegotiationRequest latestRequest,
             Integer linkedNegotiationId,
             Order sampleOrder
@@ -48,8 +46,8 @@ public record NegotiationListResponse(
         return new NegotiationListResponse(
                 negotiation.getNegotiationId(),
                 negotiation.getNegotiationType(),
-                negotiation.getBuyer().getUserId(),
-                negotiation.getSeller().getUserId(),
+                negotiation.getBuyerId(),
+                negotiation.getSellerId(),
                 negotiation.getQuote() == null
                         ? null
                         : negotiation.getQuote().getQuoteId(),
@@ -62,11 +60,11 @@ public record NegotiationListResponse(
                 negotiation.getQuote() == null
                         ? null
                         : negotiation.getQuote().getProductName(),
-                negotiation.getBuyer().getName(),
-                negotiation.getSeller().getName(),
-                negotiation.getAdmin() == null
+                userNameById.get(negotiation.getBuyerId()),
+                userNameById.get(negotiation.getSellerId()),
+                negotiation.getAdminId() == null
                         ? null
-                        : negotiation.getAdmin().getName(),
+                        : userNameById.get(negotiation.getAdminId()),
                 negotiation.getStatus(),
                 negotiation.getTitle(),
                 latestRequest == null

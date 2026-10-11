@@ -29,19 +29,19 @@ public interface NegotiationRepository extends JpaRepository<Negotiation, Intege
     );
 
     Optional<Negotiation>
-    findFirstByQuote_QuoteIdAndBuyer_UserIdOrderByOpenedAtDesc(
+    findFirstByQuote_QuoteIdAndBuyerIdOrderByOpenedAtDesc(
             Integer quoteId,
             Integer buyerId
     );
 
     Optional<Negotiation>
-    findFirstByContract_ContractIdAndBuyer_UserIdOrderByOpenedAtDesc(
+    findFirstByContract_ContractIdAndBuyerIdOrderByOpenedAtDesc(
             Integer contractId,
             Integer buyerId
     );
 
     Optional<Negotiation>
-    findFirstByQuote_QuoteIdAndBuyer_UserIdAndSeller_UserIdAndNegotiationTypeOrderByOpenedAtDesc(
+    findFirstByQuote_QuoteIdAndBuyerIdAndSellerIdAndNegotiationTypeOrderByOpenedAtDesc(
             Integer quoteId,
             Integer buyerId,
             Integer sellerId,
@@ -50,9 +50,8 @@ public interface NegotiationRepository extends JpaRepository<Negotiation, Intege
 
     @Query("""
             SELECT n FROM Negotiation n
-            JOIN FETCH n.buyer b
-            JOIN FETCH n.seller s
             LEFT JOIN FETCH n.quote q
+            JOIN User b ON b.userId = n.buyerId
             WHERE b.company.companyId = :buyerCompanyId
               AND n.status IN :statuses
               AND (:role = 'PRESIDENT' OR b.userId = :userId)
@@ -68,7 +67,7 @@ public interface NegotiationRepository extends JpaRepository<Negotiation, Intege
 
     @Query("""
             SELECT COUNT(n) FROM Negotiation n
-            JOIN n.buyer b
+            JOIN User b ON b.userId = n.buyerId
             WHERE b.company.companyId = :buyerCompanyId
               AND n.status IN :statuses
               AND (:role = 'PRESIDENT' OR b.userId = :userId)
@@ -83,10 +82,10 @@ public interface NegotiationRepository extends JpaRepository<Negotiation, Intege
     @Query("""
             SELECT n FROM Negotiation n
             LEFT JOIN FETCH n.quote q
-            JOIN FETCH n.buyer b
-            WHERE n.seller.company.companyId = :sellerCompanyId
+            JOIN User s ON s.userId = n.sellerId
+            WHERE s.company.companyId = :sellerCompanyId
               AND n.status IN :statuses
-              AND (:role = 'PRESIDENT' OR n.seller.userId = :sellerUserId)
+              AND (:role = 'PRESIDENT' OR s.userId = :sellerUserId)
             ORDER BY n.updatedAt DESC
             """)
     List<Negotiation> findTop5SellerNegotiations(
