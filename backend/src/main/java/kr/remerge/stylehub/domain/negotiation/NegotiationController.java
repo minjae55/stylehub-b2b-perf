@@ -6,6 +6,7 @@ import kr.remerge.stylehub.domain.negotiation.dto.NegotiationFileResponse;
 import kr.remerge.stylehub.domain.negotiation.dto.NegotiationListResponse;
 import kr.remerge.stylehub.domain.negotiation.dto.NegotiationRequestDetailResponse;
 import kr.remerge.stylehub.domain.negotiation.dto.NegotiationRespondRequest;
+import kr.remerge.stylehub.domain.negotiation.service.NegotiationQueryFacade;
 import kr.remerge.stylehub.domain.negotiation.service.NegotiationService;
 import kr.remerge.stylehub.global.auth.dto.login.AuthUser;
 import kr.remerge.stylehub.global.auth.security.LoginUser;
@@ -23,6 +24,7 @@ import java.util.List;
 public class NegotiationController {
 
     private final NegotiationService negotiationService;
+    private final NegotiationQueryFacade negotiationQueryFacade;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<NegotiationListResponse>>> getNegotiationList(
@@ -32,7 +34,7 @@ public class NegotiationController {
     ) {
 
         List<NegotiationListResponse> responses =
-                negotiationService.getNegotiationList(authUser.userId(), page, size);
+                negotiationQueryFacade.getNegotiationList(authUser.userId(), page, size);
 
         return ResponseEntity.ok(ApiResponse.success(responses));
 

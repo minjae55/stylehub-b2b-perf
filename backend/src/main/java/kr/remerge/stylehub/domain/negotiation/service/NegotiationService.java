@@ -9,6 +9,7 @@ import kr.remerge.stylehub.domain.negotiation.dto.NegotiationFileResponse;
 import kr.remerge.stylehub.domain.negotiation.dto.NegotiationListResponse;
 import kr.remerge.stylehub.domain.negotiation.dto.NegotiationRequestDetailResponse;
 import kr.remerge.stylehub.domain.negotiation.dto.NegotiationRespondRequest;
+import kr.remerge.stylehub.domain.negotiation.dto.event.NegotiationChangedEvent;
 import kr.remerge.stylehub.domain.negotiation.entity.Negotiation;
 import kr.remerge.stylehub.domain.negotiation.entity.NegotiationFile;
 import kr.remerge.stylehub.domain.negotiation.entity.NegotiationRequest;
@@ -34,6 +35,7 @@ import kr.remerge.stylehub.global.common.ImageUploadService;
 import kr.remerge.stylehub.global.exception.BusinessException;
 import kr.remerge.stylehub.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -72,6 +74,7 @@ public class NegotiationService {
     private final OrderRepository orderRepository;
     private final OrderLogRepository orderLogRepository;
     private final ImageUploadService imageUploadService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public List<NegotiationListResponse> getNegotiationList(Integer userId, int page, int size) {
 
@@ -261,6 +264,7 @@ public class NegotiationService {
         } else {
             createQuoteNegotiation(userId, request);
         }
+
     }
 
     private void createQuoteNegotiation(Integer userId, NegotiationCreateRequest request) {
@@ -345,6 +349,11 @@ public class NegotiationService {
                         )
                 )
         );
+
+        eventPublisher.publishEvent(
+                new NegotiationChangedEvent(negotiation.getBuyerId(),
+                        negotiation.getSellerId())
+        );
     }
 
     private Quote resolveRootQuote(Quote quote) {
@@ -419,6 +428,10 @@ public class NegotiationService {
         );
 
         negotiation.markRequested();
+
+        eventPublisher.publishEvent(
+                new NegotiationChangedEvent(negotiation.getBuyerId(), negotiation.getSellerId())
+        );
     }
 
     @Transactional
@@ -500,7 +513,11 @@ public class NegotiationService {
             );
 
             negotiationRequest.respondWithQuote(revisedQuote, request.sellerMemo());
+
         }
+        eventPublisher.publishEvent(
+                new NegotiationChangedEvent(negotiation.getBuyerId(), negotiation.getSellerId())
+        );
     }
 
 
@@ -519,6 +536,12 @@ public class NegotiationService {
         if (negotiationRequest.getRevisedQuote() != null) {
             negotiationRequest.getRevisedQuote().changeStatus(QuoteStatusCode.APPROVED);
         }
+
+        Negotiation negotiation = negotiationRequest.getNegotiation();
+
+        eventPublisher.publishEvent(
+                new NegotiationChangedEvent(negotiation.getBuyerId(), negotiation.getSellerId())
+        );
     }
 
     @Transactional
@@ -532,6 +555,11 @@ public class NegotiationService {
 
         negotiationRequest.cancel();
         negotiationRequest.getNegotiation().close();
+
+        Negotiation negotiation = negotiationRequest.getNegotiation();
+        eventPublisher.publishEvent(
+                new NegotiationChangedEvent(negotiation.getBuyerId(), negotiation.getSellerId())
+        );
     }
 
     private NegotiationRequest findRequestForBuyer(Integer buyerUserId, Integer negotiationRequestId) {
