@@ -21,22 +21,19 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 import java.time.Duration;
 
 @Configuration
-@EnableCaching  // @Cacheable 등 캐시 어노테이션 활성화
+@EnableCaching
 public class RedisConfig {
 
     public static final String NOTIFICATION_CHANNEL = "notification";
 
-    // RedisTemplate - 직접 Redis 조작할 때 사용 (예: JWT 블랙리스트, RefreshToken 저장)
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(factory);
 
-        // Key는 String으로 직렬화
         template.setKeySerializer(new StringRedisSerializer());
         template.setHashKeySerializer(new StringRedisSerializer());
 
-        // Value는 JSON으로 직렬화 (기본 JDK 직렬화는 사람이 읽기 어려움)
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.activateDefaultTyping(
                 LaissezFaireSubTypeValidator.instance,
@@ -51,12 +48,11 @@ public class RedisConfig {
         return template;
     }
 
-    // CacheManager - @Cacheable, @CacheEvict 등에서 사용
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory factory) {
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(30))           // 기본 캐시 TTL 30분
-                .disableCachingNullValues()                 // null은 캐싱 안 함
+                .entryTtl(Duration.ofMinutes(30))
+                .disableCachingNullValues()
                 .serializeKeysWith(
                         RedisSerializationContext.SerializationPair
                                 .fromSerializer(new StringRedisSerializer()))
@@ -69,8 +65,6 @@ public class RedisConfig {
                 .build();
     }
 
-    // 기존 RedisTemplate<String, Object> 유지하고
-// pub/sub용 listener container/adapter만 추가
 
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(
