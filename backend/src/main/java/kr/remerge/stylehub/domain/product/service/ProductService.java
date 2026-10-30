@@ -4,6 +4,8 @@ import kr.remerge.stylehub.domain.category.entity.Category;
 import kr.remerge.stylehub.domain.category.repository.CategoryRepository;
 import kr.remerge.stylehub.domain.company.entity.Brand;
 import kr.remerge.stylehub.domain.company.repository.BrandRepository;
+import kr.remerge.stylehub.domain.product.cache.ProductNewCache;
+import kr.remerge.stylehub.domain.product.cache.ProductNewLocalCache;
 import kr.remerge.stylehub.domain.product.dto.ProductDto;
 import kr.remerge.stylehub.domain.product.entity.Product;
 import kr.remerge.stylehub.domain.product.entity.ProductCertification;
@@ -43,6 +45,8 @@ public class ProductService {
     private final ProductOptionValueRepository productOptionValueRepository;
     private final ProductImageRepository productImageRepository;
     private final ProductCertificationRepository productCertificationRepository;
+    private final ProductNewCache productNewCache;
+    private final ProductNewLocalCache productNewLocalCache;
 
     // [CREATE] 상품 등록
     @Transactional
@@ -144,6 +148,9 @@ public class ProductService {
             }
         }
 
+        productNewCache.evict();
+        productNewLocalCache.evict();
+
         return ProductDto.DetailResponse.from(savedProduct, savedCertifications);
     }
 
@@ -185,17 +192,24 @@ public class ProductService {
                 .toList();
     }
 
-    // [READ] 신규 상품 (최근 등록순 6개)
-    // [READ] 신규 상품 (최근 등록순 18개 - 6열 x 3줄)
     public List<ProductDto.SummaryResponse> getNewProducts() {
-        return productRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
-                .stream()
-                .limit(18)
-                .map(ProductDto.SummaryResponse::from)
-                .toList();
+        return productNewLocalCache.getOrLoad(this::loadNewProducts);
     }
 
-    // [READ] 인기 상품 (7일 내 조회수 높은 순 5개)
+    private List<ProductDto.SummaryResponse> loadNewProducts() {
+        return productNewCache.get().orElseGet(() -> {
+            List<ProductDto.SummaryResponse> result =
+                    productRepository.findTop18ByOrderByCreatedAtDesc()
+                            .stream()
+                            .map(ProductDto.SummaryResponse::from)
+                            .toList();
+            productNewCache.put(result);
+            return result;
+        });
+    }
+
+    // [READ] 인기 상품 (7일 내 조회수 높은 순 5
+    // 개)
     public List<ProductDto.SummaryResponse> getPopularProducts() {
         LocalDateTime since = LocalDateTime.now().minusDays(7);
         return productRepository.findTop5ByViewCountSince(since, PageRequest.of(0, 5))
@@ -300,6 +314,10 @@ public class ProductService {
         }
 
         List<ProductCertification> certifications = productCertificationRepository.findByProduct_ProductId(productId);
+
+        productNewCache.evict();
+        productNewLocalCache.evict();
+
         return ProductDto.DetailResponse.from(product, certifications);
     }
 
@@ -309,6 +327,9 @@ public class ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
         product.setActive(active);
+        productNewCache.evict();
+        productNewLocalCache.evict();
+
     }
 
     // [DELETE] 상품 삭제 (옵션/이미지/옵션값/인증서까지 함께 삭제)
@@ -335,5 +356,9 @@ public class ProductService {
             // 주문/장바구니 등에서 이 상품의 옵션을 참조 중이면 FK 제약으로 삭제 불가
             throw new IllegalStateException("이미 주문된 이력이 있는 상품은 삭제할 수 없습니다. 판매 중지(숨김) 처리를 이용해 주세요.");
         }
+        productNewCache.evict();
+        productNewLocalCache.evict();
+
+
     }
 }

@@ -19,56 +19,59 @@ java {
 // 의존성을 다운로드할 저장소
 repositories {
 	mavenCentral()    // Maven 중앙 저장소 (기본 공개 저장소)
+    dependencies {
+        // ── 핵심 스타터 (컴파일 + 런타임 모두 포함) ──────────────────────────────
+        implementation 'org.springframework.boot:spring-boot-starter-data-jpa'       // JPA/Hibernate ORM + 트랜잭션 관리
+        implementation 'org.springframework.boot:spring-boot-starter-data-redis'     // Redis 연동 (캐시, 세션 등)
+        implementation 'org.springframework.boot:spring-boot-starter-security'       // Spring Security (인증·인가)
+        implementation 'org.springframework.boot:spring-boot-starter-validation'     // Bean Validation (@NotNull, @Size 등 입력값 검증)
+        implementation 'org.springframework.boot:spring-boot-starter-web'            // Spring MVC + 내장 Tomcat (REST API 서버)
+        implementation 'org.springframework.boot:spring-boot-starter-websocket'      // WebSocket 지원 (실시간 양방향 통신)
+        implementation 'org.springframework.boot:spring-boot-starter-actuator'       // 헬스체크·메트릭 엔드포인트 (/actuator/health 등) - 운영 모니터링 필수
+        implementation 'io.jsonwebtoken:jjwt-api:0.12.7'                             // JWT 생성·파싱 API (버전 명시 필요 - BOM 미포함)
+        implementation 'org.mapstruct:mapstruct:1.6.3'                              // MapStruct - Entity ↔ DTO 변환 구현체 자동 생성
+        implementation 'org.springframework.boot:spring-boot-starter-webflux'
+        implementation 'net.nurigo:sdk:4.3.2'                                        // CoolSMS(누리고) SDK
+        implementation 'org.springframework.boot:spring-boot-starter-mail'
+        implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+        implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'    // Swagger UI 자동 생성
+
+        implementation 'net.datafaker:datafaker:2.4.2'
+        implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+
+        // ── 자바용 인메모리 캐시  ───────────────────────────
+        implementation 'com.github.ben-manes.caffeine:caffeine'
+
+        // ── 서명 전용  ───────────────────────────
+        implementation 'com.itextpdf:kernel:9.6.0'
+        implementation 'com.itextpdf:layout:9.6.0'
+
+        // ── 컴파일 타임 전용 (런타임 jar에 포함 안 됨) ───────────────────────────
+        compileOnly 'org.projectlombok:lombok'                   // Lombok - @Getter/@Setter/@Builder 등 보일러플레이트 코드 자동 생성
+
+        // ── 개발 환경 전용 (운영 배포 시 제외됨) ────────────────────────────────
+        developmentOnly 'org.springframework.boot:spring-boot-devtools'              // 코드 변경 시 자동 재시작, 라이브 리로드 (개발 편의)
+
+        // ── 런타임 전용 (컴파일엔 불필요, 실행 시 필요) ─────────────────────────
+        runtimeOnly 'com.mysql:mysql-connector-j'                // MySQL JDBC 드라이버
+        runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.7'          // JWT 내부 구현체
+        runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.7'       // JWT ↔ JSON 직렬화 (Jackson 연동)
+
+        // ── 어노테이션 프로세서 (컴파일 시 코드 생성) ───────────────────────────
+        // 순서 중요 - Lombok → lombok-mapstruct-binding → MapStruct 순서 지켜야 함
+        annotationProcessor 'org.projectlombok:lombok'                        // Lombok 어노테이션 처리기 (compileOnly와 세트)
+        annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'  // Lombok @Builder와 MapStruct 충돌 방지 바인딩
+        annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'          // MapStruct 매퍼 구현체 자동 생성
+
+        // ── 테스트 전용 ──────────────────────────────────────────────────────────
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'       // JUnit 5, Mockito, AssertJ 등 테스트 도구 모음
+        testImplementation 'org.springframework.security:spring-security-test'       // Security 계층 테스트 지원 (@WithMockUser 등)
+        testCompileOnly 'org.projectlombok:lombok'               // 테스트 코드에서 Lombok 사용
+        testAnnotationProcessor 'org.projectlombok:lombok'       // 테스트 코드 Lombok 어노테이션 처리기
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'                 // JUnit 플랫폼 런처 (Gradle 테스트 실행 엔진)
+    }
 }
 
-dependencies {
-	// ── 핵심 스타터 (컴파일 + 런타임 모두 포함) ──────────────────────────────
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'       // JPA/Hibernate ORM + 트랜잭션 관리
-	implementation 'org.springframework.boot:spring-boot-starter-data-redis'     // Redis 연동 (캐시, 세션 등)
-	implementation 'org.springframework.boot:spring-boot-starter-security'       // Spring Security (인증·인가)
-	implementation 'org.springframework.boot:spring-boot-starter-validation'     // Bean Validation (@NotNull, @Size 등 입력값 검증)
-	implementation 'org.springframework.boot:spring-boot-starter-web'            // Spring MVC + 내장 Tomcat (REST API 서버)
-	implementation 'org.springframework.boot:spring-boot-starter-websocket'      // WebSocket 지원 (실시간 양방향 통신)
-	implementation 'org.springframework.boot:spring-boot-starter-actuator'       // 헬스체크·메트릭 엔드포인트 (/actuator/health 등) - 운영 모니터링 필수
-	implementation 'io.jsonwebtoken:jjwt-api:0.12.7'                             // JWT 생성·파싱 API (버전 명시 필요 - BOM 미포함)
-	implementation 'org.mapstruct:mapstruct:1.6.3'                              // MapStruct - Entity ↔ DTO 변환 구현체 자동 생성
-	implementation 'org.springframework.boot:spring-boot-starter-webflux'
-	implementation 'net.nurigo:sdk:4.3.2'                                        // CoolSMS(누리고) SDK
-	implementation 'org.springframework.boot:spring-boot-starter-mail'
-	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'    // Swagger UI 자동 생성
-
-    implementation 'net.datafaker:datafaker:2.4.2'
-    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
-
-    // ── 서명 전용  ───────────────────────────
-    implementation 'com.itextpdf:kernel:9.6.0'
-    implementation 'com.itextpdf:layout:9.6.0'
-
-	// ── 컴파일 타임 전용 (런타임 jar에 포함 안 됨) ───────────────────────────
-	compileOnly 'org.projectlombok:lombok'                   // Lombok - @Getter/@Setter/@Builder 등 보일러플레이트 코드 자동 생성
-
-	// ── 개발 환경 전용 (운영 배포 시 제외됨) ────────────────────────────────
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'              // 코드 변경 시 자동 재시작, 라이브 리로드 (개발 편의)
-
-	// ── 런타임 전용 (컴파일엔 불필요, 실행 시 필요) ─────────────────────────
-	runtimeOnly 'com.mysql:mysql-connector-j'                // MySQL JDBC 드라이버
-	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.7'          // JWT 내부 구현체
-	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.7'       // JWT ↔ JSON 직렬화 (Jackson 연동)
-
-	// ── 어노테이션 프로세서 (컴파일 시 코드 생성) ───────────────────────────
-	// 순서 중요 - Lombok → lombok-mapstruct-binding → MapStruct 순서 지켜야 함
-	annotationProcessor 'org.projectlombok:lombok'                        // Lombok 어노테이션 처리기 (compileOnly와 세트)
-	annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'  // Lombok @Builder와 MapStruct 충돌 방지 바인딩
-	annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'          // MapStruct 매퍼 구현체 자동 생성
-
-	// ── 테스트 전용 ──────────────────────────────────────────────────────────
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'       // JUnit 5, Mockito, AssertJ 등 테스트 도구 모음
-	testImplementation 'org.springframework.security:spring-security-test'       // Security 계층 테스트 지원 (@WithMockUser 등)
-	testCompileOnly 'org.projectlombok:lombok'               // 테스트 코드에서 Lombok 사용
-	testAnnotationProcessor 'org.projectlombok:lombok'       // 테스트 코드 Lombok 어노테이션 처리기
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'                 // JUnit 플랫폼 런처 (Gradle 테스트 실행 엔진)
-}
 
 // 테스트 실행 설정
 tasks.named('test') {

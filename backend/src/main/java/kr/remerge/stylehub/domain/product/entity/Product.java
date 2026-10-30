@@ -13,7 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "products")
+@Table(name = "products", indexes = {
+        @Index(name = "idx_products_created_at", columnList = "created_at")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -126,6 +128,7 @@ public class Product extends BaseEntity {
         if (request.sampleAvailable() != null) this.sampleAvailable = request.sampleAvailable();
         if (request.whiteLabel() != null) this.whiteLabel = request.whiteLabel();
     }
+
     public void increaseViewCount() {
         this.viewCount = (this.viewCount == null ? 0 : this.viewCount) + 1;
     }

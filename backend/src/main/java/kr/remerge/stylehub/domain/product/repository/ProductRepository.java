@@ -20,10 +20,9 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     // 브랜드별 상품 목록
     List<Product> findByBrand_BrandId(Integer brandId);
 
-    // 신규 상품 (최근 등록순 6개)
-    List<Product> findTop6ByOrderByCreatedAtDesc();
-
     // 인기 상품 (7일 내 조회수 높은 순 5개)
     @Query("SELECT p FROM Product p WHERE p.createdAt >= :since ORDER BY p.viewCount DESC")
     List<Product> findTop5ByViewCountSince(@Param("since") LocalDateTime since, Pageable pageable);
+
+    List<Product> findTop18ByOrderByCreatedAtDesc();
 }
