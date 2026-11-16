@@ -7,10 +7,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-// 협의 요청(NegotiationRequest)에 대한 셀러 응답 값.
-// negotiationType이 QUOTE면 견적 관련 필드를, CONTRACT면 계약 관련 필드를 사용한다.
-// 두 타입이 서로 다른 필드 집합을 쓰기 때문에 필수 검증은 NegotiationService에서
-// negotiationType에 따라 분기해서 수행한다.
 public record NegotiationRespondRequest(
 
         @Size(max = 2000, message = "셀러 메모는 2,000자 이하로 입력해주세요.")

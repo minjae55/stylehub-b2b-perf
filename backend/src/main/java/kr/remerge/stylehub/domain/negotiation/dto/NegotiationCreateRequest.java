@@ -5,8 +5,6 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
-// negotiationType이 QUOTE면 quoteId, CONTRACT면 contractId가 필요하다.
-// 둘 중 하나만 오기 때문에 @NotNull은 걸지 않고 NegotiationService에서 타입별로 검증한다.
 public record NegotiationCreateRequest(
 
         @Positive

@@ -9,8 +9,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-// 협의 스레드의 라운드 하나(제안 -> 셀러 응답)를 나타낸다.
-// negotiationType이 QUOTE면 requestedQuote/revisedQuote가, CONTRACT면 requestedContract/revisedContract가 채워진다.
 public record NegotiationRequestDetailResponse(
         Integer negotiationRequestId,
         String status,
