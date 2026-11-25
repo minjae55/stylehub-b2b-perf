@@ -1,0 +1,9 @@
+{
+  "project": "stylehub-b2b-perf",
+  "source": "README.md 목표 기준치",
+  "targets": [
+    {"api": "GET /api/negotiations", "name": "협의 목록 조회", "p95_ms": 300, "error_rate": 0.01},
+    {"api": "POST /api/buyer/orders", "name": "주문 생성", "p95_ms": 800, "error_rate": 0.01},
+    {"api": "POST /api/v1/payments/confirm", "name": "결제 confirm", "p95_ms": 1500, "error_rate": 0.01}
+  ]
+}

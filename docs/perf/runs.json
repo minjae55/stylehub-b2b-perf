@@ -1,0 +1,13 @@
+{
+  "project": "stylehub-b2b-perf",
+  "note": "측정할 때마다 한 줄씩 추가한다. kind: load(일반 부하, 목표 판정에 사용) / stress(한계 시험) / fault(일부러 장애를 넣은 시험)",
+  "runs": [
+    {"time": "2026-11-25T21:16:32+09:00", "api": "GET /api/negotiations", "scenario": "k6/negotiation-list-warm.js (200명, 1초 간격)", "kind": "load", "p95_ms": 26.3, "max_ms": 1490, "error_rate": 0, "requests": 6054},
+    {"time": "2026-11-25T21:17:43+09:00", "api": "GET /api/negotiations", "scenario": "pool-exhaust.js (300명, 대기 없음, 페이지 0~19)", "kind": "stress", "p95_ms": 997.3, "max_ms": 3080, "error_rate": 0, "requests": 82856},
+    {"time": "2026-11-25T21:41:26+09:00", "api": "GET /api/buyer/orders", "scenario": "buyer-order-list.js (5명, 인덱스 정상)", "kind": "load", "p95_ms": 770.4, "max_ms": 891.9, "error_rate": 0, "requests": 165},
+    {"time": "2026-11-25T21:44:05+09:00", "api": "GET /api/buyer/orders", "scenario": "buyer-order-list.js (5명, 인덱스 숨김)", "kind": "fault", "p95_ms": 7840, "max_ms": 7880, "error_rate": 0, "requests": 75},
+    {"time": "2026-11-25T21:56:07+09:00", "api": "GET /api/buyer/orders", "scenario": "buyer-order-list.js (5명, 인덱스 숨김, 재시험)", "kind": "fault", "p95_ms": 3700, "max_ms": 3770, "error_rate": 0, "requests": 90},
+    {"time": "2026-11-25T22:35:01+09:00", "api": "GET /api/negotiations", "scenario": "k6/negotiation-cache-expiry.js (500명) · TTL 고정", "kind": "load", "p95_ms": 62.6, "max_ms": 1126.5, "error_rate": 0, "requests": 74812},
+    {"time": "2026-11-25T22:46:29+09:00", "api": "GET /api/negotiations", "scenario": "k6/negotiation-cache-expiry.js (500명) · TTL jitter", "kind": "load", "p95_ms": 36.4, "max_ms": 321.5, "error_rate": 0.000013, "requests": 75223}
+  ]
+}
