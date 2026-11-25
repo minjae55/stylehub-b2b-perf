@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Component
 @Slf4j
@@ -18,7 +19,9 @@ import java.util.Optional;
 public class NegotiationListCache {
 
     private static final String KEY_PREFIX = "negotiationList:";
-    private static final Duration TTL = Duration.ofSeconds(60);
+    private static final Duration BASE_TTL = Duration.ofSeconds(60);
+    // 같은 시각에 채워진 키들이 한꺼번에 만료되지 않도록 TTL에 0~30초를 무작위로 더함
+    private static final long JITTER_SECONDS = 30;
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
@@ -61,7 +64,8 @@ public class NegotiationListCache {
             Long ttl = redis.getExpire(key);
 
             if (ttl == null || ttl < 0) {
-                redis.expire(key, TTL);
+                long jitter = ThreadLocalRandom.current().nextLong(JITTER_SECONDS + 1);
+                redis.expire(key, BASE_TTL.plusSeconds(jitter));
             }
 
         } catch (Exception e) {
