@@ -1,0 +1,64 @@
+{
+  "id": "2026-11-25-negotiation-cache-ttl-jitter",
+  "title": "협의 목록 캐시 동시 만료 개선 (TTL jitter)",
+  "plain_summary": "캐시가 60초마다 한꺼번에 사라져 DB에 요청이 몰리던 문제를, 만료 시각을 60~90초 사이로 흩어 해결함",
+  "change": "NegotiationListCache TTL 60초 고정 → 60초 + 0~30초 무작위",
+  "scenario": "k6/negotiation-cache-expiry.js: 사용자 500명, 첫 페이지만 1초 간격 조회, 150초. 시작 시 모든 캐시를 같은 순간에 채움",
+  "results": [
+    {
+      "metric": "5초 구간 p95 최대",
+      "unit": "ms",
+      "before": 392,
+      "after": 125,
+      "lower_is_better": true
+    },
+    {
+      "metric": "커넥션 대기 (최대)",
+      "unit": "건",
+      "before": 88.0,
+      "after": 0.0,
+      "lower_is_better": true
+    },
+    {
+      "metric": "커넥션 획득 대기 (최대 평균)",
+      "unit": "ms",
+      "before": 257,
+      "after": 5.8,
+      "lower_is_better": true
+    },
+    {
+      "metric": "스레드 덤프 중 커넥션 대기 스레드 (최대)",
+      "unit": "개",
+      "before": 31,
+      "after": 0,
+      "lower_is_better": true
+    },
+    {
+      "metric": "최대 응답 시간 (k6)",
+      "unit": "ms",
+      "before": 1126.5,
+      "after": 321.5,
+      "lower_is_better": true
+    },
+    {
+      "metric": "전체 p95 (k6)",
+      "unit": "ms",
+      "before": 62.6,
+      "after": 36.4,
+      "lower_is_better": true
+    }
+  ],
+  "requests": {
+    "before": 74812,
+    "after": 75223
+  },
+  "errors": {
+    "before": 0,
+    "after": 1,
+    "note": "after의 1건은 측정 시작 직후 22:46:29 로컬 연결 재설정(connection reset)으로, 캐시와 무관"
+  },
+  "limits": [
+    "처음 캐시가 비어 있을 때의 몰림(콜드 스타트)은 줄지 않음 (두 측정 모두 시작 시 MySQL 초당 600~800 쿼리)",
+    "로컬 단일 서버, k6와 앱이 같은 PC에서 실행됨"
+  ]
+}
